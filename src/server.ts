@@ -110,6 +110,10 @@ class QAUseMcpServer {
                   type: 'string',
                   description: 'The testing task description',
                 },
+                dependencyId: {
+                  type: 'string',
+                  description: 'Optional test ID that this session depends on',
+                },
               },
               required: ['url', 'task'],
             },
@@ -175,6 +179,28 @@ class QAUseMcpServer {
               required: ['sessionId', 'action'],
             },
           },
+          {
+            name: 'search_automated_tests',
+            description: 'Search and list all automated tests',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
+          {
+            name: 'get_automated_test',
+            description: 'Get detailed information about a specific automated test',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                testId: {
+                  type: 'string',
+                  description: 'The test ID to retrieve',
+                },
+              },
+              required: ['testId'],
+            },
+          },
         ],
       };
     });
@@ -212,6 +238,14 @@ class QAUseMcpServer {
 
       if (name === 'send_message_to_qa_session') {
         return this.handleSendMessageToQaSession(params);
+      }
+
+      if (name === 'search_automated_tests') {
+        return this.handleSearchAutomatedTests(params);
+      }
+
+      if (name === 'get_automated_test') {
+        return this.handleGetAutomatedTest(params);
       }
 
       return {
@@ -466,9 +500,10 @@ After registration, you'll receive an API key that you can use in Option 1.`,
 
   private async handleStartQaSession(params: any): Promise<CallToolResult> {
     try {
-      const { url, task } = params as {
+      const { url, task, dependencyId } = params as {
         url: string;
         task: string;
+        dependencyId?: string;
       };
 
       if (!this.globalApiClient.getApiKey()) {
@@ -513,6 +548,7 @@ After registration, you'll receive an API key that you can use in Option 1.`,
           url,
           task,
           wsUrl,
+          dependencyId,
         });
 
         return {
@@ -753,6 +789,104 @@ Please provide your response below, and it will be automatically sent to the ses
           {
             type: 'text',
             text: `Failed to send message: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  private async handleSearchAutomatedTests(params: any): Promise<CallToolResult> {
+    try {
+      if (!this.globalApiClient.getApiKey()) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'API key not configured. Please run init_qa_server first with an API key.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const tests = await this.globalApiClient.listTests();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(tests, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to fetch tests: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to search tests: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  private async handleGetAutomatedTest(params: any): Promise<CallToolResult> {
+    try {
+      const { testId } = params as { testId: string };
+
+      if (!this.globalApiClient.getApiKey()) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'API key not configured. Please run init_qa_server first with an API key.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const test = await this.globalApiClient.getTest(testId);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(test, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to get test: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to get test: ${error instanceof Error ? error.message : 'Unknown error'}`,
           },
         ],
         isError: true,

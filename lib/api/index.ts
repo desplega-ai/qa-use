@@ -62,6 +62,21 @@ export interface RegisterResponse {
   apiKey?: string;
 }
 
+export interface AutomatedTest {
+  id: string;
+  name: string;
+  description?: string;
+  url?: string;
+  task?: string;
+  status?: string;
+  created_at: string;
+  updated_at?: string;
+  organization_id?: string;
+  app_config_id?: string;
+  dependency_test_ids?: string[];
+  metadata?: any;
+}
+
 export class ApiClient {
   private readonly client: AxiosInstance;
   private apiKey: string | null = null;
@@ -277,6 +292,69 @@ export class ApiClient {
         success: false,
         message: error instanceof Error ? error.message : 'Unknown error during registration',
       };
+    }
+  }
+
+  async listTests(): Promise<AutomatedTest[]> {
+    try {
+      const response: AxiosResponse = await this.client.get('/vibe-qa/tests');
+      return response.data.map((test: any) => ({
+        id: test.id,
+        name: test.name,
+        description: test.description,
+        url: test.url,
+        task: test.task,
+        status: test.status,
+        created_at: test.created_at,
+        updated_at: test.updated_at,
+        organization_id: test.organization_id,
+        app_config_id: test.app_config_id,
+        dependency_test_ids: test.dependency_test_ids,
+        metadata: test.metadata,
+      }));
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const statusCode = error.response?.status;
+        const errorData = error.response?.data;
+        throw new Error(
+          errorData?.message || errorData?.detail || `HTTP ${statusCode}: Failed to fetch tests`
+        );
+      }
+      throw new Error(error instanceof Error ? error.message : 'Unknown error fetching tests');
+    }
+  }
+
+  async getTest(testId: string): Promise<AutomatedTest> {
+    try {
+      const response: AxiosResponse = await this.client.get(`/vibe-qa/tests/${testId}`);
+      return {
+        id: response.data.id,
+        name: response.data.name,
+        description: response.data.description,
+        url: response.data.url,
+        task: response.data.task,
+        status: response.data.status,
+        created_at: response.data.created_at,
+        updated_at: response.data.updated_at,
+        organization_id: response.data.organization_id,
+        app_config_id: response.data.app_config_id,
+        dependency_test_ids: response.data.dependency_test_ids,
+        metadata: response.data.metadata,
+      };
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const statusCode = error.response?.status;
+        const errorData = error.response?.data;
+
+        if (statusCode === 404) {
+          throw new Error(`Test not found: ${testId}`);
+        }
+
+        throw new Error(
+          errorData?.message || errorData?.detail || `HTTP ${statusCode}: Failed to fetch test`
+        );
+      }
+      throw new Error(error instanceof Error ? error.message : 'Unknown error fetching test');
     }
   }
 }
