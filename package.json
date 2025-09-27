@@ -1,6 +1,6 @@
 {
   "name": "@desplega.ai/qa-use-mcp",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "MCP server for browser automation and QA testing",
   "type": "module",
   "main": "dist/src/index.js",
@@ -36,16 +36,16 @@
   "author": {
     "name": "tarasyarema",
     "email": "t@desplega.ai",
-    "url": "https://github.com/tarasyarema"
+    "url": "https://github.com/desplega-ai-use"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tarasyarema/qa-use-mcp.git"
+    "url": "https://github.com/desplega-ai/qa-use-mcp.git"
   },
-  "homepage": "https://github.com/tarasyarema/qa-use-mcp#readme",
+  "homepage": "https://github.com/desplega-ai/qa-use",
   "bugs": {
-    "url": "https://github.com/tarasyarema/qa-use-mcp/issues"
+    "url": "https://github.com/desplega-ai/qa-use/issues"
   },
   "publishConfig": {
     "access": "public"
