@@ -1,73 +1,105 @@
-# PRD: QA-Use
+# PRD: QA-Use MCP Server
 
 ## What is it?
-A CLI tool that connects local development environments to the desplega.ai platform for automated QA testing and monitoring.
+An **npx executable MCP server** that provides browser automation and QA testing capabilities through the Model Context Protocol. It exposes browser management, tunneling, and API connection functionalities to MCP clients like Claude.
+
+## Architecture
+- **MCP Server**: Implements the Model Context Protocol for tool-based interactions
+- **npx Executable**: Can be installed and run globally via `npx qa-use-mcp`
+- **Library Structure**: Core functionalities organized in `lib/` for reusability
+- **TypeScript + pnpm**: Modern build system with TypeScript and pnpm package manager
 
 ## Core Features
 
-### Browser Management
-- Spin up a local Playwright browser instance
-- Port forward the browser WebSocket endpoint using localtunnel
-- Provide remote access to the browser for automated testing
+### Browser Management (lib/browser)
+- Playwright browser instance management
+- Browser lifecycle control (start/stop/restart)
+- Browser session isolation and configuration
 
-### API Integration
-- Connect to desplega.ai API with authentication (API key required)
-- Establish WebSocket connection for real-time communication
-- Send/receive testing commands and results
-- Optional: Open registration page in browser if no API key configured
+### Tunneling (lib/tunnel)
+- Port forwarding using localtunnel
+- WebSocket endpoint exposure for remote access
+- Secure tunnel management and cleanup
 
-### Git Integration
-- Monitor local git repository for file changes
-- Generate AI-powered summaries of code changes
-- Automatically notify desplega.ai of relevant updates
+### API Integration (lib/api)
+- desplega.ai API connection and authentication
+- WebSocket communication for real-time updates
+- Session management and status reporting
 
-## User Flow
-1. User runs `qa-use init` to configure API credentials
-   - If no desplega.ai API key found, optionally opens `app.desplega.ai/register`
-   - Prompts for API keys (desplega.ai + AI provider)
-2. User runs `qa-use start` to begin monitoring
-3. Tool launches browser, establishes connections, and monitors git
-4. On file changes, tool summarizes changes and sends to desplega.ai
-5. desplega.ai can trigger tests via the exposed browser instance
+## MCP Tools
+
+The server exposes the following MCP tools:
+
+### 1. `init_qa_server`
+**Description**: Initialize QA server environment
+**Actions**:
+- Install Playwright browsers if needed
+- Validate API key configuration
+- Start browser forwarding setup
+
+### 2. `list_qa_sessions`
+**Description**: List all active QA testing sessions
+**Returns**: Array of session objects with status and metadata
+
+### 3. `get_qa_session`
+**Description**: Get detailed information about a specific QA session
+**Parameters**: `sessionId` (string)
+**Returns**: Session details including browser state, tunnel info, and logs
+
+### 4. `start_qa_session`
+**Description**: Start a new QA testing session
+**Returns**: Session ID and connection details
+
+### 5. `send_message_to_qa_session`
+**Description**: Send control messages to an active session
+**Parameters**:
+- `sessionId` (string)
+- `action` (enum): `pause`, `response`, `close`
+- `data` (optional): Additional message data
 
 ## Tech Stack
 
 ### Core Dependencies
-- **Node.js** - Runtime environment
-- **Playwright 1.55.0** - Browser automation and WebSocket management
-- **localtunnel** - Port forwarding for browser WebSocket endpoint
-- **tasuku** - Async task management and progress display
-- **ink** - Interactive CLI interface components
+- **@modelcontextprotocol/sdk** - MCP server implementation
+- **Playwright** - Browser automation
+- **localtunnel** - Port forwarding
+- **TypeScript** - Type safety and modern JS features
+- **pnpm** - Fast, efficient package manager
 
-### AI Integration
-- **Vercel AI SDK** - Unified interface for multiple AI providers
-- **Supported providers** (in order of priority):
-  1. OpenRouter API
-  2. OpenAI API
-  3. Anthropic API
-  4. Gemini API
+### Build System
+- **TypeScript Compiler** - Compilation to JavaScript
+- **pnpm scripts** - Build, dev, and packaging workflows
+- **ESM modules** - Modern module system
 
-### Additional Libraries
-- **chokidar** - File system monitoring for git changes
-- **ws** - WebSocket client for desplega.ai connection
-- **commander** - CLI argument parsing
+## Project Structure
+```
+qa-use-mcp/
+├── src/
+│   ├── index.ts          # MCP server entry point
+│   ├── server.ts         # Main MCP server implementation
+│   └── tools/            # MCP tool implementations
+├── lib/
+│   ├── browser/          # Browser management functionality
+│   ├── tunnel/           # Tunneling and port forwarding
+│   └── api/              # API connection and communication
+├── package.json          # pnpm configuration with bin entry
+├── tsconfig.json         # TypeScript configuration
+└── README.md             # Usage and setup instructions
+```
 
 ## Configuration
-- Config file: `~/.qa-use/config.json`
-- Required: API key for desplega.ai and chosen AI provider
-- Optional: Custom browser launch options, file watch patterns
+- Environment variables or config file for API keys
+- Runtime configuration for browser options
+- MCP server capabilities declaration
 
-### Environment Support
-- **Production**: `api.desplega.ai` (default)
-- **Local Development**: `localhost:3000` or custom endpoint
-- Registration URL: `app.desplega.ai/register`
+## Installation & Usage
+```bash
+# Install and run directly
+npx qa-use-mcp
 
-### API Configuration
-```json
-{
-  "apiUrl": "https://api.desplega.ai",
-  "apiKey": "your-api-key",
-  "aiProvider": "openrouter",
-  "aiApiKey": "your-ai-key"
-}
+# Or install globally
+npm install -g qa-use-mcp
+qa-use-mcp
 ```
+
+The server connects via stdio transport and exposes tools to MCP clients for browser automation and QA testing workflows.

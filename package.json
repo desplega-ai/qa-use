@@ -1,27 +1,55 @@
 {
-  "name": "qa-use",
-  "version": "1.0.0",
-  "description": "",
+  "name": "@desplega.ai/qa-use-mcp",
+  "version": "1.0.2",
+  "description": "MCP server for browser automation and QA testing",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/src/index.js",
   "bin": {
-    "qa-use": "dist/index.js"
+    "qa-use-mcp": "dist/src/index.js",
+    "desplega-qa": "dist/src/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "lib",
+    "README.md",
+    "server.json",
+    "LICENSE"
   ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
-    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\"",
-    "lint": "eslint \"src/**/*.{ts,tsx,js,jsx}\"",
-    "lint:fix": "eslint \"src/**/*.{ts,tsx,js,jsx}\" --fix",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "pnpm build && node dist/src/index.js",
+    "inspector": "pnpm build && npx -y @modelcontextprotocol/inspector node dist/src/index.js",
+    "inspector:env": "pnpm build && npx dotenv-cli -e .env -- npx -y @modelcontextprotocol/inspector node dist/src/index.js",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\" \"lib/**/*.{ts,tsx,js,jsx,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\" \"lib/**/*.{ts,tsx,js,jsx,json}\"",
+    "lint": "eslint \"src/**/*.{ts,tsx,js,jsx}\" \"lib/**/*.{ts,tsx,js,jsx}\"",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx,js,jsx}\" \"lib/**/*.{ts,tsx,js,jsx}\" --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepublishOnly": "pnpm build && pnpm lint && pnpm typecheck"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["mcp", "browser-automation", "qa-testing", "playwright", "testing"],
+  "author": {
+    "name": "tarasyarema",
+    "email": "t@desplega.ai",
+    "url": "https://github.com/tarasyarema"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tarasyarema/qa-use-mcp.git"
+  },
+  "homepage": "https://github.com/tarasyarema/qa-use-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/tarasyarema/qa-use-mcp/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "packageManager": "pnpm@10.10.0",
   "devDependencies": {
     "@eslint/js": "^9.36.0",
@@ -31,6 +59,7 @@
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.44.1",
     "@typescript-eslint/parser": "^8.44.1",
+    "dotenv-cli": "^7.4.2",
     "eslint": "^9.36.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
@@ -42,23 +71,10 @@
     "typescript-eslint": "^8.44.1"
   },
   "dependencies": {
-    "@inquirer/prompts": "^7.8.6",
-    "@types/inquirer": "^9.0.9",
-    "ai": "^5.0.56",
+    "@modelcontextprotocol/sdk": "^1.18.1",
     "axios": "^1.12.2",
-    "chalk": "^5.6.2",
-    "chokidar": "^4.0.3",
-    "commander": "^14.0.1",
-    "dotenv": "^17.2.2",
-    "ink": "^6.3.1",
-    "inquirer": "^12.9.6",
+    "dotenv": "^16.4.5",
     "localtunnel": "^2.0.2",
-    "open": "^10.2.0",
-    "playwright": "1.55.0",
-    "react": "^19.1.1",
-    "tasuku": "^2.0.1",
-    "ws": "^8.18.3",
-    "yoga-layout": "^3.2.1",
-    "yoga-layout-prebuilt": "^1.10.0"
+    "playwright": "1.55.0"
   }
 }

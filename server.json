@@ -1,0 +1,15 @@
+{
+  "name": "@desplega.ai/qa-use-mcp",
+  "version": "1.0.1",
+  "description": "MCP server for browser automation and QA testing",
+  "command": "npx",
+  "args": ["-y", "@desplega.ai/qa-use-mcp"],
+  "capabilities": ["tools"],
+  "env": {
+    "QA_USE_API_KEY": "",
+    "QA_USE_API_URL": "",
+    "QA_USE_APP_URL": ""
+  },
+  "homepage": "https://github.com/your-username/qa-use-mcp",
+  "license": "ISC"
+}
