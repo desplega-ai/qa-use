@@ -50,6 +50,12 @@ export interface SendMessageOptions {
   data?: any;
 }
 
+export interface ListOptions {
+  limit?: number;
+  offset?: number;
+  query?: string;
+}
+
 export interface AuthResponse {
   success: boolean;
   message?: string;
@@ -186,9 +192,14 @@ export class ApiClient {
     }
   }
 
-  async listSessions(): Promise<QASession[]> {
+  async listSessions(options: ListOptions = {}): Promise<QASession[]> {
     try {
-      const response: AxiosResponse = await this.client.get('/vibe-qa/sessions');
+      const params = new URLSearchParams();
+      if (options.limit !== undefined) params.append('limit', options.limit.toString());
+      if (options.offset !== undefined) params.append('offset', options.offset.toString());
+      if (options.query) params.append('query', options.query);
+
+      const response: AxiosResponse = await this.client.get(`/vibe-qa/sessions?${params.toString()}`);
       return response.data.map((session: any) => ({
         id: session.id,
         status: session.status,
@@ -295,9 +306,14 @@ export class ApiClient {
     }
   }
 
-  async listTests(): Promise<AutomatedTest[]> {
+  async listTests(options: ListOptions = {}): Promise<AutomatedTest[]> {
     try {
-      const response: AxiosResponse = await this.client.get('/vibe-qa/tests');
+      const params = new URLSearchParams();
+      if (options.limit !== undefined) params.append('limit', options.limit.toString());
+      if (options.offset !== undefined) params.append('offset', options.offset.toString());
+      if (options.query) params.append('query', options.query);
+
+      const response: AxiosResponse = await this.client.get(`/vibe-qa/tests?${params.toString()}`);
       return response.data.map((test: any) => ({
         id: test.id,
         name: test.name,

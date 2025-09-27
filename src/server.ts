@@ -57,6 +57,18 @@ interface RegisterUserParams {
   email: string;
 }
 
+interface ListQaSessionsParams {
+  limit?: number;
+  offset?: number;
+  query?: string;
+}
+
+interface SearchAutomatedTestsParams {
+  limit?: number;
+  offset?: number;
+  query?: string;
+}
+
 interface GetQaSessionParams {
   sessionId: string;
 }
@@ -310,10 +322,25 @@ class QAUseMcpServer {
           },
           {
             name: 'list_qa_sessions',
-            description: 'List all QA testing sessions',
+            description: 'List QA testing sessions with pagination and search',
             inputSchema: {
               type: 'object',
-              properties: {},
+              properties: {
+                limit: {
+                  type: 'number',
+                  description: 'Maximum number of sessions to return (default: 10, min: 1)',
+                  minimum: 1,
+                },
+                offset: {
+                  type: 'number',
+                  description: 'Number of sessions to skip (default: 0, min: 0)',
+                  minimum: 0,
+                },
+                query: {
+                  type: 'string',
+                  description: 'Search query to filter sessions by task, URL, or status',
+                },
+              },
             },
           },
           {
@@ -415,10 +442,25 @@ class QAUseMcpServer {
           },
           {
             name: 'search_automated_tests',
-            description: 'Search and list all automated tests',
+            description: 'Search and list automated tests with pagination and filtering',
             inputSchema: {
               type: 'object',
-              properties: {},
+              properties: {
+                limit: {
+                  type: 'number',
+                  description: 'Maximum number of tests to return (default: 10, min: 1)',
+                  minimum: 1,
+                },
+                offset: {
+                  type: 'number',
+                  description: 'Number of tests to skip (default: 0, min: 0)',
+                  minimum: 0,
+                },
+                query: {
+                  type: 'string',
+                  description: 'Search query to filter tests by name, description, URL, or task',
+                },
+              },
             },
           },
           {
@@ -451,7 +493,7 @@ class QAUseMcpServer {
       }
 
       if (name === 'list_qa_sessions') {
-        return this.handleListQaSessions(params as unknown as Record<string, never>);
+        return this.handleListQaSessions(params as unknown as ListQaSessionsParams);
       }
 
       if (name === 'get_qa_session') {
@@ -475,7 +517,7 @@ class QAUseMcpServer {
       }
 
       if (name === 'search_automated_tests') {
-        return this.handleSearchAutomatedTests(params as unknown as Record<string, never>);
+        return this.handleSearchAutomatedTests(params as unknown as SearchAutomatedTestsParams);
       }
 
       if (name === 'get_automated_test') {
@@ -639,7 +681,7 @@ After registration, you'll receive an API key that you can use in Option 1.`,
     }
   }
 
-  private async handleListQaSessions(params: Record<string, never>): Promise<CallToolResult> {
+  private async handleListQaSessions(params: ListQaSessionsParams): Promise<CallToolResult> {
     try {
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -654,11 +696,15 @@ After registration, you'll receive an API key that you can use in Option 1.`,
       }
 
       try {
-        const sessions = await this.globalApiClient.listSessions();
+        // Set defaults: limit=10, offset=0, query=empty
+        const options = {
+          limit: params.limit || 10,
+          offset: params.offset || 0,
+          query: params.query || '',
+        };
 
-        // Limit to first 20 sessions to avoid token overflow
-        const limitedSessions = sessions.slice(0, 20);
-        const sessionSummaries = limitedSessions.map(session => this.createSessionSummary(session));
+        const sessions = await this.globalApiClient.listSessions(options);
+        const sessionSummaries = sessions.map(session => this.createSessionSummary(session));
 
         return {
           content: [
@@ -666,12 +712,11 @@ After registration, you'll receive an API key that you can use in Option 1.`,
               type: 'text',
               text: JSON.stringify({
                 sessions: sessionSummaries,
-                displayed: limitedSessions.length,
-                total: sessions.length,
-                truncated: sessions.length > 20,
-                note: sessions.length > 20
-                  ? `Showing first 20 of ${sessions.length} sessions to avoid token limits. Use get_qa_session for specific session details.`
-                  : 'This is a summary view. Use get_qa_session with a specific sessionId to get full details including complete history and blocks.'
+                displayed: sessions.length,
+                limit: options.limit,
+                offset: options.offset,
+                query: options.query || 'none',
+                note: 'This is a summary view. Use get_qa_session with a specific sessionId to get full details including complete history and blocks. Use limit/offset for pagination.'
               }, null, 2),
             },
           ],
@@ -1083,7 +1128,7 @@ Please provide your response below, and it will be automatically sent to the ses
     }
   }
 
-  private async handleSearchAutomatedTests(params: Record<string, never>): Promise<CallToolResult> {
+  private async handleSearchAutomatedTests(params: SearchAutomatedTestsParams): Promise<CallToolResult> {
     try {
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -1098,11 +1143,15 @@ Please provide your response below, and it will be automatically sent to the ses
       }
 
       try {
-        const tests = await this.globalApiClient.listTests();
+        // Set defaults: limit=10, offset=0, query=empty
+        const options = {
+          limit: params.limit || 10,
+          offset: params.offset || 0,
+          query: params.query || '',
+        };
 
-        // Limit to first 50 tests to avoid token overflow
-        const limitedTests = tests.slice(0, 50);
-        const testSummaries = limitedTests.map(test => this.createTestSummary(test));
+        const tests = await this.globalApiClient.listTests(options);
+        const testSummaries = tests.map(test => this.createTestSummary(test));
 
         return {
           content: [
@@ -1110,12 +1159,11 @@ Please provide your response below, and it will be automatically sent to the ses
               type: 'text',
               text: JSON.stringify({
                 tests: testSummaries,
-                displayed: limitedTests.length,
-                total: tests.length,
-                truncated: tests.length > 50,
-                note: tests.length > 50
-                  ? `Showing first 50 of ${tests.length} tests to avoid token limits. Use get_automated_test for specific test details.`
-                  : 'This is a summary view. Use get_automated_test with a specific testId to get full details.'
+                displayed: tests.length,
+                limit: options.limit,
+                offset: options.offset,
+                query: options.query || 'none',
+                note: 'This is a summary view. Use get_automated_test with a specific testId to get full details. Use limit/offset for pagination.'
               }, null, 2),
             },
           ],

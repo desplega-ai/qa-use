@@ -1,6 +1,6 @@
 {
   "name": "@desplega.ai/qa-use-mcp",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "MCP server for browser automation and QA testing",
   "type": "module",
   "main": "dist/src/index.js",
