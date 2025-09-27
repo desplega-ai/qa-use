@@ -11,6 +11,7 @@ class QAUseMcpServer {
   private server: Server;
   private globalApiClient: ApiClient;
   private browserManager: BrowserManager | null = null;
+  private tunnelManager: TunnelManager | null = null;
 
   constructor() {
     this.server = new Server(
@@ -337,6 +338,16 @@ After registration, you'll receive an API key that you can use in Option 1.`,
       const browserSession = await this.browserManager.startBrowser({ headless });
       const wsEndpoint = browserSession.wsEndpoint;
 
+      // Initialize TunnelManager and create tunnel for browser WebSocket
+      this.tunnelManager = new TunnelManager();
+
+      // Extract port from WebSocket URL (e.g., ws://127.0.0.1:9222/devtools/browser/xxx)
+      const wsUrl = new URL(wsEndpoint);
+      const browserPort = parseInt(wsUrl.port);
+
+      const tunnelSession = await this.tunnelManager.startTunnel(browserPort);
+      const tunnelWsUrl = this.tunnelManager.getWebSocketUrl(wsEndpoint);
+
       const apiUrl = this.globalApiClient.getApiUrl();
       const appUrl = ApiClient.getAppUrl();
 
@@ -344,7 +355,7 @@ After registration, you'll receive an API key that you can use in Option 1.`,
         content: [
           {
             type: 'text',
-            text: `QA server initialized successfully. API key validated and browser started.\nAPI URL: ${apiUrl}\nApp URL: ${appUrl}\nBrowser WebSocket: ${wsEndpoint}\nHeadless mode: ${headless}`,
+            text: `QA server initialized successfully. API key validated and browser started.\nAPI URL: ${apiUrl}\nApp URL: ${appUrl}\nLocal Browser WebSocket: ${wsEndpoint}\nTunneled Browser WebSocket: ${tunnelWsUrl}\nTunnel URL: ${tunnelSession.publicUrl}\nHeadless mode: ${headless}`,
           },
         ],
       };
@@ -530,13 +541,38 @@ After registration, you'll receive an API key that you can use in Option 1.`,
         };
       }
 
-      const wsUrl = this.browserManager.getWebSocketEndpoint();
-      if (!wsUrl) {
+      if (!this.tunnelManager || !this.tunnelManager.isActive()) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Tunnel not initialized. Please run init_qa_server first to create the tunnel.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const localWsUrl = this.browserManager.getWebSocketEndpoint();
+      if (!localWsUrl) {
         return {
           content: [
             {
               type: 'text',
               text: 'Browser WebSocket endpoint not available. Please reinitialize the server.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const wsUrl = this.tunnelManager.getWebSocketUrl(localWsUrl);
+      if (!wsUrl) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Failed to create tunneled WebSocket URL. Please reinitialize the server.',
             },
           ],
           isError: true,
@@ -912,6 +948,9 @@ Please provide your response below, and it will be automatically sent to the ses
   }
 
   private async cleanup(): Promise<void> {
+    if (this.tunnelManager) {
+      await this.tunnelManager.stopTunnel();
+    }
     if (this.browserManager) {
       await this.browserManager.stopBrowser();
     }
