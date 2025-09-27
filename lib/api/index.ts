@@ -95,6 +95,52 @@ export interface AutomatedTest {
   metadata?: any;
 }
 
+export interface TestRun {
+  id: string;
+  rerun_id?: string;
+  name: string;
+  external_id?: string;
+  matrix_option_id?: string;
+  test_id: string;
+  test_version_hash?: string;
+  test_suite_id?: string;
+  test_suite_run_id?: string;
+  used_variables?: any[];
+  run_status: 'pending' | 'running' | 'passed' | 'failed' | 'skipped' | 'cancelled' | 'timeout';
+  final_run_status?:
+    | 'pending'
+    | 'running'
+    | 'passed'
+    | 'failed'
+    | 'skipped'
+    | 'cancelled'
+    | 'timeout';
+  final_comment_id?: string;
+  allow_fix?: boolean;
+  result?: string;
+  error_message?: string;
+  recording_path?: string;
+  har_path?: string;
+  live_view_url?: string;
+  start_time?: string;
+  end_time?: string;
+  duration_seconds?: number;
+  pfs_score?: number;
+  pfs_bad_state_prob?: number;
+  pfs_confidence_lower?: number;
+  pfs_confidence_upper?: number;
+  pfs_num_observations?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface ListTestRunsOptions {
+  test_id?: string;
+  run_id?: string;
+  limit?: number;
+  offset?: number;
+}
+
 export class ApiClient {
   private readonly client: AxiosInstance;
   private apiKey: string | null = null;
@@ -189,7 +235,7 @@ export class ApiClient {
         id: response.data.data.id,
         status: response.data.data.status,
         createdAt: response.data.data.created_at,
-        data: response.data.data.data,
+        data: response.data.data,
         source: response.data.data.source,
       };
     } catch (error) {
@@ -211,7 +257,9 @@ export class ApiClient {
       if (options.offset !== undefined) params.append('offset', options.offset.toString());
       if (options.query) params.append('query', options.query);
 
-      const response: AxiosResponse = await this.client.get(`/vibe-qa/sessions?${params.toString()}`);
+      const response: AxiosResponse = await this.client.get(
+        `/vibe-qa/sessions?${params.toString()}`
+      );
       return response.data.map((session: any) => ({
         id: session.id,
         status: session.status,
@@ -409,7 +457,8 @@ export class ApiClient {
 
         return {
           success: false,
-          message: errorData?.message || errorData?.detail || `HTTP ${statusCode}: Failed to run tests`,
+          message:
+            errorData?.message || errorData?.detail || `HTTP ${statusCode}: Failed to run tests`,
         };
       }
 
@@ -417,6 +466,60 @@ export class ApiClient {
         success: false,
         message: error instanceof Error ? error.message : 'Unknown error running tests',
       };
+    }
+  }
+
+  async listTestRuns(options: ListTestRunsOptions = {}): Promise<TestRun[]> {
+    try {
+      const params = new URLSearchParams();
+      if (options.test_id) params.append('test_id', options.test_id);
+      if (options.run_id) params.append('run_id', options.run_id);
+      if (options.limit !== undefined) params.append('limit', options.limit.toString());
+      if (options.offset !== undefined) params.append('offset', options.offset.toString());
+
+      const response: AxiosResponse = await this.client.get(
+        `/vibe-qa/tests-runs?${params.toString()}`
+      );
+      return response.data.map((testRun: any) => ({
+        id: testRun.id,
+        rerun_id: testRun.rerun_id,
+        name: testRun.name,
+        external_id: testRun.external_id,
+        matrix_option_id: testRun.matrix_option_id,
+        test_id: testRun.test_id,
+        test_version_hash: testRun.test_version_hash,
+        test_suite_id: testRun.test_suite_id,
+        test_suite_run_id: testRun.test_suite_run_id,
+        used_variables: testRun.used_variables,
+        run_status: testRun.run_status,
+        final_run_status: testRun.final_run_status,
+        final_comment_id: testRun.final_comment_id,
+        allow_fix: testRun.allow_fix,
+        result: testRun.result,
+        error_message: testRun.error_message,
+        recording_path: testRun.recording_path,
+        har_path: testRun.har_path,
+        live_view_url: testRun.live_view_url,
+        start_time: testRun.start_time,
+        end_time: testRun.end_time,
+        duration_seconds: testRun.duration_seconds,
+        pfs_score: testRun.pfs_score,
+        pfs_bad_state_prob: testRun.pfs_bad_state_prob,
+        pfs_confidence_lower: testRun.pfs_confidence_lower,
+        pfs_confidence_upper: testRun.pfs_confidence_upper,
+        pfs_num_observations: testRun.pfs_num_observations,
+        created_at: testRun.created_at,
+        updated_at: testRun.updated_at,
+      }));
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const statusCode = error.response?.status;
+        const errorData = error.response?.data;
+        throw new Error(
+          errorData?.message || errorData?.detail || `HTTP ${statusCode}: Failed to fetch test runs`
+        );
+      }
+      throw new Error(error instanceof Error ? error.message : 'Unknown error fetching test runs');
     }
   }
 }

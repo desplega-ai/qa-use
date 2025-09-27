@@ -1,6 +1,6 @@
 # QA-Use MCP Server
 
-An MCP (Model Context Protocol) server that provides browser automation and QA testing capabilities. This server can be used with MCP clients like Claude to perform automated browser testing.
+An MCP (Model Context Protocol) server that provides comprehensive browser automation and QA testing capabilities. This server integrates with desplega.ai to offer automated testing, session monitoring, batch test execution, and intelligent test guidance using AAA (Arrange-Act-Assert) framework templates.
 
 ## MCP Client Configuration
 
@@ -56,34 +56,60 @@ For other MCP clients (Cline, Cursor, etc.), use the standard configuration:
 
 ## Features
 
-- **Browser Management**: Launch and control Playwright browser instances
+- **Browser Management**: Launch and control Playwright browser instances with headless/headed modes
 - **Tunneling**: Create public tunnels for browser WebSocket endpoints using localtunnel
-- **API Integration**: Connect to desplega.ai API for QA testing workflows
-- **Session Management**: Manage multiple QA testing sessions
-- **Async Session Monitoring**: Handle sessions that require user input during execution
-- **Interactive Elicitation**: Get prompted when remote sessions need your input to continue
+- **API Integration**: Full integration with desplega.ai API for comprehensive QA testing workflows
+- **Session Management**: Create, monitor, and control multiple QA testing sessions with real-time status
+- **Progress Monitoring**: Real-time progress notifications with MCP timeout protection (25s max per call)
+- **Batch Test Execution**: Run multiple automated tests simultaneously with dependency management
+- **Interactive Elicitation**: Intelligent prompts when remote sessions need user input to continue
+- **Test Discovery**: Search and list automated tests with pagination and filtering
+- **Test Run Analytics**: View test execution history with performance metrics and flakiness scores
+- **AAA Framework Templates**: Pre-built prompts for login, forms, e-commerce, navigation, and comprehensive testing scenarios
+- **User Registration**: Built-in user registration system for new desplega.ai accounts
+- **Comprehensive Documentation**: Built-in MCP resources with guides, workflows, and best practices
 
 ## Quick Start
 
-1. **Initialize the server** (with interactive setup):
-   ```
-   init_qa_server with interactive=true
-   ```
+### 1. Initialize Server
+```
+init_qa_server with interactive=true
+```
+Or with direct API key:
+```
+init_qa_server with apiKey="your-api-key" and headless=false
+```
 
-2. **Start a QA session**:
-   ```
-   start_qa_session with url="https://example.com" and task="test the login form"
-   ```
+### 2. Register New Account (if needed)
+```
+register_user with email="your-email@example.com"
+```
 
-3. **Monitor for user input** (sessions may ask questions during execution):
-   ```
-   monitor_qa_session with sessionId="session-id" and autoRespond=true
-   ```
+### 3. Start Testing Session
+```
+start_qa_session with url="https://example.com" and task="test the login form"
+```
 
-4. **Respond when prompted**:
-   ```
-   respond_to_qa_session with sessionId="session-id" and response="your answer"
-   ```
+### 4. Monitor Progress (with timeout protection)
+```
+monitor_qa_session with sessionId="session-id" and wait_for_completion=true and timeout=180
+```
+
+### 5. Use AAA Framework Templates
+Generate structured test prompts:
+```
+Use prompt: aaa_login_test with url="https://app.example.com/login"
+```
+
+### 6. Run Batch Tests
+```
+run_automated_tests with test_ids=["test-1", "test-2", "test-3"]
+```
+
+### 7. View Test History
+```
+list_test_runs with test_id="test-123" and limit=20
+```
 
 ## Installation
 
@@ -124,45 +150,120 @@ pnpm dev
 
 ## MCP Tools
 
-The server exposes the following MCP tools:
+The server exposes comprehensive MCP tools for browser automation and QA testing:
 
-### `init_qa_server`
+### Core Server Management
 
-Initialize the QA server environment with API credentials.
+#### `init_qa_server`
+Initialize the QA server environment with API credentials and browser setup.
 
 **Parameters:**
-- `apiKey` (string, required): API key for desplega.ai
+- `apiKey` (string, optional): API key for desplega.ai (uses env var if not provided)
 - `forceInstall` (boolean, optional): Force reinstall of Playwright browsers
+- `interactive` (boolean, optional): Enable interactive setup for missing credentials
+- `headless` (boolean, optional): Run browser in headless mode (default: false)
 
-### `list_qa_sessions`
+#### `register_user`
+Register a new user account with desplega.ai and receive an API key.
 
-List all active QA testing sessions.
+**Parameters:**
+- `email` (string, required): Email address for registration
 
-### `get_qa_session`
+### Session Management
 
-Get detailed information about a specific QA session.
+#### `list_qa_sessions`
+List QA testing sessions with pagination and search capabilities.
+
+**Parameters:**
+- `limit` (number, optional): Maximum sessions to return (default: 10)
+- `offset` (number, optional): Number of sessions to skip (default: 0)
+- `query` (string, optional): Search query for filtering sessions
+
+#### `get_qa_session`
+Get detailed information about a specific QA session including history and blocks.
 
 **Parameters:**
 - `sessionId` (string, required): The session ID to retrieve
 
-### `start_qa_session`
-
+#### `start_qa_session`
 Start a new QA testing session with browser automation.
 
 **Parameters:**
 - `url` (string, required): The URL to test
 - `task` (string, required): The testing task description
-- `mode` (string, optional): Testing mode - "fast", "normal", or "max"
-- `headless` (boolean, optional): Run browser in headless mode
+- `dependencyId` (string, optional): Test ID that this session depends on
 
-### `send_message_to_qa_session`
+#### `monitor_qa_session`
+Monitor session progress with MCP timeout protection and real-time notifications.
 
+**Parameters:**
+- `sessionId` (string, required): The session ID to monitor
+- `autoRespond` (boolean, optional): Auto-format response instructions (default: true)
+- `wait_for_completion` (boolean, optional): Wait for completion with timeout protection
+- `timeout` (number, optional): User timeout in seconds (default: 60, max 25s per MCP call)
+
+#### `respond_to_qa_session`
+Respond to a QA session that is waiting for user input.
+
+**Parameters:**
+- `sessionId` (string, required): The session ID that needs a response
+- `response` (string, required): Your response to the pending question
+
+#### `send_message_to_qa_session`
 Send control messages to an active session.
 
 **Parameters:**
 - `sessionId` (string, required): The session ID
 - `action` (string, required): Action to perform - "pause", "response", or "close"
 - `data` (string, optional): Additional message data
+
+### Test Management
+
+#### `search_automated_tests`
+Search and list automated tests with pagination and filtering.
+
+**Parameters:**
+- `limit` (number, optional): Maximum tests to return (default: 10)
+- `offset` (number, optional): Number of tests to skip (default: 0)
+- `query` (string, optional): Search query for filtering by name, description, URL, or task
+
+#### `get_automated_test`
+Get detailed information about a specific automated test.
+
+**Parameters:**
+- `testId` (string, required): The test ID to retrieve
+
+#### `run_automated_tests`
+Execute multiple automated tests simultaneously with dependency management.
+
+**Parameters:**
+- `test_ids` (array, required): Array of test IDs to execute
+- `ws_url` (string, optional): WebSocket URL override (uses global tunnel by default)
+
+#### `list_test_runs`
+List test run history with performance metrics and filtering capabilities.
+
+**Parameters:**
+- `test_id` (string, optional): Filter by specific test ID
+- `run_id` (string, optional): Filter by specific run ID
+- `limit` (number, optional): Maximum test runs to return (default: 10)
+- `offset` (number, optional): Number of test runs to skip (default: 0)
+
+### Built-in Documentation
+
+The server includes comprehensive MCP resources and prompts:
+
+#### MCP Resources
+- **Getting Started Guide**: Complete setup and usage instructions
+- **Testing Workflows**: Common patterns for interactive, batch, and development testing
+- **Session Monitoring Guide**: Best practices for monitoring and timeout management
+
+#### MCP Prompts (AAA Framework Templates)
+- **`aaa_login_test`**: Generate login tests using Arrange-Act-Assert framework
+- **`aaa_form_test`**: Generate form submission tests with validation
+- **`aaa_ecommerce_test`**: Generate e-commerce workflow tests (add to cart, checkout, search)
+- **`aaa_navigation_test`**: Generate navigation and menu testing scenarios
+- **`comprehensive_test_scenario`**: Generate comprehensive tests for authentication, validation, accessibility, performance, or mobile testing
 
 ## Configuration
 
@@ -211,6 +312,62 @@ Alternatively, if you have the API key in your system environment:
 }
 ```
 
+## Usage Examples
+
+### Interactive Testing Workflow
+```bash
+# 1. Initialize server
+init_qa_server with interactive=true
+
+# 2. Start a test session
+start_qa_session with url="https://app.example.com" and task="Test user registration flow"
+
+# 3. Monitor with automatic waiting
+monitor_qa_session with sessionId="session-123" and wait_for_completion=true and timeout=300
+
+# 4. Respond to user input requests
+respond_to_qa_session with sessionId="session-123" and response="john.doe@example.com"
+```
+
+### Batch Testing Workflow
+```bash
+# 1. Search for available tests
+search_automated_tests with query="login" and limit=10
+
+# 2. Run multiple tests simultaneously
+run_automated_tests with test_ids=["login-test-1", "signup-test-2", "checkout-test-3"]
+
+# 3. Monitor progress
+list_qa_sessions with limit=20
+
+# 4. Check test run history
+list_test_runs with limit=50
+```
+
+### Using AAA Framework Templates
+```bash
+# Generate a login test using AAA framework
+Use prompt: aaa_login_test with url="https://app.example.com/login" and username="testuser" and expected_redirect="/dashboard"
+
+# Generate an e-commerce test
+Use prompt: aaa_ecommerce_test with product_url="https://shop.example.com/widget" and workflow_type="add_to_cart" and quantity="2"
+
+# Generate a comprehensive accessibility test
+Use prompt: comprehensive_test_scenario with scenario_type="accessibility" and url="https://app.example.com" and browser_type="desktop"
+```
+
+### Test Run Analytics
+```bash
+# View test runs for a specific test
+list_test_runs with test_id="login-test-123" and limit=20
+
+# Filter by run status or time period
+list_test_runs with limit=50 and offset=0
+
+# Get specific test run details with PFS metrics
+list_test_runs with run_id="run-456"
+```
+
 ## Testing
 
 Use the provided test scripts to test MCP server functionality:
@@ -233,11 +390,66 @@ node scripts/mcp-test.js
 
 The project is organized into modular components:
 
-- **`src/`**: Main MCP server implementation
+- **`src/`**: Main MCP server implementation with comprehensive tool handlers
+  - MCP protocol implementation with tools, resources, and prompts
+  - Session management and monitoring with timeout protection
+  - Real-time progress notifications using MCP logging specification
+  - AAA framework prompt templates for structured testing
 - **`lib/browser/`**: Browser management functionality using Playwright
+  - Headless and headed browser support
+  - WebSocket endpoint management for remote control
 - **`lib/tunnel/`**: Tunneling and port forwarding using localtunnel
-- **`lib/api/`**: API client for desplega.ai integration
+  - Public tunnel creation for browser WebSocket access
+  - Automatic WebSocket URL conversion for remote testing
+- **`lib/api/`**: Complete API client for desplega.ai integration
+  - Session lifecycle management (create, monitor, respond)
+  - Test discovery and execution
+  - Test run analytics and history
+  - User registration and authentication
+  - Batch test execution with dependency handling
+
+### Key Features Implementation
+
+#### MCP Timeout Protection
+- Limited monitoring calls to 25 seconds to prevent MCP timeouts
+- Automatic continuation support for long-running sessions
+- Real-time progress notifications during session monitoring
+
+#### AAA Framework Integration
+- Pre-built templates for login, forms, e-commerce, and navigation testing
+- Comprehensive test scenarios for accessibility, performance, and mobile testing
+- Dynamic argument support for customizable test generation
+
+#### Test Analytics
+- Complete test run history with performance metrics
+- Probabilistic Flakiness Score (PFS) tracking
+- Execution timing and error tracking
+- Filtering and pagination for large datasets
+
+## Recent Updates (v1.0.14)
+
+### New Features
+- **Test Run Analytics**: Added `list_test_runs` tool for viewing test execution history
+- **MCP Progress Notifications**: Real-time progress updates during session monitoring
+- **MCP Timeout Protection**: Intelligent 25-second call limits to prevent timeouts
+- **AAA Framework Templates**: 5 pre-built prompts for structured test creation
+- **Batch Test Execution**: Run multiple tests simultaneously with `run_automated_tests`
+- **Enhanced Documentation**: Built-in MCP resources with guides and best practices
+- **User Registration**: Direct account creation with `register_user` tool
+
+### Improvements
+- **Session Monitoring**: Enhanced with automatic continuation support for long sessions
+- **API Response Handling**: Fixed session creation response mapping for better reliability
+- **Error Handling**: Comprehensive error messages and status reporting
+- **Tool Parameters**: Expanded parameter support across all tools
+- **Performance Metrics**: Added PFS (Probabilistic Flakiness Score) tracking
+
+### Technical Enhancements
+- **MCP Protocol**: Full implementation of tools, resources, and prompts capabilities
+- **TypeScript Support**: Complete type safety across all interfaces
+- **Modular Architecture**: Clean separation of browser, tunnel, and API components
+- **Dynamic Configuration**: Environment variable support with fallbacks
 
 ## License
 
-ISC
+MIT
