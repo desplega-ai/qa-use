@@ -1,0 +1,64 @@
+{
+  "name": "qa-use",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "qa-use": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\"",
+    "lint": "eslint \"src/**/*.{ts,tsx,js,jsx}\"",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx,js,jsx}\" --fix",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.10.0",
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "@types/localtunnel": "^2.0.4",
+    "@types/node": "^24.5.2",
+    "@types/react": "^19.1.14",
+    "@types/ws": "^8.18.1",
+    "@typescript-eslint/eslint-plugin": "^8.44.1",
+    "@typescript-eslint/parser": "^8.44.1",
+    "eslint": "^9.36.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "ignore": "^7.0.5",
+    "prettier": "^3.6.2",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.44.1"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.8.6",
+    "@types/inquirer": "^9.0.9",
+    "ai": "^5.0.56",
+    "axios": "^1.12.2",
+    "chalk": "^5.6.2",
+    "chokidar": "^4.0.3",
+    "commander": "^14.0.1",
+    "dotenv": "^17.2.2",
+    "ink": "^6.3.1",
+    "inquirer": "^12.9.6",
+    "localtunnel": "^2.0.2",
+    "open": "^10.2.0",
+    "playwright": "1.55.0",
+    "react": "^19.1.1",
+    "tasuku": "^2.0.1",
+    "ws": "^8.18.3",
+    "yoga-layout": "^3.2.1",
+    "yoga-layout-prebuilt": "^1.10.0"
+  }
+}
