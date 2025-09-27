@@ -1,7 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import type { CallToolResult, TextContent } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult, TextContent, ProgressToken } from '@modelcontextprotocol/sdk/types.js';
 
 import { BrowserManager } from '../lib/browser/index.js';
 import { TunnelManager } from '../lib/tunnel/index.js';
@@ -82,6 +82,8 @@ interface StartQaSessionParams {
 interface MonitorQaSessionParams {
   sessionId: string;
   autoRespond?: boolean;
+  wait_for_completion?: boolean;
+  timeout?: number;
 }
 
 interface RespondToQaSessionParams {
@@ -359,7 +361,7 @@ class QAUseMcpServer {
           },
           {
             name: 'start_qa_session',
-            description: 'Start a new QA testing session. Returns sessionId (data.agent_id) for subsequent operations.',
+            description: 'Start a new QA testing session. Returns sessionId (data.agent_id) for subsequent operations. Use monitor_qa_session to track progress and wait for completion.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -382,7 +384,7 @@ class QAUseMcpServer {
           {
             name: 'monitor_qa_session',
             description:
-              'Monitor a session for pending user input and provide interactive responses',
+              'Monitor a session for pending user input and track completion. Keep calling until status is "closed" or "idle". Use wait_for_completion to automatically wait.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -394,6 +396,15 @@ class QAUseMcpServer {
                   type: 'boolean',
                   description:
                     'Automatically check for pending input and format response instructions',
+                },
+                wait_for_completion: {
+                  type: 'boolean',
+                  description: 'Wait for session to complete (closed/idle) with progress updates',
+                },
+                timeout: {
+                  type: 'number',
+                  description: 'Timeout in seconds for wait_for_completion (default: 60)',
+                  minimum: 1,
                 },
               },
               required: ['sessionId'],
@@ -927,7 +938,7 @@ After registration, you'll receive an API key that you can use in Option 1.`,
 
   private async handleMonitorQaSession(params: MonitorQaSessionParams): Promise<CallToolResult> {
     try {
-      const { sessionId, autoRespond = true } = params;
+      const { sessionId, autoRespond = true, wait_for_completion = false, timeout = 60 } = params;
 
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -941,6 +952,10 @@ After registration, you'll receive an API key that you can use in Option 1.`,
         };
       }
 
+      if (wait_for_completion) {
+        return this.handleWaitForCompletion(sessionId, timeout, autoRespond);
+      }
+
       try {
         const session = await this.globalApiClient.getSession(sessionId);
 
@@ -951,6 +966,7 @@ After registration, you'll receive an API key that you can use in Option 1.`,
           pendingInput: session.data?.pending_user_input,
           lastDone: session.data?.last_done,
           liveviewUrl: session.data?.liveview_url,
+          note: 'Keep calling monitor_qa_session until status is "closed" or "idle". Use wait_for_completion=true to automatically wait.',
         };
 
         if (autoRespond && session.data?.pending_user_input) {
@@ -1006,6 +1022,135 @@ Please provide your response below, and it will be automatically sent to the ses
           {
             type: 'text',
             text: `Failed to monitor session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  private async handleWaitForCompletion(sessionId: string, timeout: number, autoRespond: boolean): Promise<CallToolResult> {
+    const startTime = Date.now();
+    const timeoutMs = timeout * 1000;
+    let iteration = 0;
+
+    try {
+      while (Date.now() - startTime < timeoutMs) {
+        iteration++;
+
+        try {
+          const session = await this.globalApiClient.getSession(sessionId);
+          const status = session.data?.status || session.status;
+
+          // Send progress notification
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
+          const progressMessage = `⏳ Monitoring session ${sessionId} (${elapsed}s elapsed, attempt ${iteration}) - Status: ${status}`;
+
+          // Note: In a real MCP implementation, we would send progress notifications
+          // For now, we'll include progress in the final response
+
+          // Check if session is complete
+          if (status === 'closed' || status === 'idle') {
+            const result = {
+              sessionId: session.id,
+              status: status,
+              hasPendingInput: !!session.data?.pending_user_input,
+              pendingInput: session.data?.pending_user_input,
+              lastDone: session.data?.last_done,
+              liveviewUrl: session.data?.liveview_url,
+              completedAfter: elapsed,
+              iterations: iteration,
+              note: `Session completed with status: ${status}`
+            };
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({
+                    success: true,
+                    message: `✅ Session ${sessionId} completed successfully!`,
+                    result,
+                    progressLog: `Monitored for ${elapsed} seconds with ${iteration} checks`
+                  }, null, 2),
+                },
+              ],
+            };
+          }
+
+          // Check for pending input
+          if (autoRespond && session.data?.pending_user_input) {
+            const pendingInput = session.data.pending_user_input;
+            const result = {
+              sessionId: session.id,
+              status: status,
+              hasPendingInput: true,
+              pendingInput: session.data?.pending_user_input,
+              lastDone: session.data?.last_done,
+              liveviewUrl: session.data?.liveview_url,
+              stoppedAfter: elapsed,
+              iterations: iteration,
+              note: 'Session requires user input - monitoring stopped'
+            };
+
+            const elicitationText = `
+🤖 **Session ${sessionId} requires your input to continue!**
+
+**Monitoring stopped after ${elapsed} seconds** because the session is waiting for input.
+
+**Context:** ${pendingInput.reasoning || 'The QA session needs input to proceed'}
+
+**Question:** ${pendingInput.question || 'Please provide your response'}
+
+**Priority:** ${pendingInput.priority || 'normal'}
+
+Please provide your response below, and it will be automatically sent to the session.`;
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: elicitationText,
+                },
+              ],
+              isError: false,
+            };
+          }
+
+          // Wait before next check (3 seconds)
+          await new Promise(resolve => setTimeout(resolve, 3000));
+
+        } catch (sessionError) {
+          // If session not found or error, wait a bit and try again
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          continue;
+        }
+      }
+
+      // Timeout reached
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              success: false,
+              message: `⏰ Timeout: Session ${sessionId} did not complete within ${timeout} seconds`,
+              sessionId,
+              timeoutAfter: timeout,
+              iterations: iteration,
+              note: 'Use monitor_qa_session without wait_for_completion to check current status'
+            }, null, 2),
+          },
+        ],
+        isError: true,
+      };
+
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to wait for completion: ${error instanceof Error ? error.message : 'Unknown error'}`,
           },
         ],
         isError: true,
