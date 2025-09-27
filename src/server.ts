@@ -1,7 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import type { CallToolResult, TextContent, ProgressToken } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ListToolsRequestSchema, ListResourcesRequestSchema, ReadResourceRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult, TextContent, ProgressToken, Resource } from '@modelcontextprotocol/sdk/types.js';
 
 import { BrowserManager } from '../lib/browser/index.js';
 import { TunnelManager } from '../lib/tunnel/index.js';
@@ -199,12 +199,14 @@ class QAUseMcpServer {
       {
         capabilities: {
           tools: {},
+          resources: {},
         },
       }
     );
 
     this.globalApiClient = new ApiClient();
     this.setupTools();
+    this.setupResources();
   }
 
   private createSessionSummary(session: QASessionResponse): SessionSummary {
@@ -1523,6 +1525,623 @@ Please provide your response below, and it will be automatically sent to the ses
     }
 
     return this.tunnelManager.getWebSocketUrl(browserWsUrl);
+  }
+
+  private setupResources(): void {
+    // List resources handler
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+      return {
+        resources: [
+          {
+            uri: 'qa-use://guides/getting-started',
+            name: 'Getting Started Guide',
+            description: 'Complete guide to setting up and using QA-Use MCP server',
+            mimeType: 'text/markdown',
+          },
+          {
+            uri: 'qa-use://guides/workflows',
+            name: 'Testing Workflows',
+            description: 'Common testing workflows and best practices',
+            mimeType: 'text/markdown',
+          },
+          {
+            uri: 'qa-use://templates/aaa-framework',
+            name: 'AAA Framework Templates',
+            description: 'Prompt templates using Arrange-Act-Assert framework for effective testing',
+            mimeType: 'text/markdown',
+          },
+          {
+            uri: 'qa-use://templates/test-scenarios',
+            name: 'Test Scenario Templates',
+            description: 'Ready-to-use test scenario templates for common use cases',
+            mimeType: 'text/markdown',
+          },
+          {
+            uri: 'qa-use://guides/monitoring',
+            name: 'Session Monitoring Guide',
+            description: 'How to effectively monitor and manage QA sessions',
+            mimeType: 'text/markdown',
+          },
+        ],
+      };
+    });
+
+    // Read resource handler
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      const { uri } = request.params;
+
+      switch (uri) {
+        case 'qa-use://guides/getting-started':
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: 'text/markdown',
+                text: this.getGettingStartedGuide(),
+              },
+            ],
+          };
+
+        case 'qa-use://guides/workflows':
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: 'text/markdown',
+                text: this.getWorkflowsGuide(),
+              },
+            ],
+          };
+
+        case 'qa-use://templates/aaa-framework':
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: 'text/markdown',
+                text: this.getAAAFrameworkTemplates(),
+              },
+            ],
+          };
+
+        case 'qa-use://templates/test-scenarios':
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: 'text/markdown',
+                text: this.getTestScenarioTemplates(),
+              },
+            ],
+          };
+
+        case 'qa-use://guides/monitoring':
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: 'text/markdown',
+                text: this.getMonitoringGuide(),
+              },
+            ],
+          };
+
+        default:
+          throw new Error(`Resource not found: ${uri}`);
+      }
+    });
+  }
+
+  private getGettingStartedGuide(): string {
+    return `# QA-Use MCP Server - Getting Started Guide
+
+## Quick Setup
+
+### 1. Initialize the Server
+\`\`\`json
+{
+  "tool": "init_qa_server",
+  "params": {
+    "apiKey": "your-api-key",
+    "headless": false
+  }
+}
+\`\`\`
+
+### 2. Start a QA Session
+\`\`\`json
+{
+  "tool": "start_qa_session",
+  "params": {
+    "url": "https://example.com",
+    "task": "Test login functionality"
+  }
+}
+\`\`\`
+
+### 3. Monitor Progress
+\`\`\`json
+{
+  "tool": "monitor_qa_session",
+  "params": {
+    "sessionId": "session-id-from-start-response",
+    "wait_for_completion": true,
+    "timeout": 120
+  }
+}
+\`\`\`
+
+## Core Concepts
+
+- **Sessions**: Individual QA testing instances
+- **Tunneling**: Automatic browser WebSocket URL tunneling for remote access
+- **Monitoring**: Real-time session progress tracking
+- **Batch Testing**: Execute multiple automated tests simultaneously
+
+## Next Steps
+
+1. Read the Workflows guide for common testing patterns
+2. Check out AAA Framework templates for effective test writing
+3. Explore monitoring best practices
+`;
+  }
+
+  private getWorkflowsGuide(): string {
+    return `# QA-Use Testing Workflows
+
+## Workflow 1: Interactive Testing
+*For manual testing with AI assistance*
+
+1. **Initialize** → \`init_qa_server\`
+2. **Start Session** → \`start_qa_session\`
+3. **Monitor & Respond** → \`monitor_qa_session\` + \`respond_to_qa_session\`
+4. **Completion** → Session reaches "closed" or "idle"
+
+## Workflow 2: Automated Batch Testing
+*For running pre-defined test suites*
+
+1. **Initialize** → \`init_qa_server\`
+2. **Search Tests** → \`search_automated_tests\`
+3. **Run Tests** → \`run_automated_tests\`
+4. **Monitor Progress** → \`list_qa_sessions\` + \`monitor_qa_session\`
+
+## Workflow 3: Test Development
+*For creating and refining test cases*
+
+1. **Search Existing** → \`search_automated_tests\`
+2. **Get Test Details** → \`get_automated_test\`
+3. **Start New Session** → \`start_qa_session\` (with reference)
+4. **Monitor & Iterate** → \`monitor_qa_session\`
+
+## Best Practices
+
+### Session Management
+- Always use \`wait_for_completion=true\` for unattended monitoring
+- Set appropriate timeouts (default: 60s, recommended: 120-300s for complex tests)
+- Use pagination (\`limit\`/\`offset\`) when listing many sessions
+
+### Error Handling
+- Check session status regularly: "active", "pending", "closed", "idle"
+- Handle user input requests promptly
+- Monitor for timeout conditions
+
+### Performance
+- Use batch testing for multiple related tests
+- Leverage global WebSocket URL for consistent browser access
+- Implement proper cleanup with session monitoring
+`;
+  }
+
+  private getAAAFrameworkTemplates(): string {
+    return `# AAA Framework Templates for QA-Use
+
+The **Arrange-Act-Assert (AAA)** pattern helps create clear, maintainable test scenarios.
+
+## Template 1: Login Flow Testing
+
+### Arrange
+\`\`\`
+Navigate to the login page at https://example.com/login and prepare test credentials
+\`\`\`
+
+### Act
+\`\`\`
+Enter username "testuser@example.com" in the email field, enter password "securepass123" in the password field, and click the "Sign In" button
+\`\`\`
+
+### Assert
+\`\`\`
+Verify that the page redirects to the dashboard at /dashboard and displays the welcome message "Welcome, Test User"
+\`\`\`
+
+## Template 2: Form Submission Testing
+
+### Arrange
+\`\`\`
+Navigate to the contact form at https://example.com/contact and prepare test data: name="John Doe", email="john@test.com", message="Test inquiry"
+\`\`\`
+
+### Act
+\`\`\`
+Fill out the contact form with the prepared test data and submit by clicking the "Send Message" button
+\`\`\`
+
+### Assert
+\`\`\`
+Verify that a success message appears stating "Message sent successfully" and the form is cleared
+\`\`\`
+
+## Template 3: E-commerce Cart Testing
+
+### Arrange
+\`\`\`
+Navigate to the product page at https://shop.example.com/products/widget-123 and verify the product is in stock
+\`\`\`
+
+### Act
+\`\`\`
+Select quantity "2", choose size "Medium", and click "Add to Cart" button
+\`\`\`
+
+### Assert
+\`\`\`
+Verify the cart icon shows "2" items, the cart total updates correctly, and a confirmation notification displays
+\`\`\`
+
+## Template 4: Navigation Testing
+
+### Arrange
+\`\`\`
+Start at the homepage https://example.com and locate the main navigation menu
+\`\`\`
+
+### Act
+\`\`\`
+Click through each main navigation item: About, Services, Products, Contact
+\`\`\`
+
+### Assert
+\`\`\`
+Verify each page loads correctly, has proper page titles, and the active navigation item is highlighted
+\`\`\`
+
+## Best Practices for AAA in QA-Use
+
+### ✅ Good AAA Examples:
+- **Specific**: "Click the blue 'Submit' button in the footer"
+- **Measurable**: "Verify response time is under 2 seconds"
+- **Clear State**: "Ensure the form is empty before testing"
+
+### ❌ Avoid These Patterns:
+- **Vague**: "Test the form" (not specific enough)
+- **Mixed**: Combining multiple actions in one step
+- **Unclear**: "Make sure it works" (not measurable)
+
+## QA-Use Specific Tips
+
+1. **Use Specific Selectors**: Reference exact button text, input labels, or unique identifiers
+2. **Wait for State**: Always verify the page/element state before acting
+3. **Verify Thoroughly**: Check multiple aspects (URL, text, state, count)
+4. **Handle Async**: Account for loading states and dynamic content
+5. **Clean Separation**: Keep each phase distinct and focused
+`;
+  }
+
+  private getTestScenarioTemplates(): string {
+    return `# Test Scenario Templates
+
+## User Authentication Scenarios
+
+### Successful Login
+\`\`\`
+ARRANGE: Navigate to login page, prepare valid credentials
+ACT: Enter username and password, click login
+ASSERT: Redirected to dashboard, user menu shows username
+\`\`\`
+
+### Failed Login
+\`\`\`
+ARRANGE: Navigate to login page, prepare invalid credentials
+ACT: Enter wrong username/password, click login
+ASSERT: Error message displays, remains on login page
+\`\`\`
+
+### Password Reset
+\`\`\`
+ARRANGE: Navigate to login page, click "Forgot Password"
+ACT: Enter email address, click "Send Reset Link"
+ASSERT: Success message appears, check email instruction shows
+\`\`\`
+
+## Form Validation Scenarios
+
+### Required Field Validation
+\`\`\`
+ARRANGE: Navigate to form, leave required field empty
+ACT: Attempt to submit form
+ASSERT: Validation error shows, form not submitted
+\`\`\`
+
+### Email Format Validation
+\`\`\`
+ARRANGE: Navigate to form with email field
+ACT: Enter invalid email format (e.g., "notanemail")
+ASSERT: Email format error message displays
+\`\`\`
+
+### Character Limit Validation
+\`\`\`
+ARRANGE: Navigate to form with character-limited field
+ACT: Enter text exceeding limit (e.g., 500 chars in 100-char field)
+ASSERT: Character count warning shows, submission blocked
+\`\`\`
+
+## E-commerce Scenarios
+
+### Add to Cart
+\`\`\`
+ARRANGE: Navigate to product page, verify product availability
+ACT: Select options (size, color), set quantity, click "Add to Cart"
+ASSERT: Cart counter updates, product appears in cart dropdown
+\`\`\`
+
+### Checkout Flow
+\`\`\`
+ARRANGE: Add items to cart, navigate to checkout
+ACT: Fill shipping info, select payment method, place order
+ASSERT: Order confirmation shows, email confirmation mentioned
+\`\`\`
+
+### Product Search
+\`\`\`
+ARRANGE: Navigate to homepage, locate search bar
+ACT: Enter product search term, click search button
+ASSERT: Results page loads, relevant products displayed
+\`\`\`
+
+## API Integration Scenarios
+
+### Data Loading
+\`\`\`
+ARRANGE: Navigate to page that loads data via API
+ACT: Wait for page load, observe loading indicators
+ASSERT: Data displays correctly, no error messages
+\`\`\`
+
+### Form Submission with API
+\`\`\`
+ARRANGE: Fill out form connected to API endpoint
+ACT: Submit form data
+ASSERT: Success response received, UI updates appropriately
+\`\`\`
+
+## Accessibility Scenarios
+
+### Keyboard Navigation
+\`\`\`
+ARRANGE: Navigate to page, focus on first interactive element
+ACT: Use Tab key to navigate through all interactive elements
+ASSERT: All elements focusable, focus visible, logical order
+\`\`\`
+
+### Screen Reader Compatibility
+\`\`\`
+ARRANGE: Navigate to form with screen reader simulation
+ACT: Navigate through form fields using screen reader commands
+ASSERT: All labels read correctly, instructions clear
+\`\`\`
+
+## Performance Scenarios
+
+### Page Load Speed
+\`\`\`
+ARRANGE: Clear cache, navigate to page
+ACT: Measure page load time
+ASSERT: Page loads under 3 seconds, no performance errors
+\`\`\`
+
+### Image Loading
+\`\`\`
+ARRANGE: Navigate to image-heavy page
+ACT: Observe image loading behavior
+ASSERT: Images load progressively, no broken image icons
+\`\`\`
+
+## Mobile Responsive Scenarios
+
+### Mobile Menu
+\`\`\`
+ARRANGE: Resize browser to mobile view, navigate to homepage
+ACT: Click hamburger menu icon
+ASSERT: Mobile navigation menu expands, all links accessible
+\`\`\`
+
+### Touch Interactions
+\`\`\`
+ARRANGE: Set mobile viewport, navigate to interactive page
+ACT: Test touch gestures (tap, swipe, pinch)
+ASSERT: Touch targets appropriate size, gestures work correctly
+\`\`\`
+
+## Quick Reference: Task Writing Tips
+
+1. **Be Specific**: Use exact text, button labels, and selectors
+2. **Single Purpose**: One clear action or verification per step
+3. **State Aware**: Always verify current state before acting
+4. **User Focused**: Write from user perspective, not technical implementation
+5. **Measurable**: Include specific expected outcomes
+`;
+  }
+
+  private getMonitoringGuide(): string {
+    return `# Session Monitoring Guide
+
+## Monitoring Strategies
+
+### 1. Manual Monitoring (Interactive)
+Best for development and debugging:
+
+\`\`\`json
+{
+  "tool": "monitor_qa_session",
+  "params": {
+    "sessionId": "your-session-id",
+    "autoRespond": true
+  }
+}
+\`\`\`
+
+**When to use**: Development, debugging, interactive testing
+**Frequency**: Call repeatedly until status is "closed" or "idle"
+
+### 2. Automatic Monitoring (Fire-and-forget)
+Best for production and batch testing:
+
+\`\`\`json
+{
+  "tool": "monitor_qa_session",
+  "params": {
+    "sessionId": "your-session-id",
+    "wait_for_completion": true,
+    "timeout": 300
+  }
+}
+\`\`\`
+
+**When to use**: Batch testing, CI/CD, unattended runs
+**Timeout recommendations**:
+- Simple tests: 60-120 seconds
+- Complex workflows: 180-300 seconds
+- Deep testing: 300-600 seconds
+
+### 3. Batch Monitoring
+Monitor multiple sessions efficiently:
+
+\`\`\`json
+{
+  "tool": "list_qa_sessions",
+  "params": {
+    "limit": 20,
+    "offset": 0
+  }
+}
+\`\`\`
+
+## Session Status Guide
+
+| Status | Meaning | Action Required |
+|--------|---------|----------------|
+| \`active\` | Running normally | Continue monitoring |
+| \`pending\` | Waiting for user input | Respond with \`respond_to_qa_session\` |
+| \`closed\` | ✅ Completed successfully | Review results |
+| \`idle\` | ⏸️ Paused/waiting | May need intervention |
+| \`failed\` | ❌ Error occurred | Check logs, retry |
+
+## Best Practices
+
+### Monitoring Frequency
+- **Interactive**: Every 5-10 seconds
+- **Automatic**: Let \`wait_for_completion\` handle it
+- **Batch**: Every 30-60 seconds for overview
+
+### Timeout Management
+\`\`\`javascript
+// Good timeout settings
+{
+  "simple_login": 60,      // Basic form interactions
+  "e_commerce": 180,       // Shopping flow with payments
+  "complex_workflow": 300, // Multi-step processes
+  "integration_test": 600  // Full system tests
+}
+\`\`\`
+
+### Error Handling
+1. **Session Not Found**: Check session ID, may have expired
+2. **Timeout**: Increase timeout or break into smaller tests
+3. **Pending Input**: Always respond promptly to avoid blocking
+4. **API Errors**: Check API key and network connectivity
+
+### Response Handling
+When session requires input:
+
+\`\`\`json
+{
+  "tool": "respond_to_qa_session",
+  "params": {
+    "sessionId": "session-id",
+    "response": "Your specific response based on the question"
+  }
+}
+\`\`\`
+
+## Common Patterns
+
+### Pattern 1: Start and Wait
+\`\`\`javascript
+// 1. Start session
+start_qa_session({url, task})
+
+// 2. Get session ID from response.data.agent_id
+const sessionId = response.data.agent_id
+
+// 3. Wait for completion
+monitor_qa_session({
+  sessionId,
+  wait_for_completion: true,
+  timeout: 180
+})
+\`\`\`
+
+### Pattern 2: Interactive Testing
+\`\`\`javascript
+// 1. Start session
+start_qa_session({url, task})
+
+// 2. Monitor with auto-respond
+while (status !== 'closed' && status !== 'idle') {
+  const result = monitor_qa_session({sessionId, autoRespond: true})
+  if (result.hasPendingInput) {
+    // Handle user input prompt
+    respond_to_qa_session({sessionId, response})
+  }
+  wait(5000) // Wait 5 seconds
+}
+\`\`\`
+
+### Pattern 3: Batch Testing
+\`\`\`javascript
+// 1. Run multiple tests
+run_automated_tests({test_ids: ['test1', 'test2', 'test3']})
+
+// 2. Monitor all sessions
+const sessions = list_qa_sessions({limit: 50})
+sessions.forEach(session => {
+  if (session.status === 'active') {
+    monitor_qa_session({
+      sessionId: session.id,
+      wait_for_completion: true
+    })
+  }
+})
+\`\`\`
+
+## Troubleshooting
+
+### Session Stuck in "active"
+- Increase timeout
+- Check if user input is required
+- Verify browser connectivity
+
+### High Response Times
+- Use pagination for large session lists
+- Monitor fewer sessions simultaneously
+- Check network connectivity
+
+### Memory Usage
+- Clean up completed sessions regularly
+- Use appropriate timeouts
+- Avoid monitoring too many sessions concurrently
+`;
   }
 
   async start(): Promise<void> {
