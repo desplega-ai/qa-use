@@ -101,6 +101,11 @@ interface GetAutomatedTestParams {
   testId: string;
 }
 
+interface RunAutomatedTestsParams {
+  test_ids: string[];
+  ws_url?: string;
+}
+
 interface SessionSummary {
   id: string;
   status: string;
@@ -488,6 +493,28 @@ class QAUseMcpServer {
               required: ['testId'],
             },
           },
+          {
+            name: 'run_automated_tests',
+            description: 'Execute multiple automated tests simultaneously. Uses the global browser WebSocket URL from init_qa_server.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                test_ids: {
+                  type: 'array',
+                  items: {
+                    type: 'string',
+                  },
+                  description: 'Array of test IDs to execute',
+                  minItems: 1,
+                },
+                ws_url: {
+                  type: 'string',
+                  description: 'Optional WebSocket URL override (uses global tunnel URL by default)',
+                },
+              },
+              required: ['test_ids'],
+            },
+          },
         ],
       };
     });
@@ -533,6 +560,10 @@ class QAUseMcpServer {
 
       if (name === 'get_automated_test') {
         return this.handleGetAutomatedTest(params as unknown as GetAutomatedTestParams);
+      }
+
+      if (name === 'run_automated_tests') {
+        return this.handleRunAutomatedTests(params as unknown as RunAutomatedTestsParams);
       }
 
       return {
@@ -1385,6 +1416,113 @@ Please provide your response below, and it will be automatically sent to the ses
         isError: true,
       };
     }
+  }
+
+  private async handleRunAutomatedTests(params: RunAutomatedTestsParams): Promise<CallToolResult> {
+    try {
+      const { test_ids, ws_url } = params;
+
+      if (!this.globalApiClient.getApiKey()) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'API key not configured. Please run init_qa_server first with an API key.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Use provided ws_url or fall back to the global tunneled URL
+      const websocketUrl = ws_url || this.getGlobalWebSocketUrl();
+
+      if (!websocketUrl) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'No WebSocket URL available. Please run init_qa_server first to set up browser tunneling, or provide ws_url parameter.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const result = await this.globalApiClient.runTests({
+          test_ids,
+          ws_url: websocketUrl,
+        });
+
+        if (result.success) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  success: true,
+                  message: `✅ Successfully started ${test_ids.length} automated tests`,
+                  test_run_id: result.test_run_id,
+                  test_ids: test_ids,
+                  ws_url: websocketUrl,
+                  sessions: result.sessions,
+                  note: 'Tests are now running. Use list_qa_sessions to monitor progress or monitor_qa_session with individual session IDs.'
+                }, null, 2),
+              },
+            ],
+          };
+        } else {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  success: false,
+                  message: result.message || 'Failed to start tests',
+                  test_ids: test_ids,
+                  ws_url: websocketUrl,
+                }, null, 2),
+              },
+            ],
+            isError: true,
+          };
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to run tests: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to run tests: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  private getGlobalWebSocketUrl(): string | null {
+    if (!this.tunnelManager || !this.browserManager) {
+      return null;
+    }
+
+    const browserWsUrl = this.browserManager.getWebSocketEndpoint();
+    if (!browserWsUrl) {
+      return null;
+    }
+
+    return this.tunnelManager.getWebSocketUrl(browserWsUrl);
   }
 
   async start(): Promise<void> {

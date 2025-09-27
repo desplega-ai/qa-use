@@ -56,6 +56,18 @@ export interface ListOptions {
   query?: string;
 }
 
+export interface RunTestsOptions {
+  test_ids: string[];
+  ws_url?: string;
+}
+
+export interface RunTestsResponse {
+  success: boolean;
+  message?: string;
+  test_run_id?: string;
+  sessions?: any[];
+}
+
 export interface AuthResponse {
   success: boolean;
   message?: string;
@@ -371,6 +383,40 @@ export class ApiClient {
         );
       }
       throw new Error(error instanceof Error ? error.message : 'Unknown error fetching test');
+    }
+  }
+
+  async runTests(options: RunTestsOptions): Promise<RunTestsResponse> {
+    try {
+      const requestData = {
+        test_ids: options.test_ids,
+        ws_url: options.ws_url,
+      };
+
+      const response: AxiosResponse = await this.client.post('/vibe-qa/run-tests', requestData);
+
+      return {
+        success: true,
+        message: response.data.message || 'Tests started successfully',
+        test_run_id: response.data.test_run_id,
+        sessions: response.data.sessions,
+        ...response.data,
+      };
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const statusCode = error.response?.status;
+        const errorData = error.response?.data;
+
+        return {
+          success: false,
+          message: errorData?.message || errorData?.detail || `HTTP ${statusCode}: Failed to run tests`,
+        };
+      }
+
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error running tests',
+      };
     }
   }
 }
