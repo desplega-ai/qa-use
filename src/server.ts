@@ -7,6 +7,164 @@ import { BrowserManager } from '../lib/browser/index.js';
 import { TunnelManager } from '../lib/tunnel/index.js';
 import { ApiClient } from '../lib/api/index.js';
 
+// TypeScript interfaces based on Python models
+interface UserInputIntent {
+  question?: string;
+  priority?: string;
+  reasoning?: string;
+  memory?: unknown;
+  confidence?: string;
+  description?: string;
+  tasks_pending?: boolean;
+  previous_step_analysis?: string;
+}
+
+interface SessionData {
+  status?: string;
+  wsUrl?: string;
+  url?: string;
+  task?: string;
+  pending_user_input?: UserInputIntent;
+  last_done?: unknown;
+  liveview_url?: string;
+  test_id?: string;
+  agent_id?: string;
+  blocks?: unknown[];
+  history?: unknown[];
+  model_name?: string;
+  recording_path?: string;
+  app_config_id?: string;
+  organization_id?: string;
+  dependency_test_ids?: string[];
+}
+
+interface QASessionResponse {
+  id: string;
+  status: string;
+  createdAt: string;
+  data?: SessionData;
+  source?: string;
+}
+
+interface InitQaServerParams {
+  apiKey?: string;
+  forceInstall?: boolean;
+  interactive?: boolean;
+  headless?: boolean;
+}
+
+interface RegisterUserParams {
+  email: string;
+}
+
+interface GetQaSessionParams {
+  sessionId: string;
+}
+
+interface StartQaSessionParams {
+  url: string;
+  task: string;
+  dependencyId?: string;
+}
+
+interface MonitorQaSessionParams {
+  sessionId: string;
+  autoRespond?: boolean;
+}
+
+interface RespondToQaSessionParams {
+  sessionId: string;
+  response: string;
+}
+
+interface SendMessageToQaSessionParams {
+  sessionId: string;
+  action: 'pause' | 'response' | 'close';
+  data?: string;
+}
+
+interface GetAutomatedTestParams {
+  testId: string;
+}
+
+interface SessionSummary {
+  id: string;
+  status: string;
+  createdAt: string;
+  data: {
+    status?: string;
+    url?: string;
+    task?: string;
+    test_id?: string;
+    agent_id?: string;
+    liveview_url?: string;
+    hasPendingInput: boolean;
+    lastActivity: string;
+    historyCount: number;
+    blocksCount: number;
+  };
+  source?: string;
+  note: string;
+}
+
+interface SessionDetails {
+  id: string;
+  status: string;
+  createdAt: string;
+  data: {
+    status?: string;
+    url?: string;
+    task?: string;
+    test_id?: string;
+    agent_id?: string;
+    liveview_url?: string;
+    pending_user_input?: UserInputIntent;
+    last_done?: unknown;
+    model_name?: string;
+    recording_path?: string;
+    dependency_test_ids?: string[];
+    history: unknown[];
+    historyNote?: string;
+    blocks: unknown[];
+    blocksNote?: string;
+  };
+  source?: string;
+}
+
+interface TestSummary {
+  id: string;
+  name: string;
+  description?: string;
+  url?: string;
+  task?: string;
+  status?: string;
+  created_at: string;
+  dependency_test_ids?: string[];
+  note: string;
+}
+
+interface StartSessionResult {
+  success: boolean;
+  message: string;
+  sessionId: string;
+  note: string;
+  session: {
+    id: string;
+    status: string;
+    createdAt: string;
+    data: {
+      agent_id?: string;
+      test_id?: string;
+      url?: string;
+      task?: string;
+      status?: string;
+      liveview_url?: string;
+      dependency_test_ids?: string[];
+    };
+    source?: string;
+  };
+}
+
 class QAUseMcpServer {
   private server: Server;
   private globalApiClient: ApiClient;
@@ -30,7 +188,7 @@ class QAUseMcpServer {
     this.setupTools();
   }
 
-  private createSessionSummary(session: any): any {
+  private createSessionSummary(session: QASessionResponse): SessionSummary {
     return {
       id: session.id,
       status: session.status,
@@ -38,23 +196,23 @@ class QAUseMcpServer {
       data: {
         status: session.data?.status,
         url: session.data?.url,
-        task: session.data?.task?.length > 100
-          ? session.data.task.substring(0, 100) + '...'
+        task: session.data?.task && session.data.task.length > 50
+          ? session.data.task.substring(0, 50) + '...'
           : session.data?.task,
         test_id: session.data?.test_id,
         agent_id: session.data?.agent_id,
         liveview_url: session.data?.liveview_url,
         hasPendingInput: !!session.data?.pending_user_input,
         lastActivity: session.data?.last_done ? 'Recent activity available' : 'No recent activity',
-        historyCount: session.data?.history?.length || 0,
-        blocksCount: session.data?.blocks?.length || 0,
+        historyCount: session.data?.history?.length ?? 0,
+        blocksCount: session.data?.blocks?.length ?? 0,
       },
       source: session.source,
       note: 'Use get_qa_session for full details including history and blocks'
     };
   }
 
-  private createSessionDetails(session: any): any {
+  private createSessionDetails(session: QASessionResponse): SessionDetails {
     const result = {
       id: session.id,
       status: session.status,
@@ -72,13 +230,13 @@ class QAUseMcpServer {
         recording_path: session.data?.recording_path,
         dependency_test_ids: session.data?.dependency_test_ids,
         // Limit history to last 5 entries
-        history: session.data?.history?.slice(-5) || [],
-        historyNote: session.data?.history?.length > 5
+        history: session.data?.history?.slice(-5) ?? [],
+        historyNote: session.data?.history && session.data.history.length > 5
           ? `Showing last 5 of ${session.data.history.length} total history entries`
           : undefined,
         // Limit blocks to last 10 entries
-        blocks: session.data?.blocks?.slice(-10) || [],
-        blocksNote: session.data?.blocks?.length > 10
+        blocks: session.data?.blocks?.slice(-10) ?? [],
+        blocksNote: session.data?.blocks && session.data.blocks.length > 10
           ? `Showing last 10 of ${session.data.blocks.length} total blocks`
           : undefined,
       },
@@ -87,16 +245,16 @@ class QAUseMcpServer {
     return result;
   }
 
-  private createTestSummary(test: any): any {
+  private createTestSummary(test: { id: string; name: string; description?: string; url?: string; task?: string; status?: string; created_at: string; dependency_test_ids?: string[] }): TestSummary {
     return {
       id: test.id,
       name: test.name,
-      description: test.description?.length > 100
-        ? test.description.substring(0, 100) + '...'
+      description: test.description && test.description.length > 60
+        ? test.description.substring(0, 60) + '...'
         : test.description,
       url: test.url,
-      task: test.task?.length > 100
-        ? test.task.substring(0, 100) + '...'
+      task: test.task && test.task.length > 60
+        ? test.task.substring(0, 60) + '...'
         : test.task,
       status: test.status,
       created_at: test.created_at,
@@ -285,43 +443,43 @@ class QAUseMcpServer {
       const { name, arguments: params } = request.params;
 
       if (name === 'init_qa_server') {
-        return this.handleInitQaServer(params);
+        return this.handleInitQaServer(params as unknown as InitQaServerParams);
       }
 
       if (name === 'register_user') {
-        return this.handleRegisterUser(params);
+        return this.handleRegisterUser(params as unknown as RegisterUserParams);
       }
 
       if (name === 'list_qa_sessions') {
-        return this.handleListQaSessions(params);
+        return this.handleListQaSessions(params as unknown as Record<string, never>);
       }
 
       if (name === 'get_qa_session') {
-        return this.handleGetQaSession(params);
+        return this.handleGetQaSession(params as unknown as GetQaSessionParams);
       }
 
       if (name === 'start_qa_session') {
-        return this.handleStartQaSession(params);
+        return this.handleStartQaSession(params as unknown as StartQaSessionParams);
       }
 
       if (name === 'monitor_qa_session') {
-        return this.handleMonitorQaSession(params);
+        return this.handleMonitorQaSession(params as unknown as MonitorQaSessionParams);
       }
 
       if (name === 'respond_to_qa_session') {
-        return this.handleRespondToQaSession(params);
+        return this.handleRespondToQaSession(params as unknown as RespondToQaSessionParams);
       }
 
       if (name === 'send_message_to_qa_session') {
-        return this.handleSendMessageToQaSession(params);
+        return this.handleSendMessageToQaSession(params as unknown as SendMessageToQaSessionParams);
       }
 
       if (name === 'search_automated_tests') {
-        return this.handleSearchAutomatedTests(params);
+        return this.handleSearchAutomatedTests(params as unknown as Record<string, never>);
       }
 
       if (name === 'get_automated_test') {
-        return this.handleGetAutomatedTest(params);
+        return this.handleGetAutomatedTest(params as unknown as GetAutomatedTestParams);
       }
 
       return {
@@ -336,19 +494,14 @@ class QAUseMcpServer {
     });
   }
 
-  private async handleInitQaServer(params: any): Promise<CallToolResult> {
+  private async handleInitQaServer(params: InitQaServerParams): Promise<CallToolResult> {
     try {
       const {
         apiKey,
         forceInstall,
         interactive,
         headless = false,
-      } = params as {
-        apiKey?: string;
-        forceInstall?: boolean;
-        interactive?: boolean;
-        headless?: boolean;
-      };
+      } = params;
 
       // Use provided API key or fall back to environment variable
       if (apiKey) {
@@ -447,9 +600,9 @@ After registration, you'll receive an API key that you can use in Option 1.`,
     }
   }
 
-  private async handleRegisterUser(params: any): Promise<CallToolResult> {
+  private async handleRegisterUser(params: RegisterUserParams): Promise<CallToolResult> {
     try {
-      const { email } = params as { email: string };
+      const { email } = params;
 
       const result = await this.globalApiClient.register(email);
 
@@ -486,7 +639,7 @@ After registration, you'll receive an API key that you can use in Option 1.`,
     }
   }
 
-  private async handleListQaSessions(params: any): Promise<CallToolResult> {
+  private async handleListQaSessions(params: Record<string, never>): Promise<CallToolResult> {
     try {
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -502,15 +655,23 @@ After registration, you'll receive an API key that you can use in Option 1.`,
 
       try {
         const sessions = await this.globalApiClient.listSessions();
-        const sessionSummaries = sessions.map(session => this.createSessionSummary(session));
+
+        // Limit to first 20 sessions to avoid token overflow
+        const limitedSessions = sessions.slice(0, 20);
+        const sessionSummaries = limitedSessions.map(session => this.createSessionSummary(session));
+
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify({
                 sessions: sessionSummaries,
-                count: sessions.length,
-                note: 'This is a summary view. Use get_qa_session with a specific sessionId to get full details including complete history and blocks.'
+                displayed: limitedSessions.length,
+                total: sessions.length,
+                truncated: sessions.length > 20,
+                note: sessions.length > 20
+                  ? `Showing first 20 of ${sessions.length} sessions to avoid token limits. Use get_qa_session for specific session details.`
+                  : 'This is a summary view. Use get_qa_session with a specific sessionId to get full details including complete history and blocks.'
               }, null, 2),
             },
           ],
@@ -539,9 +700,9 @@ After registration, you'll receive an API key that you can use in Option 1.`,
     }
   }
 
-  private async handleGetQaSession(params: any): Promise<CallToolResult> {
+  private async handleGetQaSession(params: GetQaSessionParams): Promise<CallToolResult> {
     try {
-      const { sessionId } = params as { sessionId: string };
+      const { sessionId } = params;
 
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -590,13 +751,9 @@ After registration, you'll receive an API key that you can use in Option 1.`,
     }
   }
 
-  private async handleStartQaSession(params: any): Promise<CallToolResult> {
+  private async handleStartQaSession(params: StartQaSessionParams): Promise<CallToolResult> {
     try {
-      const { url, task, dependencyId } = params as {
-        url: string;
-        task: string;
-        dependencyId?: string;
-      };
+      const { url, task, dependencyId } = params;
 
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -723,12 +880,9 @@ After registration, you'll receive an API key that you can use in Option 1.`,
     }
   }
 
-  private async handleMonitorQaSession(params: any): Promise<CallToolResult> {
+  private async handleMonitorQaSession(params: MonitorQaSessionParams): Promise<CallToolResult> {
     try {
-      const { sessionId, autoRespond = true } = params as {
-        sessionId: string;
-        autoRespond?: boolean;
-      };
+      const { sessionId, autoRespond = true } = params;
 
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -814,12 +968,9 @@ Please provide your response below, and it will be automatically sent to the ses
     }
   }
 
-  private async handleRespondToQaSession(params: any): Promise<CallToolResult> {
+  private async handleRespondToQaSession(params: RespondToQaSessionParams): Promise<CallToolResult> {
     try {
-      const { sessionId, response } = params as {
-        sessionId: string;
-        response: string;
-      };
+      const { sessionId, response } = params;
 
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -873,17 +1024,13 @@ Please provide your response below, and it will be automatically sent to the ses
     }
   }
 
-  private async handleSendMessageToQaSession(params: any): Promise<CallToolResult> {
+  private async handleSendMessageToQaSession(params: SendMessageToQaSessionParams): Promise<CallToolResult> {
     try {
       const {
         sessionId,
         action,
         data = '',
-      } = params as {
-        sessionId: string;
-        action: 'pause' | 'response' | 'close';
-        data?: string;
-      };
+      } = params;
 
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -936,7 +1083,7 @@ Please provide your response below, and it will be automatically sent to the ses
     }
   }
 
-  private async handleSearchAutomatedTests(params: any): Promise<CallToolResult> {
+  private async handleSearchAutomatedTests(params: Record<string, never>): Promise<CallToolResult> {
     try {
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -952,15 +1099,23 @@ Please provide your response below, and it will be automatically sent to the ses
 
       try {
         const tests = await this.globalApiClient.listTests();
-        const testSummaries = tests.map(test => this.createTestSummary(test));
+
+        // Limit to first 50 tests to avoid token overflow
+        const limitedTests = tests.slice(0, 50);
+        const testSummaries = limitedTests.map(test => this.createTestSummary(test));
+
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify({
                 tests: testSummaries,
-                count: tests.length,
-                note: 'This is a summary view. Use get_automated_test with a specific testId to get full details.'
+                displayed: limitedTests.length,
+                total: tests.length,
+                truncated: tests.length > 50,
+                note: tests.length > 50
+                  ? `Showing first 50 of ${tests.length} tests to avoid token limits. Use get_automated_test for specific test details.`
+                  : 'This is a summary view. Use get_automated_test with a specific testId to get full details.'
               }, null, 2),
             },
           ],
@@ -989,9 +1144,9 @@ Please provide your response below, and it will be automatically sent to the ses
     }
   }
 
-  private async handleGetAutomatedTest(params: any): Promise<CallToolResult> {
+  private async handleGetAutomatedTest(params: GetAutomatedTestParams): Promise<CallToolResult> {
     try {
-      const { testId } = params as { testId: string };
+      const { testId } = params;
 
       if (!this.globalApiClient.getApiKey()) {
         return {
