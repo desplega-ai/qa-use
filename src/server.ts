@@ -30,6 +30,81 @@ class QAUseMcpServer {
     this.setupTools();
   }
 
+  private createSessionSummary(session: any): any {
+    return {
+      id: session.id,
+      status: session.status,
+      createdAt: session.createdAt,
+      data: {
+        status: session.data?.status,
+        url: session.data?.url,
+        task: session.data?.task?.length > 100
+          ? session.data.task.substring(0, 100) + '...'
+          : session.data?.task,
+        test_id: session.data?.test_id,
+        agent_id: session.data?.agent_id,
+        liveview_url: session.data?.liveview_url,
+        hasPendingInput: !!session.data?.pending_user_input,
+        lastActivity: session.data?.last_done ? 'Recent activity available' : 'No recent activity',
+        historyCount: session.data?.history?.length || 0,
+        blocksCount: session.data?.blocks?.length || 0,
+      },
+      source: session.source,
+      note: 'Use get_qa_session for full details including history and blocks'
+    };
+  }
+
+  private createSessionDetails(session: any): any {
+    const result = {
+      id: session.id,
+      status: session.status,
+      createdAt: session.createdAt,
+      data: {
+        status: session.data?.status,
+        url: session.data?.url,
+        task: session.data?.task,
+        test_id: session.data?.test_id,
+        agent_id: session.data?.agent_id,
+        liveview_url: session.data?.liveview_url,
+        pending_user_input: session.data?.pending_user_input,
+        last_done: session.data?.last_done,
+        model_name: session.data?.model_name,
+        recording_path: session.data?.recording_path,
+        dependency_test_ids: session.data?.dependency_test_ids,
+        // Limit history to last 5 entries
+        history: session.data?.history?.slice(-5) || [],
+        historyNote: session.data?.history?.length > 5
+          ? `Showing last 5 of ${session.data.history.length} total history entries`
+          : undefined,
+        // Limit blocks to last 10 entries
+        blocks: session.data?.blocks?.slice(-10) || [],
+        blocksNote: session.data?.blocks?.length > 10
+          ? `Showing last 10 of ${session.data.blocks.length} total blocks`
+          : undefined,
+      },
+      source: session.source,
+    };
+    return result;
+  }
+
+  private createTestSummary(test: any): any {
+    return {
+      id: test.id,
+      name: test.name,
+      description: test.description?.length > 100
+        ? test.description.substring(0, 100) + '...'
+        : test.description,
+      url: test.url,
+      task: test.task?.length > 100
+        ? test.task.substring(0, 100) + '...'
+        : test.task,
+      status: test.status,
+      created_at: test.created_at,
+      dependency_test_ids: test.dependency_test_ids,
+      note: 'Use get_automated_test for full details'
+    };
+  }
+
   private setupTools(): void {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
@@ -427,11 +502,16 @@ After registration, you'll receive an API key that you can use in Option 1.`,
 
       try {
         const sessions = await this.globalApiClient.listSessions();
+        const sessionSummaries = sessions.map(session => this.createSessionSummary(session));
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(sessions, null, 2),
+              text: JSON.stringify({
+                sessions: sessionSummaries,
+                count: sessions.length,
+                note: 'This is a summary view. Use get_qa_session with a specific sessionId to get full details including complete history and blocks.'
+              }, null, 2),
             },
           ],
         };
@@ -477,11 +557,12 @@ After registration, you'll receive an API key that you can use in Option 1.`,
 
       try {
         const session = await this.globalApiClient.getSession(sessionId);
+        const sessionDetails = this.createSessionDetails(session);
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(session, null, 2),
+              text: JSON.stringify(sessionDetails, null, 2),
             },
           ],
         };
@@ -848,11 +929,16 @@ Please provide your response below, and it will be automatically sent to the ses
 
       try {
         const tests = await this.globalApiClient.listTests();
+        const testSummaries = tests.map(test => this.createTestSummary(test));
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(tests, null, 2),
+              text: JSON.stringify({
+                tests: testSummaries,
+                count: tests.length,
+                note: 'This is a summary view. Use get_automated_test with a specific testId to get full details.'
+              }, null, 2),
             },
           ],
         };
