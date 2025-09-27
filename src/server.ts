@@ -174,7 +174,7 @@ class QAUseMcpServer {
           },
           {
             name: 'start_qa_session',
-            description: 'Start a new QA testing session',
+            description: 'Start a new QA testing session. Returns sessionId (data.agent_id) for subsequent operations.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -668,11 +668,34 @@ After registration, you'll receive an API key that you can use in Option 1.`,
           dependencyId,
         });
 
+        const sessionId = session.data?.agent_id;
+        const result = {
+          success: true,
+          message: 'QA session started successfully',
+          sessionId: sessionId,
+          note: `Use sessionId "${sessionId}" for monitoring, responding, and controlling this session`,
+          session: {
+            id: session.id,
+            status: session.status,
+            createdAt: session.createdAt,
+            data: {
+              agent_id: session.data?.agent_id,
+              test_id: session.data?.test_id,
+              url: session.data?.url,
+              task: session.data?.task,
+              status: session.data?.status,
+              liveview_url: session.data?.liveview_url,
+              dependency_test_ids: session.data?.dependency_test_ids,
+            },
+            source: session.source,
+          }
+        };
+
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(session, null, 2),
+              text: JSON.stringify(result, null, 2),
             },
           ],
         };
