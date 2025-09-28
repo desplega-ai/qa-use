@@ -38,6 +38,8 @@ export interface QASession {
 
 export interface CreateSessionOptions {
   url: string;
+  login_username?: string;
+  login_password?: string;
   task: string;
   mode?: 'fast' | 'normal' | 'max';
   wsUrl?: string;
@@ -227,6 +229,8 @@ export class ApiClient {
         mode: options.mode,
         ws_url: options.wsUrl,
         dep_id: options.dependencyId,
+        login_username: options.login_username,
+        login_password: options.login_password,
       };
 
       const response: AxiosResponse = await this.client.post('/vibe-qa/sessions', sessionData);

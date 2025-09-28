@@ -12,7 +12,7 @@ pnpm build
 
 echo "🧪 Testing start_qa_session..."
 
-# Test start_qa_session tool call via stdio
+# Test start_qa_session tool call via stdio (basic test)
 cat << 'EOF' | node dist/src/index.js
 {
   "jsonrpc": "2.0",
@@ -22,9 +22,28 @@ cat << 'EOF' | node dist/src/index.js
     "name": "start_qa_session",
     "arguments": {
       "url": "https://example.com",
-      "task": "Test the homepage for accessibility and basic functionality",
-      "mode": "normal",
-      "headless": true
+      "task": "Test the homepage for accessibility and basic functionality"
+    }
+  }
+}
+EOF
+
+echo ""
+echo "🔐 Testing start_qa_session with login parameters..."
+
+# Test start_qa_session with login parameters
+cat << 'EOF' | node dist/src/index.js
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "start_qa_session",
+    "arguments": {
+      "url": "https://example.com/login",
+      "task": "Test login functionality with provided credentials",
+      "login_username": "testuser@example.com",
+      "login_password": "securepass123"
     }
   }
 }

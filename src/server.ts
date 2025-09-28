@@ -91,6 +91,8 @@ interface StartQaSessionParams {
   url: string;
   task: string;
   dependencyId?: string;
+  login_username?: string;
+  login_password?: string;
 }
 
 interface MonitorQaSessionParams {
@@ -418,6 +420,14 @@ class QAUseMcpServer {
                 dependencyId: {
                   type: 'string',
                   description: 'Optional test ID that this session depends on',
+                },
+                login_username: {
+                  type: 'string',
+                  description: 'Optional username for login-based testing',
+                },
+                login_password: {
+                  type: 'string',
+                  description: 'Optional password for login-based testing',
                 },
               },
               required: ['url', 'task'],
@@ -911,7 +921,7 @@ After registration, you'll receive an API key that you can use in Option 1.`,
 
   private async handleStartQaSession(params: StartQaSessionParams): Promise<CallToolResult> {
     try {
-      const { url, task, dependencyId } = params;
+      const { url, task, dependencyId, login_username, login_password } = params;
 
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -981,6 +991,8 @@ After registration, you'll receive an API key that you can use in Option 1.`,
           task,
           wsUrl,
           dependencyId,
+          login_username,
+          login_password,
         });
 
         const sessionId = session.data?.agent_id;
@@ -2044,6 +2056,20 @@ Verify that the page redirects to ${expectedRedirect}, check that the user is pr
 - Wait for state changes: ensure page load is complete before acting
 - Verify multiple aspects: URL change, UI elements, and authentication state
 - Handle loading states: account for any loading spinners or async operations
+- **New Feature**: You can now pass login_username and login_password parameters directly to start_qa_session for automated credential handling
+
+**Example start_qa_session call with login parameters:**
+\`\`\`json
+{
+  "tool": "start_qa_session",
+  "params": {
+    "url": "${url}",
+    "task": "Test login functionality with provided credentials",
+    "login_username": "${username}",
+    "login_password": "${password}"
+  }
+}
+\`\`\`
 
 Write the task description for start_qa_session following this AAA structure.`;
   }
