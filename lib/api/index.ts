@@ -37,11 +37,8 @@ export interface QASession {
 }
 
 export interface CreateSessionOptions {
-  url: string;
-  login_username?: string;
-  login_password?: string;
+  url?: string;
   task: string;
-  mode?: 'fast' | 'normal' | 'max';
   wsUrl?: string;
   dependencyId?: string;
 }
@@ -61,6 +58,7 @@ export interface ListOptions {
 export interface RunTestsOptions {
   test_ids: string[];
   ws_url?: string;
+  app_config_id?: string;
 }
 
 export interface RunTestsResponse {
@@ -74,6 +72,37 @@ export interface AuthResponse {
   success: boolean;
   message?: string;
   apiKey?: string;
+  data?: {
+    api_key?: {
+      id: string;
+      name: string;
+      scope: string;
+      status: string;
+      created_at: string;
+      organization_id: string;
+      app_config_id: string;
+      expiration_date?: string;
+    };
+    app_config?: {
+      id: string;
+      name: string;
+      base_url: string;
+      login_url: string;
+      login_username: string;
+      login_password: string;
+      login_instructions: string;
+      login_steps: any[];
+      organization_id: string;
+      status: string;
+      vp_type: string;
+      width?: number;
+      height?: number;
+      remove_popups: boolean;
+      failure_status: string;
+      created_at: string;
+      updated_at?: string;
+    };
+  };
 }
 
 export interface RegisterResponse {
@@ -143,9 +172,56 @@ export interface ListTestRunsOptions {
   offset?: number;
 }
 
+export type ViewportConfigType = 'big_desktop' | 'desktop' | 'mobile' | 'tablet';
+
+export interface UpdateAppConfigSchema {
+  base_url?: string;
+  login_url?: string;
+  login_username?: string;
+  login_password?: string;
+  vp_type?: ViewportConfigType;
+}
+
+export interface UpdateAppConfigResponse {
+  success: boolean;
+  message?: string;
+  data?: any;
+}
+
+export interface AppConfig {
+  id: string;
+  name: string;
+  base_url: string;
+  login_url: string;
+  login_username: string;
+  login_password: string;
+  login_instructions: string;
+  login_steps: any[];
+  organization_id: string;
+  status: string;
+  vp_type: string;
+  width?: number;
+  height?: number;
+  remove_popups: boolean;
+  failure_status: string;
+  created_at: string;
+  updated_at?: string;
+  created_by: string;
+  updated_by?: string;
+  deleted_at?: string;
+  deleted_by?: string;
+}
+
+export interface ListAppConfigsOptions {
+  limit?: number;
+  offset?: number;
+  query?: string;
+}
+
 export class ApiClient {
   private readonly client: AxiosInstance;
   private apiKey: string | null = null;
+  private appConfigId: string | null = null;
 
   constructor(baseUrl?: string) {
     // Use environment variable if available, otherwise use provided baseUrl, finally fall back to production
@@ -175,6 +251,14 @@ export class ApiClient {
     return this.apiKey;
   }
 
+  setAppConfigId(appConfigId: string): void {
+    this.appConfigId = appConfigId;
+  }
+
+  getAppConfigId(): string | null {
+    return this.appConfigId;
+  }
+
   static getAppUrl(): string {
     return process.env.QA_USE_APP_URL || 'https://app.desplega.ai';
   }
@@ -198,6 +282,11 @@ export class ApiClient {
           Authorization: `Bearer ${keyToValidate}`,
         },
       });
+
+      // Store app_config.id if available
+      if (response.data?.data?.app_config?.id) {
+        this.appConfigId = response.data.data.app_config.id;
+      }
 
       return {
         success: true,
@@ -226,11 +315,8 @@ export class ApiClient {
       const sessionData = {
         url: options.url,
         task: options.task,
-        mode: options.mode,
         ws_url: options.wsUrl,
         dep_id: options.dependencyId,
-        login_username: options.login_username,
-        login_password: options.login_password,
       };
 
       const response: AxiosResponse = await this.client.post('/vibe-qa/sessions', sessionData);
@@ -443,6 +529,7 @@ export class ApiClient {
       const requestData = {
         test_ids: options.test_ids,
         ws_url: options.ws_url,
+        app_config_id: options.app_config_id,
       };
 
       const response: AxiosResponse = await this.client.post('/vibe-qa/run-tests', requestData);
@@ -524,6 +611,106 @@ export class ApiClient {
         );
       }
       throw new Error(error instanceof Error ? error.message : 'Unknown error fetching test runs');
+    }
+  }
+
+  async updateAppConfig(config: UpdateAppConfigSchema): Promise<UpdateAppConfigResponse> {
+    try {
+      if (!this.apiKey) {
+        return {
+          success: false,
+          message: 'API key not configured. Please set an API key first.',
+        };
+      }
+
+      // Apply default for vp_type if not specified
+      const configWithDefaults = {
+        ...config,
+        vp_type: config.vp_type || 'desktop',
+      };
+
+      const response: AxiosResponse = await this.client.post(
+        '/vibe-qa/app-configs',
+        configWithDefaults
+      );
+
+      return {
+        success: true,
+        message: response.data.message || 'App config updated successfully',
+        data: response.data,
+      };
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const statusCode = error.response?.status;
+        const errorData = error.response?.data;
+
+        return {
+          success: false,
+          message:
+            errorData?.message ||
+            errorData?.detail ||
+            `HTTP ${statusCode}: Failed to update app config`,
+        };
+      }
+
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error updating app config',
+      };
+    }
+  }
+
+  async listAppConfigs(options: ListAppConfigsOptions = {}): Promise<AppConfig[]> {
+    try {
+      if (!this.apiKey) {
+        throw new Error('API key not configured. Please set an API key first.');
+      }
+
+      const params = new URLSearchParams();
+      if (options.limit !== undefined) params.append('limit', options.limit.toString());
+      if (options.offset !== undefined) params.append('offset', options.offset.toString());
+      if (options.query) params.append('query', options.query);
+
+      const response: AxiosResponse = await this.client.get(
+        `/vibe-qa/app-configs?${params.toString()}`
+      );
+
+      return response.data.map((config: any) => ({
+        id: config.id,
+        name: config.name,
+        base_url: config.base_url,
+        login_url: config.login_url,
+        login_username: config.login_username,
+        login_password: config.login_password,
+        login_instructions: config.login_instructions,
+        login_steps: config.login_steps,
+        organization_id: config.organization_id,
+        status: config.status,
+        vp_type: config.vp_type,
+        width: config.width,
+        height: config.height,
+        remove_popups: config.remove_popups,
+        failure_status: config.failure_status,
+        created_at: config.created_at,
+        updated_at: config.updated_at,
+        created_by: config.created_by,
+        updated_by: config.updated_by,
+        deleted_at: config.deleted_at,
+        deleted_by: config.deleted_by,
+      }));
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const statusCode = error.response?.status;
+        const errorData = error.response?.data;
+        throw new Error(
+          errorData?.message ||
+            errorData?.detail ||
+            `HTTP ${statusCode}: Failed to fetch app configs`
+        );
+      }
+      throw new Error(
+        error instanceof Error ? error.message : 'Unknown error fetching app configs'
+      );
     }
   }
 }

@@ -64,7 +64,6 @@ interface InitQaServerParams {
   apiKey?: string;
   forceInstall?: boolean;
   interactive?: boolean;
-  headless?: boolean;
 }
 
 interface RegisterUserParams {
@@ -77,22 +76,10 @@ interface ListQaSessionsParams {
   query?: string;
 }
 
-interface SearchAutomatedTestsParams {
-  limit?: number;
-  offset?: number;
-  query?: string;
-}
-
-interface GetQaSessionParams {
-  sessionId: string;
-}
-
 interface StartQaSessionParams {
-  url: string;
+  url?: string;
   task: string;
   dependencyId?: string;
-  login_username?: string;
-  login_password?: string;
 }
 
 interface MonitorQaSessionParams {
@@ -102,24 +89,23 @@ interface MonitorQaSessionParams {
   timeout?: number;
 }
 
-interface RespondToQaSessionParams {
+interface InteractWithQaSessionParams {
   sessionId: string;
-  response: string;
+  action: 'respond' | 'pause' | 'close';
+  message?: string;
 }
 
-interface SendMessageToQaSessionParams {
-  sessionId: string;
-  action: 'pause' | 'response' | 'close';
-  data?: string;
-}
-
-interface GetAutomatedTestParams {
-  testId: string;
+interface FindAutomatedTestParams {
+  testId?: string;
+  query?: string;
+  limit?: number;
+  offset?: number;
 }
 
 interface RunAutomatedTestsParams {
   test_ids: string[];
   ws_url?: string;
+  app_config_id?: string;
 }
 
 interface ListTestRunsParams {
@@ -127,6 +113,22 @@ interface ListTestRunsParams {
   run_id?: string;
   limit?: number;
   offset?: number;
+}
+
+type ViewportConfigType = 'big_desktop' | 'desktop' | 'mobile' | 'tablet';
+
+interface UpdateAppConfigParams {
+  base_url?: string;
+  login_url?: string;
+  login_username?: string;
+  login_password?: string;
+  vp_type?: ViewportConfigType;
+}
+
+interface ListAppConfigsParams {
+  limit?: number;
+  offset?: number;
+  query?: string;
 }
 
 interface SessionSummary {
@@ -255,7 +257,7 @@ class QAUseMcpServer {
         blocksCount: session.data?.blocks?.length ?? 0,
       },
       source: session.source,
-      note: 'Use get_qa_session for full details including history and blocks',
+      note: 'Use monitor_qa_session for full details including history and blocks',
     };
   }
 
@@ -316,7 +318,7 @@ class QAUseMcpServer {
       status: test.status,
       created_at: test.created_at,
       dependency_test_ids: test.dependency_test_ids,
-      note: 'Use get_automated_test for full details',
+      note: 'Use find_automated_test({testId: "specific-id"}) for full details',
     };
   }
 
@@ -326,7 +328,8 @@ class QAUseMcpServer {
         tools: [
           {
             name: 'init_qa_server',
-            description: 'Initialize QA server environment and start browser',
+            description:
+              'Initialize QA server environment and start browser. Browser runs in visible mode for better debugging.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -342,10 +345,6 @@ class QAUseMcpServer {
                 interactive: {
                   type: 'boolean',
                   description: 'Enable interactive mode for API key setup if not provided',
-                },
-                headless: {
-                  type: 'boolean',
-                  description: 'Run browser in headless mode (default: false)',
                 },
               },
               required: [],
@@ -389,29 +388,15 @@ class QAUseMcpServer {
             },
           },
           {
-            name: 'get_qa_session',
-            description: 'Get detailed information about a specific QA session',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                sessionId: {
-                  type: 'string',
-                  description: 'The session ID to retrieve',
-                },
-              },
-              required: ['sessionId'],
-            },
-          },
-          {
             name: 'start_qa_session',
             description:
-              'Start a new QA testing session. Returns sessionId (data.agent_id) for subsequent operations. Use monitor_qa_session to track progress and wait for completion.',
+              'Start a new QA testing session. Returns sessionId (data.agent_id) for subsequent operations. URL is optional - if not provided, uses the app config base_url. Use update_app_config to set login credentials and base URL first.',
             inputSchema: {
               type: 'object',
               properties: {
                 url: {
                   type: 'string',
-                  description: 'The URL to test',
+                  description: 'Optional URL to test (overrides app config base_url if provided)',
                 },
                 task: {
                   type: 'string',
@@ -421,16 +406,8 @@ class QAUseMcpServer {
                   type: 'string',
                   description: 'Optional test ID that this session depends on',
                 },
-                login_username: {
-                  type: 'string',
-                  description: 'Optional username for login-based testing',
-                },
-                login_password: {
-                  type: 'string',
-                  description: 'Optional password for login-based testing',
-                },
               },
-              required: ['url', 'task'],
+              required: ['task'],
             },
           },
           {
@@ -465,81 +442,61 @@ class QAUseMcpServer {
             },
           },
           {
-            name: 'respond_to_qa_session',
-            description: 'Respond to a QA session that is waiting for user input',
+            name: 'interact_with_qa_session',
+            description:
+              'Interact with a QA session - respond to questions, pause, or close session',
             inputSchema: {
               type: 'object',
               properties: {
                 sessionId: {
                   type: 'string',
-                  description: 'The session ID that needs a response',
-                },
-                response: {
-                  type: 'string',
-                  description: 'Your response to the pending question',
-                },
-              },
-              required: ['sessionId', 'response'],
-            },
-          },
-          {
-            name: 'send_message_to_qa_session',
-            description: 'Send control messages to an active session',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                sessionId: {
-                  type: 'string',
-                  description: 'The session ID',
+                  description: 'The session ID to interact with',
                 },
                 action: {
                   type: 'string',
-                  enum: ['pause', 'response', 'close'],
-                  description: 'Action to perform',
+                  enum: ['respond', 'pause', 'close'],
+                  description:
+                    'Action to perform: respond (answer question), pause (stop session), or close (end session)',
                 },
-                data: {
+                message: {
                   type: 'string',
-                  description: 'Additional message data',
+                  description:
+                    'Your response message (required for "respond" action, optional for others)',
                 },
               },
               required: ['sessionId', 'action'],
             },
           },
           {
-            name: 'search_automated_tests',
-            description: 'Search and list automated tests with pagination and filtering',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                limit: {
-                  type: 'number',
-                  description: 'Maximum number of tests to return (default: 10, min: 1)',
-                  minimum: 1,
-                },
-                offset: {
-                  type: 'number',
-                  description: 'Number of tests to skip (default: 0, min: 0)',
-                  minimum: 0,
-                },
-                query: {
-                  type: 'string',
-                  description: 'Search query to filter tests by name, description, URL, or task',
-                },
-              },
-            },
-          },
-          {
-            name: 'get_automated_test',
-            description: 'Get detailed information about a specific automated test',
+            name: 'find_automated_test',
+            description:
+              'Find automated tests by ID or search query. If testId provided, returns detailed info for that test. Otherwise searches with optional query/pagination.',
             inputSchema: {
               type: 'object',
               properties: {
                 testId: {
                   type: 'string',
-                  description: 'The test ID to retrieve',
+                  description:
+                    'Specific test ID to retrieve detailed information for (if provided, other params ignored)',
+                },
+                query: {
+                  type: 'string',
+                  description:
+                    'Search query to filter tests by name, description, URL, or task (ignored if testId provided)',
+                },
+                limit: {
+                  type: 'number',
+                  description:
+                    'Maximum number of tests to return (default: 10, min: 1) (ignored if testId provided)',
+                  minimum: 1,
+                },
+                offset: {
+                  type: 'number',
+                  description:
+                    'Number of tests to skip (default: 0, min: 0) (ignored if testId provided)',
+                  minimum: 0,
                 },
               },
-              required: ['testId'],
             },
           },
           {
@@ -561,6 +518,11 @@ class QAUseMcpServer {
                   type: 'string',
                   description:
                     'Optional WebSocket URL override (uses global tunnel URL by default)',
+                },
+                app_config_id: {
+                  type: 'string',
+                  description:
+                    'Optional app config ID to run tests against (uses API key default config if not provided)',
                 },
               },
               required: ['test_ids'],
@@ -593,6 +555,69 @@ class QAUseMcpServer {
               },
             },
           },
+          {
+            name: 'update_app_config',
+            description:
+              'Update app configuration settings (base URL, login settings, viewport type)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                base_url: {
+                  type: 'string',
+                  description: 'Base URL for the application being tested',
+                },
+                login_url: {
+                  type: 'string',
+                  description: 'Login page URL for the application',
+                },
+                login_username: {
+                  type: 'string',
+                  description: 'Default username for login testing',
+                },
+                login_password: {
+                  type: 'string',
+                  description: 'Default password for login testing',
+                },
+                vp_type: {
+                  type: 'string',
+                  enum: ['big_desktop', 'desktop', 'mobile', 'tablet'],
+                  description: 'Viewport configuration type for browser testing (default: desktop)',
+                },
+              },
+            },
+          },
+          {
+            name: 'list_app_configs',
+            description: 'List app configurations with pagination and search filtering',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                limit: {
+                  type: 'number',
+                  description: 'Maximum number of app configs to return (default: 10, min: 1)',
+                  minimum: 1,
+                },
+                offset: {
+                  type: 'number',
+                  description: 'Number of app configs to skip (default: 0, min: 0)',
+                  minimum: 0,
+                },
+                query: {
+                  type: 'string',
+                  description: 'Search query to filter app configs by name, base URL, or status',
+                },
+              },
+            },
+          },
+          {
+            name: 'get_current_app_config',
+            description:
+              'Get the current app configuration details (equivalent to /check endpoint)',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
         ],
       };
     });
@@ -612,10 +637,6 @@ class QAUseMcpServer {
         return this.handleListQaSessions(params as unknown as ListQaSessionsParams);
       }
 
-      if (name === 'get_qa_session') {
-        return this.handleGetQaSession(params as unknown as GetQaSessionParams);
-      }
-
       if (name === 'start_qa_session') {
         return this.handleStartQaSession(params as unknown as StartQaSessionParams);
       }
@@ -624,20 +645,12 @@ class QAUseMcpServer {
         return this.handleMonitorQaSession(params as unknown as MonitorQaSessionParams);
       }
 
-      if (name === 'respond_to_qa_session') {
-        return this.handleRespondToQaSession(params as unknown as RespondToQaSessionParams);
+      if (name === 'interact_with_qa_session') {
+        return this.handleInteractWithQaSession(params as unknown as InteractWithQaSessionParams);
       }
 
-      if (name === 'send_message_to_qa_session') {
-        return this.handleSendMessageToQaSession(params as unknown as SendMessageToQaSessionParams);
-      }
-
-      if (name === 'search_automated_tests') {
-        return this.handleSearchAutomatedTests(params as unknown as SearchAutomatedTestsParams);
-      }
-
-      if (name === 'get_automated_test') {
-        return this.handleGetAutomatedTest(params as unknown as GetAutomatedTestParams);
+      if (name === 'find_automated_test') {
+        return this.handleFindAutomatedTest(params as unknown as FindAutomatedTestParams);
       }
 
       if (name === 'run_automated_tests') {
@@ -646,6 +659,18 @@ class QAUseMcpServer {
 
       if (name === 'list_test_runs') {
         return this.handleListTestRuns(params as unknown as ListTestRunsParams);
+      }
+
+      if (name === 'update_app_config') {
+        return this.handleUpdateAppConfig(params as unknown as UpdateAppConfigParams);
+      }
+
+      if (name === 'list_app_configs') {
+        return this.handleListAppConfigs(params as unknown as ListAppConfigsParams);
+      }
+
+      if (name === 'get_current_app_config') {
+        return this.handleGetCurrentAppConfig();
       }
 
       return {
@@ -662,7 +687,8 @@ class QAUseMcpServer {
 
   private async handleInitQaServer(params: InitQaServerParams): Promise<CallToolResult> {
     try {
-      const { apiKey, forceInstall, interactive, headless = false } = params;
+      const { apiKey, forceInstall, interactive } = params;
+      const headless = false; // Always run in visible mode for better debugging
 
       // Use provided API key or fall back to environment variable
       if (apiKey) {
@@ -739,12 +765,60 @@ After registration, you'll receive an API key that you can use in Option 1.`,
 
       const apiUrl = this.globalApiClient.getApiUrl();
       const appUrl = ApiClient.getAppUrl();
+      const appConfigId = this.globalApiClient.getAppConfigId();
+
+      let initMessage = `QA server initialized successfully. API key validated and browser started.\nAPI URL: ${apiUrl}\nApp URL: ${appUrl}\nLocal Browser WebSocket: ${wsEndpoint}\nTunneled Browser WebSocket: ${tunnelWsUrl}\nTunnel URL: ${tunnelSession.publicUrl}\nHeadless mode: ${headless}`;
+
+      if (appConfigId) {
+        initMessage += `\nApp Config ID: ${appConfigId}`;
+      }
+
+      // Include app config details if available
+      if (authResult.data?.app_config) {
+        const appConfig = authResult.data.app_config;
+        initMessage += `\nApp Config: ${appConfig.name} (${appConfig.base_url})`;
+        if (appConfig.login_url) {
+          initMessage += `\nLogin URL: ${appConfig.login_url}`;
+        }
+
+        // Check if app config needs setup
+        if (!appConfig.base_url || appConfig.base_url.trim() === '') {
+          initMessage += `\n\n🔧 **Setup Required**: Your app config needs a base URL. Run this to configure:
+{
+  "tool": "update_app_config",
+  "params": {
+    "base_url": "https://your-app.com",
+    "login_url": "https://your-app.com/login",
+    "login_username": "test@example.com"
+  }
+}`;
+        }
+      } else {
+        initMessage += `\n\n🔧 **First Time Setup**: Configure your testing environment:
+{
+  "tool": "update_app_config",
+  "params": {
+    "base_url": "https://your-app.com",
+    "login_url": "https://your-app.com/login",
+    "login_username": "test@example.com",
+    "login_password": "your-password"
+  }
+}
+
+After setup, you can start testing without specifying URLs:
+{
+  "tool": "start_qa_session",
+  "params": {
+    "task": "Test the main functionality"
+  }
+}`;
+      }
 
       return {
         content: [
           {
             type: 'text',
-            text: `QA server initialized successfully. API key validated and browser started.\nAPI URL: ${apiUrl}\nApp URL: ${appUrl}\nLocal Browser WebSocket: ${wsEndpoint}\nTunneled Browser WebSocket: ${tunnelWsUrl}\nTunnel URL: ${tunnelSession.publicUrl}\nHeadless mode: ${headless}`,
+            text: initMessage,
           },
         ],
       };
@@ -836,7 +910,7 @@ After registration, you'll receive an API key that you can use in Option 1.`,
                   limit: options.limit,
                   offset: options.offset,
                   query: options.query || 'none',
-                  note: 'This is a summary view. Use get_qa_session with a specific sessionId to get full details including complete history and blocks. Use limit/offset for pagination.',
+                  note: 'This is a summary view. Use monitor_qa_session with a specific sessionId to get full details including complete history and blocks. Use limit/offset for pagination.',
                 },
                 null,
                 2
@@ -868,60 +942,9 @@ After registration, you'll receive an API key that you can use in Option 1.`,
     }
   }
 
-  private async handleGetQaSession(params: GetQaSessionParams): Promise<CallToolResult> {
-    try {
-      const { sessionId } = params;
-
-      if (!this.globalApiClient.getApiKey()) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'API key not configured. Please run init_qa_server first with an API key.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      try {
-        const session = await this.globalApiClient.getSession(sessionId);
-        const sessionDetails = this.createSessionDetails(session);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(sessionDetails, null, 2),
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Failed to get session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    } catch (error) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Failed to get session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-  }
-
   private async handleStartQaSession(params: StartQaSessionParams): Promise<CallToolResult> {
     try {
-      const { url, task, dependencyId, login_username, login_password } = params;
+      const { url, task, dependencyId } = params;
 
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -991,8 +1014,6 @@ After registration, you'll receive an API key that you can use in Option 1.`,
           task,
           wsUrl,
           dependencyId,
-          login_username,
-          login_password,
         });
 
         const sessionId = session.data?.agent_id;
@@ -1233,7 +1254,7 @@ Please provide your response below, and it will be automatically sent to the ses
 
 **Priority:** ${pendingInput.priority || 'normal'}
 
-Please use respond_to_qa_session tool to provide your response, then call monitor_qa_session again with wait_for_completion=true to continue monitoring.`;
+Please use interact_with_qa_session tool with action="respond" to provide your response, then call monitor_qa_session again with wait_for_completion=true to continue monitoring.`;
 
             return {
               content: [
@@ -1326,18 +1347,34 @@ Please use respond_to_qa_session tool to provide your response, then call monito
     }
   }
 
-  private async handleRespondToQaSession(
-    params: RespondToQaSessionParams
+  private async handleInteractWithQaSession(
+    params: InteractWithQaSessionParams
   ): Promise<CallToolResult> {
     try {
-      const { sessionId, response } = params;
+      const { sessionId, action, message = '' } = params;
 
       if (!this.globalApiClient.getApiKey()) {
         return {
           content: [
             {
               type: 'text',
-              text: 'API key not configured. Please run init_qa_server first with an API key.',
+              text: '❌ API key not configured.\n\n🎯 Next step: init_qa_server({apiKey: "your-api-key"})',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Validate required message for respond action
+      if (action === 'respond' && !message) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                '❌ Message is required for "respond" action.\n\n🎯 Next step: interact_with_qa_session({sessionId: "' +
+                sessionId +
+                '", action: "respond", message: "your-response"})',
             },
           ],
           isError: true,
@@ -1345,18 +1382,34 @@ Please use respond_to_qa_session tool to provide your response, then call monito
       }
 
       try {
-        // Send the user's response to the session
+        // Map new action format to API format
+        const apiAction = action === 'respond' ? 'response' : action;
+
         const result = await this.globalApiClient.sendMessage({
           sessionId,
-          action: 'response',
-          data: response,
+          action: apiAction,
+          data: message,
         });
+
+        // Create conversational output based on action
+        let responseText = '';
+        switch (action) {
+          case 'respond':
+            responseText = `✅ Response sent: "${message}"\n\n🎯 Next step: monitor_qa_session({sessionId: "${sessionId}", wait_for_completion: true})`;
+            break;
+          case 'pause':
+            responseText = `⏸️ Session paused\n\n🎯 Next step: monitor_qa_session({sessionId: "${sessionId}"}) to check status`;
+            break;
+          case 'close':
+            responseText = `🛑 Session closed\n\n🎯 Next step: list_qa_sessions() to see other active sessions`;
+            break;
+        }
 
         return {
           content: [
             {
               type: 'text',
-              text: `✅ Response sent to session ${sessionId}: "${response}"\n\nResult: ${JSON.stringify(result)}\n\n💡 **Tip:** Use monitor_qa_session to check if the session needs more input.`,
+              text: responseText,
             },
           ],
         };
@@ -1365,7 +1418,7 @@ Please use respond_to_qa_session tool to provide your response, then call monito
           content: [
             {
               type: 'text',
-              text: `Failed to send response: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              text: `❌ Failed to ${action} session: ${error instanceof Error ? error.message : 'Unknown error'}\n\n🎯 Next step: monitor_qa_session({sessionId: "${sessionId}"}) to check session status`,
             },
           ],
           isError: true,
@@ -1376,7 +1429,7 @@ Please use respond_to_qa_session tool to provide your response, then call monito
         content: [
           {
             type: 'text',
-            text: `Failed to respond to session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            text: `❌ Failed to interact with session: ${error instanceof Error ? error.message : 'Unknown error'}\n\n🎯 Next step: list_qa_sessions() to verify session exists`,
           },
         ],
         isError: true,
@@ -1384,106 +1437,71 @@ Please use respond_to_qa_session tool to provide your response, then call monito
     }
   }
 
-  private async handleSendMessageToQaSession(
-    params: SendMessageToQaSessionParams
-  ): Promise<CallToolResult> {
-    try {
-      const { sessionId, action, data = '' } = params;
-
-      if (!this.globalApiClient.getApiKey()) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'API key not configured. Please run init_qa_server first with an API key.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      try {
-        const result = await this.globalApiClient.sendMessage({
-          sessionId,
-          action,
-          data,
-        });
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Message sent to session ${sessionId}: ${JSON.stringify(result)}`,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Failed to send message: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    } catch (error) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Failed to send message: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-  }
-
-  private async handleSearchAutomatedTests(
-    params: SearchAutomatedTestsParams
-  ): Promise<CallToolResult> {
+  private async handleFindAutomatedTest(params: FindAutomatedTestParams): Promise<CallToolResult> {
     try {
       if (!this.globalApiClient.getApiKey()) {
         return {
           content: [
             {
               type: 'text',
-              text: 'API key not configured. Please run init_qa_server first with an API key.',
+              text: '❌ API key not configured.\n\n🎯 Next step: init_qa_server({apiKey: "your-api-key"})',
             },
           ],
           isError: true,
         };
       }
 
-      try {
-        // Set defaults: limit=10, offset=0, query=empty
-        const options = {
-          limit: params.limit || 10,
-          offset: params.offset || 0,
-          query: params.query || '',
-        };
+      const { testId, query, limit = 10, offset = 0 } = params;
 
+      try {
+        // If testId provided, get specific test details
+        if (testId) {
+          const test = await this.globalApiClient.getTest(testId);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `🔍 **Test Found:** ${test.name || testId}\n\n📋 **Details:**\n${JSON.stringify(test, null, 2)}\n\n🎯 Next step: run_automated_tests({test_ids: ["${testId}"]}) to execute this test`,
+              },
+            ],
+          };
+        }
+
+        // Otherwise, search for tests
+        const options = { limit, offset, query: query || '' };
         const tests = await this.globalApiClient.listTests(options);
         const testSummaries = tests.map((test) => this.createTestSummary(test));
 
+        if (tests.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: query
+                  ? `🔍 No tests found matching "${query}"\n\n🎯 Next step: find_automated_test() to see all available tests`
+                  : '📋 No automated tests found\n\n🎯 Next step: Create tests in your desplega.ai dashboard',
+              },
+            ],
+          };
+        }
+
+        if (tests.length === 1) {
+          const singleTest = tests[0];
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `🎯 **Found 1 test:** ${singleTest.name || singleTest.id}\n\n📋 **Summary:**\n${JSON.stringify(testSummaries[0], null, 2)}\n\n🎯 Next steps:\n• find_automated_test({testId: "${singleTest.id}"}) for full details\n• run_automated_tests({test_ids: ["${singleTest.id}"]}) to execute`,
+              },
+            ],
+          };
+        }
+
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(
-                {
-                  tests: testSummaries,
-                  displayed: tests.length,
-                  limit: options.limit,
-                  offset: options.offset,
-                  query: options.query || 'none',
-                  note: 'This is a summary view. Use get_automated_test with a specific testId to get full details. Use limit/offset for pagination.',
-                },
-                null,
-                2
-              ),
+              text: `🔍 **Found ${tests.length} tests** ${query ? `matching "${query}"` : ''}\n\n📋 **Tests:**\n${JSON.stringify(testSummaries, null, 2)}\n\n🎯 Next steps:\n• find_automated_test({testId: "specific-id"}) for details on any test\n• run_automated_tests({test_ids: ["id1", "id2"]}) to execute multiple tests`,
             },
           ],
         };
@@ -1492,7 +1510,7 @@ Please use respond_to_qa_session tool to provide your response, then call monito
           content: [
             {
               type: 'text',
-              text: `Failed to fetch tests: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              text: `❌ Failed to find tests: ${error instanceof Error ? error.message : 'Unknown error'}\n\n🎯 Next step: Verify your API key and try again`,
             },
           ],
           isError: true,
@@ -1503,57 +1521,7 @@ Please use respond_to_qa_session tool to provide your response, then call monito
         content: [
           {
             type: 'text',
-            text: `Failed to search tests: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-  }
-
-  private async handleGetAutomatedTest(params: GetAutomatedTestParams): Promise<CallToolResult> {
-    try {
-      const { testId } = params;
-
-      if (!this.globalApiClient.getApiKey()) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'API key not configured. Please run init_qa_server first with an API key.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      try {
-        const test = await this.globalApiClient.getTest(testId);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(test, null, 2),
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Failed to get test: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    } catch (error) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Failed to get test: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            text: `❌ Failed to find tests: ${error instanceof Error ? error.message : 'Unknown error'}\n\n🎯 Next step: Check your connection and try again`,
           },
         ],
         isError: true,
@@ -1563,7 +1531,7 @@ Please use respond_to_qa_session tool to provide your response, then call monito
 
   private async handleRunAutomatedTests(params: RunAutomatedTestsParams): Promise<CallToolResult> {
     try {
-      const { test_ids, ws_url } = params;
+      const { test_ids, ws_url, app_config_id } = params;
 
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -1596,6 +1564,7 @@ Please use respond_to_qa_session tool to provide your response, then call monito
         const result = await this.globalApiClient.runTests({
           test_ids,
           ws_url: websocketUrl,
+          app_config_id,
         });
 
         if (result.success) {
@@ -1610,6 +1579,7 @@ Please use respond_to_qa_session tool to provide your response, then call monito
                     test_run_id: result.test_run_id,
                     test_ids: test_ids,
                     ws_url: websocketUrl,
+                    app_config_id: app_config_id || 'Using API key default config',
                     sessions: result.sessions,
                     note: 'Tests are now running. Use list_qa_sessions to monitor progress or monitor_qa_session with individual session IDs.',
                   },
@@ -1727,6 +1697,219 @@ Please use respond_to_qa_session tool to provide your response, then call monito
           {
             type: 'text',
             text: `Failed to list test runs: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  private async handleUpdateAppConfig(params: UpdateAppConfigParams): Promise<CallToolResult> {
+    try {
+      if (!this.globalApiClient.getApiKey()) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'API key not configured. Please run init_qa_server first with an API key.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const result = await this.globalApiClient.updateAppConfig(params);
+
+        if (result.success) {
+          const appConfigId = this.globalApiClient.getAppConfigId();
+          let successMessage = `✅ App config updated successfully! ${result.message}`;
+
+          if (appConfigId) {
+            successMessage += `\nApp Config ID: ${appConfigId}`;
+          }
+
+          // List the changes made
+          const changes = Object.entries(params)
+            .filter(([_, value]) => value !== undefined)
+            .map(([key, value]) => `  - ${key}: ${value}`)
+            .join('\n');
+
+          if (changes) {
+            successMessage += `\n\nUpdated settings:\n${changes}`;
+          }
+
+          successMessage +=
+            '\n\n💡 **Tip:** These settings will be used for future QA sessions. You may need to restart active sessions for changes to take effect.';
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: successMessage,
+              },
+            ],
+          };
+        } else {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `❌ Failed to update app config: ${result.message}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to update app config: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to update app config: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  private async handleListAppConfigs(params: ListAppConfigsParams): Promise<CallToolResult> {
+    try {
+      if (!this.globalApiClient.getApiKey()) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'API key not configured. Please run init_qa_server first with an API key.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        // Set defaults: limit=10, offset=0, query=empty
+        const options = {
+          limit: params.limit || 10,
+          offset: params.offset || 0,
+          query: params.query || '',
+        };
+
+        const appConfigs = await this.globalApiClient.listAppConfigs(options);
+
+        // Create summary view for better readability
+        const configSummaries = appConfigs.map((config) => ({
+          id: config.id,
+          name: config.name,
+          base_url: config.base_url,
+          login_url: config.login_url || 'Not configured',
+          login_username: config.login_username || 'Not configured',
+          vp_type: config.vp_type,
+          status: config.status,
+          organization_id: config.organization_id,
+          created_at: config.created_at,
+          updated_at: config.updated_at || 'Never updated',
+          remove_popups: config.remove_popups,
+          failure_status: config.failure_status,
+        }));
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  app_configs: configSummaries,
+                  displayed: appConfigs.length,
+                  limit: options.limit,
+                  offset: options.offset,
+                  query: options.query || 'none',
+                  note: 'App configurations available for your organization. Use update_app_config to modify settings. Use limit/offset for pagination.',
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to fetch app configs: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to list app configs: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  private async handleGetCurrentAppConfig(): Promise<CallToolResult> {
+    try {
+      if (!this.globalApiClient.getApiKey()) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'API key not configured. Please run init_qa_server first with an API key.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const checkData = await this.globalApiClient.validateApiKey();
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(checkData, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to get current app config: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to get current app config: ${error instanceof Error ? error.message : 'Unknown error'}`,
           },
         ],
         isError: true,
@@ -2056,17 +2239,28 @@ Verify that the page redirects to ${expectedRedirect}, check that the user is pr
 - Wait for state changes: ensure page load is complete before acting
 - Verify multiple aspects: URL change, UI elements, and authentication state
 - Handle loading states: account for any loading spinners or async operations
-- **New Feature**: You can now pass login_username and login_password parameters directly to start_qa_session for automated credential handling
+- **Setup Required**: First configure your app using update_app_config with login credentials and base URL
 
-**Example start_qa_session call with login parameters:**
+**Example workflow:**
+1. **Configure app first:**
+\`\`\`json
+{
+  "tool": "update_app_config",
+  "params": {
+    "base_url": "${url}",
+    "login_url": "${url}",
+    "login_username": "${username}",
+    "login_password": "${password}"
+  }
+}
+\`\`\`
+
+2. **Then start testing:**
 \`\`\`json
 {
   "tool": "start_qa_session",
   "params": {
-    "url": "${url}",
-    "task": "Test login functionality with provided credentials",
-    "login_username": "${username}",
-    "login_password": "${password}"
+    "task": "Test login functionality using configured credentials"
   }
 }
 \`\`\`
@@ -2329,31 +2523,43 @@ Write the task description for start_qa_session following this AAA structure wit
   private getGettingStartedGuide(): string {
     return `# QA-Use MCP Server - Getting Started Guide
 
-## Quick Setup
+## Quick Setup (New App Config Workflow)
 
 ### 1. Initialize the Server
 \`\`\`json
 {
   "tool": "init_qa_server",
   "params": {
-    "apiKey": "your-api-key",
-    "headless": false
+    "apiKey": "your-api-key"
   }
 }
 \`\`\`
 
-### 2. Start a QA Session
+### 2. Configure Your App (One-time setup)
+\`\`\`json
+{
+  "tool": "update_app_config",
+  "params": {
+    "base_url": "https://your-app.com",
+    "login_url": "https://your-app.com/login",
+    "login_username": "test@example.com",
+    "login_password": "your-password",
+    "vp_type": "desktop"
+  }
+}
+\`\`\`
+
+### 3. Start Testing (URL optional - uses app config)
 \`\`\`json
 {
   "tool": "start_qa_session",
   "params": {
-    "url": "https://example.com",
-    "task": "Test login functionality"
+    "task": "Test login functionality using configured credentials"
   }
 }
 \`\`\`
 
-### 3. Monitor Progress
+### 4. Monitor Progress
 \`\`\`json
 {
   "tool": "monitor_qa_session",
@@ -2365,49 +2571,118 @@ Write the task description for start_qa_session following this AAA structure wit
 }
 \`\`\`
 
+## New Workflow Benefits
+
+- **One-time Setup**: Configure your app once, test repeatedly
+- **User Isolation**: Each user has their own app config
+- **Simplified Testing**: No need to pass URL/credentials every time
+- **Flexible Overrides**: Can still specify URL for specific tests
+- **Multi-Config Support**: Test against different environments
+
 ## Core Concepts
 
-- **Sessions**: Individual QA testing instances
+- **App Configs**: Centralized configuration for your testing environment
+- **Sessions**: Individual QA testing instances using your app config
 - **Tunneling**: Automatic browser WebSocket URL tunneling for remote access
 - **Monitoring**: Real-time session progress tracking
 - **Batch Testing**: Execute multiple automated tests simultaneously
 
+## New User Journey
+
+1. **Register** → Get API key (if needed)
+2. **Initialize** → \`init_qa_server\` with API key
+3. **Configure** → \`update_app_config\` with your app settings
+4. **Test** → \`start_qa_session\` (URL optional)
+5. **Monitor** → \`list_app_configs\` to see available configs
+6. **Batch** → \`run_automated_tests\` with optional app_config_id
+
 ## Next Steps
 
-1. Read the Workflows guide for common testing patterns
+1. Read the Workflows guide for app config patterns
 2. Check out AAA Framework templates for effective test writing
 3. Explore monitoring best practices
+4. Use \`list_app_configs\` to see other available configurations
 `;
   }
 
   private getWorkflowsGuide(): string {
     return `# QA-Use Testing Workflows
 
+## New Workflow: App Config-Based Testing
+*Recommended workflow with centralized configuration*
+
+1. **Initialize** → \`init_qa_server\` with API key
+2. **Configure** → \`update_app_config\` (one-time setup)
+3. **Test** → \`start_qa_session\` (URL optional)
+4. **Monitor** → \`monitor_qa_session\`
+5. **Explore** → \`list_app_configs\` to see other environments
+
+### App Config Setup Example
+\`\`\`json
+{
+  "tool": "update_app_config",
+  "params": {
+    "base_url": "https://staging.myapp.com",
+    "login_url": "https://staging.myapp.com/auth/login",
+    "login_username": "tester@mycompany.com",
+    "login_password": "secure-test-password",
+    "vp_type": "desktop"
+  }
+}
+\`\`\`
+
+### Testing with App Config
+\`\`\`json
+{
+  "tool": "start_qa_session",
+  "params": {
+    "task": "Test user registration flow"
+  }
+}
+\`\`\`
+
 ## Workflow 1: Interactive Testing
 *For manual testing with AI assistance*
 
 1. **Initialize** → \`init_qa_server\`
-2. **Start Session** → \`start_qa_session\`
-3. **Monitor & Respond** → \`monitor_qa_session\` + \`respond_to_qa_session\`
-4. **Completion** → Session reaches "closed" or "idle"
+2. **Configure** → \`update_app_config\` (if first time)
+3. **Start Session** → \`start_qa_session\` (URL optional)
+4. **Monitor & Interact** → \`monitor_qa_session\` + \`interact_with_qa_session\`
+5. **Completion** → Session reaches "closed" or "idle"
 
 ## Workflow 2: Automated Batch Testing
 *For running pre-defined test suites*
 
 1. **Initialize** → \`init_qa_server\`
-2. **Search Tests** → \`search_automated_tests\`
-3. **Run Tests** → \`run_automated_tests\`
+2. **Find Tests** → \`find_automated_test\`
+3. **Run Tests** → \`run_automated_tests\` (with optional app_config_id)
 4. **Monitor Progress** → \`list_qa_sessions\` + \`monitor_qa_session\`
+
+### Multi-Environment Testing
+\`\`\`json
+{
+  "tool": "run_automated_tests",
+  "params": {
+    "test_ids": ["login-test", "checkout-test"],
+    "app_config_id": "staging-config-id"
+  }
+}
+\`\`\`
 
 ## Workflow 3: Test Development
 *For creating and refining test cases*
 
-1. **Search Existing** → \`search_automated_tests\`
-2. **Get Test Details** → \`get_automated_test\`
-3. **Start New Session** → \`start_qa_session\` (with reference)
-4. **Monitor & Iterate** → \`monitor_qa_session\`
+1. **Find Tests** → \`find_automated_test\` (by query or testId)
+2. **Start New Session** → \`start_qa_session\` (uses app config + pass dependencyId if needed)
+3. **Monitor & Iterate** → \`monitor_qa_session\`
 
 ## Best Practices
+
+### App Configuration
+- **One-time Setup**: Configure your app once per environment
+- **User Isolation**: Each team member has their own app config
+- **Environment Management**: Use \`list_app_configs\` to see available configs
+- **Override When Needed**: Still pass URL for specific page testing
 
 ### Session Management
 - Always use \`wait_for_completion=true\` for unattended monitoring
@@ -2423,6 +2698,7 @@ Write the task description for start_qa_session following this AAA structure wit
 - Use batch testing for multiple related tests
 - Leverage global WebSocket URL for consistent browser access
 - Implement proper cleanup with session monitoring
+- Use \`app_config_id\` to test against different environments efficiently
 `;
   }
 
@@ -2485,7 +2761,7 @@ Monitor multiple sessions efficiently:
 | Status | Meaning | Action Required |
 |--------|---------|----------------|
 | \`active\` | Running normally | Continue monitoring |
-| \`pending\` | Waiting for user input | Respond with \`respond_to_qa_session\` |
+| \`pending\` | Waiting for user input | Use \`interact_with_qa_session\` with action="respond" |
 | \`closed\` | ✅ Completed successfully | Review results |
 | \`idle\` | ⏸️ Paused/waiting | May need intervention |
 | \`failed\` | ❌ Error occurred | Check logs, retry |
@@ -2519,25 +2795,33 @@ When session requires input:
 
 \`\`\`json
 {
-  "tool": "respond_to_qa_session",
+  "tool": "interact_with_qa_session",
   "params": {
     "sessionId": "session-id",
-    "response": "Your specific response based on the question"
+    "action": "respond",
+    "message": "Your specific response based on the question"
   }
 }
 \`\`\`
 
 ## Common Patterns
 
-### Pattern 1: Start and Wait
+### Pattern 1: App Config-Based Testing (Recommended)
 \`\`\`javascript
-// 1. Start session
-start_qa_session({url, task})
+// 1. Configure once (if not already done)
+update_app_config({
+  base_url: "https://staging.app.com",
+  login_username: "test@company.com",
+  login_password: "secure-password"
+})
 
-// 2. Get session ID from response.data.agent_id
+// 2. Start session (URL optional - uses app config)
+start_qa_session({task: "Test user registration flow"})
+
+// 3. Get session ID from response.data.agent_id
 const sessionId = response.data.agent_id
 
-// 3. Wait for completion
+// 4. Wait for completion
 monitor_qa_session({
   sessionId,
   wait_for_completion: true,
@@ -2545,28 +2829,30 @@ monitor_qa_session({
 })
 \`\`\`
 
-### Pattern 2: Interactive Testing
+### Pattern 2: URL Override Testing
 \`\`\`javascript
-// 1. Start session
-start_qa_session({url, task})
+// Test specific page while keeping app config for credentials
+start_qa_session({
+  url: "https://app.com/special-feature",
+  task: "Test special feature page"
+})
 
-// 2. Monitor with auto-respond
-while (status !== 'closed' && status !== 'idle') {
-  const result = monitor_qa_session({sessionId, autoRespond: true})
-  if (result.hasPendingInput) {
-    // Handle user input prompt
-    respond_to_qa_session({sessionId, response})
-  }
-  wait(5000) // Wait 5 seconds
-}
+// Monitor as usual
+monitor_qa_session({sessionId, wait_for_completion: true})
 \`\`\`
 
-### Pattern 3: Batch Testing
+### Pattern 3: Multi-Environment Batch Testing
 \`\`\`javascript
-// 1. Run multiple tests
-run_automated_tests({test_ids: ['test1', 'test2', 'test3']})
+// 1. See available configurations
+const configs = list_app_configs({limit: 10})
 
-// 2. Monitor all sessions
+// 2. Run tests against specific config
+run_automated_tests({
+  test_ids: ['test1', 'test2', 'test3'],
+  app_config_id: 'staging-config-id'
+})
+
+// 3. Monitor all sessions
 const sessions = list_qa_sessions({limit: 50})
 sessions.forEach(session => {
   if (session.status === 'active') {
@@ -2576,6 +2862,22 @@ sessions.forEach(session => {
     })
   }
 })
+\`\`\`
+
+### Pattern 4: Interactive Testing
+\`\`\`javascript
+// 1. Start session with app config
+start_qa_session({task: "Interactive exploration"})
+
+// 2. Monitor with auto-respond
+while (status !== 'closed' && status !== 'idle') {
+  const result = monitor_qa_session({sessionId, autoRespond: true})
+  if (result.hasPendingInput) {
+    // Handle user input prompt
+    interact_with_qa_session({sessionId, action: "respond", message: response})
+  }
+  wait(5000) // Wait 5 seconds
+}
 \`\`\`
 
 ## Troubleshooting
@@ -2600,7 +2902,7 @@ sessions.forEach(session => {
   async start(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error('QA-Use MCP Server started');
+    console.info(`${getName()} running (PID: ${process.pid}, Version: ${getVersion()})`);
 
     // Handle graceful shutdown
     process.on('SIGINT', async () => {

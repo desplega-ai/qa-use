@@ -77,7 +77,7 @@ init_qa_server with interactive=true
 ```
 Or with direct API key:
 ```
-init_qa_server with apiKey="your-api-key" and headless=false
+init_qa_server with apiKey="your-api-key"
 ```
 
 ### 2. Register New Account (if needed)
@@ -85,12 +85,21 @@ init_qa_server with apiKey="your-api-key" and headless=false
 register_user with email="your-email@example.com"
 ```
 
-### 3. Start Testing Session
+### 3. Configure App Settings (one-time setup)
 ```
-start_qa_session with url="https://example.com" and task="test the login form"
+update_app_config with base_url="https://example.com" and login_url="https://example.com/login" and login_username="user@example.com" and vp_type="desktop"
 ```
 
-### 4. Monitor Progress (with timeout protection)
+### 4. Start Testing Session
+```
+start_qa_session with task="test the login form"
+```
+Or with URL override:
+```
+start_qa_session with url="https://specific-page.com" and task="test specific page"
+```
+
+### 5. Monitor Progress (with timeout protection)
 ```
 monitor_qa_session with sessionId="session-id" and wait_for_completion=true and timeout=180
 ```
@@ -161,7 +170,6 @@ Initialize the QA server environment with API credentials and browser setup.
 - `apiKey` (string, optional): API key for desplega.ai (uses env var if not provided)
 - `forceInstall` (boolean, optional): Force reinstall of Playwright browsers
 - `interactive` (boolean, optional): Enable interactive setup for missing credentials
-- `headless` (boolean, optional): Run browser in headless mode (default: false)
 
 #### `register_user`
 Register a new user account with desplega.ai and receive an API key.
@@ -179,17 +187,11 @@ List QA testing sessions with pagination and search capabilities.
 - `offset` (number, optional): Number of sessions to skip (default: 0)
 - `query` (string, optional): Search query for filtering sessions
 
-#### `get_qa_session`
-Get detailed information about a specific QA session including history and blocks.
-
-**Parameters:**
-- `sessionId` (string, required): The session ID to retrieve
-
 #### `start_qa_session`
 Start a new QA testing session with browser automation.
 
 **Parameters:**
-- `url` (string, required): The URL to test
+- `url` (string, optional): The URL to test (uses app config base_url if not provided)
 - `task` (string, required): The testing task description
 - `dependencyId` (string, optional): Test ID that this session depends on
 
@@ -202,43 +204,56 @@ Monitor session progress with MCP timeout protection and real-time notifications
 - `wait_for_completion` (boolean, optional): Wait for completion with timeout protection
 - `timeout` (number, optional): User timeout in seconds (default: 60, max 25s per MCP call)
 
-#### `respond_to_qa_session`
-Respond to a QA session that is waiting for user input.
+#### `interact_with_qa_session`
+Interact with a QA session - respond to questions, pause, or close session.
 
 **Parameters:**
-- `sessionId` (string, required): The session ID that needs a response
-- `response` (string, required): Your response to the pending question
-
-#### `send_message_to_qa_session`
-Send control messages to an active session.
-
-**Parameters:**
-- `sessionId` (string, required): The session ID
-- `action` (string, required): Action to perform - "pause", "response", or "close"
-- `data` (string, optional): Additional message data
+- `sessionId` (string, required): The session ID to interact with
+- `action` (string, required): Action to perform - "respond", "pause", or "close"
+- `message` (string, optional): Your response message (required for "respond" action)
 
 ### Test Management
 
-#### `search_automated_tests`
-Search and list automated tests with pagination and filtering.
+#### `find_automated_test`
+Find automated tests by ID or search query. Smart tool that returns detailed info if testId provided, otherwise searches tests.
 
 **Parameters:**
+- `testId` (string, optional): Specific test ID to get detailed information (if provided, other params ignored)
+- `query` (string, optional): Search query to filter tests by name, description, URL, or task
 - `limit` (number, optional): Maximum tests to return (default: 10)
 - `offset` (number, optional): Number of tests to skip (default: 0)
-- `query` (string, optional): Search query for filtering by name, description, URL, or task
-
-#### `get_automated_test`
-Get detailed information about a specific automated test.
-
-**Parameters:**
-- `testId` (string, required): The test ID to retrieve
 
 #### `run_automated_tests`
 Execute multiple automated tests simultaneously with dependency management.
 
 **Parameters:**
 - `test_ids` (array, required): Array of test IDs to execute
-- `ws_url` (string, optional): WebSocket URL override (uses global tunnel by default)
+- `app_config_id` (string, optional): Override app config for this test run
+
+### App Configuration Management
+
+#### `update_app_config`
+Update your application configuration settings (one-time setup).
+
+**Parameters:**
+- `base_url` (string, optional): Default URL for testing sessions
+- `login_url` (string, optional): Login page URL for authentication
+- `login_username` (string, optional): Username for login credentials
+- `login_password` (string, optional): Password for login credentials
+- `vp_type` (string, optional): Viewport type - "mobile" or "desktop" (default: "desktop")
+
+#### `list_app_configs`
+List your saved app configurations.
+
+**Parameters:**
+- `limit` (number, optional): Maximum configs to return (default: 10)
+- `offset` (number, optional): Number of configs to skip (default: 0)
+
+#### `get_current_app_config`
+Get details about your current active app configuration.
+
+**Parameters:**
+- None (no parameters required)
 
 #### `list_test_runs`
 List test run history with performance metrics and filtering capabilities.
@@ -319,20 +334,23 @@ Alternatively, if you have the API key in your system environment:
 # 1. Initialize server
 init_qa_server with interactive=true
 
-# 2. Start a test session
-start_qa_session with url="https://app.example.com" and task="Test user registration flow"
+# 2. Configure app settings (one-time setup)
+update_app_config with base_url="https://app.example.com" and login_url="https://app.example.com/login" and login_username="testuser@example.com"
 
-# 3. Monitor with automatic waiting
+# 3. Start a test session (URL is now optional)
+start_qa_session with task="Test user registration flow"
+
+# 4. Monitor with automatic waiting
 monitor_qa_session with sessionId="session-123" and wait_for_completion=true and timeout=300
 
-# 4. Respond to user input requests
-respond_to_qa_session with sessionId="session-123" and response="john.doe@example.com"
+# 5. Interact with session (respond, pause, or close)
+interact_with_qa_session with sessionId="session-123" and action="respond" and message="john.doe@example.com"
 ```
 
 ### Batch Testing Workflow
 ```bash
-# 1. Search for available tests
-search_automated_tests with query="login" and limit=10
+# 1. Find available tests
+find_automated_test with query="login" and limit=10
 
 # 2. Run multiple tests simultaneously
 run_automated_tests with test_ids=["login-test-1", "signup-test-2", "checkout-test-3"]
@@ -426,7 +444,21 @@ The project is organized into modular components:
 - Execution timing and error tracking
 - Filtering and pagination for large datasets
 
-## Recent Updates (v1.0.14)
+## Recent Updates (v1.2.0)
+
+### Major UX Simplifications
+- **Unified Session Interaction**: Replaced `respond_to_qa_session` + `send_message_to_qa_session` with single `interact_with_qa_session` tool
+- **Smart Test Finding**: Merged `search_automated_tests` + `get_automated_test` into intelligent `find_automated_test` tool
+- **Conversational Outputs**: All tool responses now use emojis and suggest specific next steps
+- **Current Config Access**: Added `get_current_app_config` for easy configuration visibility
+
+### Previous Updates (v1.1.0)
+- **App Configuration System**: One-time setup with `update_app_config` for base URLs and login credentials
+- **Optional URL Parameter**: `start_qa_session` now uses app config base_url by default
+- **Simplified Workflow**: Removed redundant parameters and consolidated tools
+- **Smart Defaults**: Automatic configuration guidance and setup suggestions
+
+## Previous Updates (v1.0.14)
 
 ### New Features
 - **Test Run Analytics**: Added `list_test_runs` tool for viewing test execution history
