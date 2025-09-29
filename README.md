@@ -4,11 +4,27 @@ An MCP (Model Context Protocol) server that provides comprehensive browser autom
 
 ## MCP Client Configuration
 
-Configure this server in your MCP client. The server requires a desplega.ai API key - you can get one by using the `register_user` tool or by signing up at [desplega.ai](https://desplega.ai).
+The server requires a desplega.ai API key - you can get one by using the `register_user` tool or by signing up at [desplega.ai](https://desplega.ai).
 
-### Claude Code
+**Standard configuration for most MCP clients:**
 
-Add the server using the CLI:
+```json
+{
+  "mcpServers": {
+    "desplega-qa": {
+      "command": "npx",
+      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
+      "env": {
+        "QA_USE_API_KEY": "your-desplega-ai-api-key"
+      }
+    }
+  }
+}
+```
+
+<details>
+  <summary>Claude Code</summary>
+    Use the Claude Code CLI to add the QA-Use MCP server (<a href="https://docs.anthropic.com/en/docs/claude-code/mcp">guide</a>):
 
 ```bash
 claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest --env QA_USE_API_KEY=your-desplega-ai-api-key
@@ -20,27 +36,11 @@ Or add without the API key and configure it later through the interactive setup:
 claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest
 ```
 
-### Claude Desktop
+</details>
 
-Add to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "desplega-qa": {
-      "command": "npx",
-      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
-      "env": {
-        "QA_USE_API_KEY": "your-desplega-ai-api-key"
-      }
-    }
-  }
-}
-```
-
-### Cline
-
-Add to your Cline MCP settings:
+<details>
+  <summary>Claude Desktop</summary>
+  Add to your <code>claude_desktop_config.json</code>:
 
 ```json
 {
@@ -56,9 +56,46 @@ Add to your Cline MCP settings:
 }
 ```
 
-### Cursor
+</details>
 
-Add to your Cursor MCP configuration:
+<details>
+  <summary>Cline</summary>
+  Follow <a href="https://docs.cline.bot/mcp/configuring-mcp-servers">https://docs.cline.bot/mcp/configuring-mcp-servers</a> and use the config provided above.
+</details>
+
+<details>
+  <summary>Codex</summary>
+  Follow the <a href="https://github.com/openai/codex/blob/main/docs/advanced.md#model-context-protocol-mcp">configure MCP guide</a>
+  using the standard config from above. You can also install the QA-Use MCP server using the Codex CLI:
+
+```bash
+codex mcp add desplega-qa -- npx @desplega.ai/qa-use-mcp@latest
+```
+
+</details>
+
+<details>
+  <summary>Copilot / VS Code</summary>
+  Follow the MCP install <a href="https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server">guide</a>,
+  with the standard config from above. You can also install the QA-Use MCP server using the VS Code CLI:
+
+  ```bash
+  code --add-mcp '{"name":"desplega-qa","command":"npx","args":["-y","@desplega.ai/qa-use-mcp@latest"],"env":{"QA_USE_API_KEY":"your-desplega-ai-api-key"}}'
+  ```
+</details>
+
+<details>
+  <summary>Cursor</summary>
+
+**Or install manually:**
+
+Go to `Cursor Settings` -> `MCP` -> `New MCP Server`. Use the config provided above.
+
+</details>
+
+<details>
+  <summary>Continue</summary>
+  Add to your Continue <code>config.json</code>:
 
 ```json
 {
@@ -74,9 +111,45 @@ Add to your Cursor MCP configuration:
 }
 ```
 
-### Continue
+</details>
 
-Add to your Continue config.json:
+<details>
+  <summary>Gemini CLI</summary>
+Install the QA-Use MCP server using the Gemini CLI.
+
+**Project wide:**
+
+```bash
+gemini mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest
+```
+
+**Globally:**
+
+```bash
+gemini mcp add -s user desplega-qa npx @desplega.ai/qa-use-mcp@latest
+```
+
+Alternatively, follow the <a href="https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md#how-to-set-up-your-mcp-server">MCP guide</a> and use the standard config from above.
+
+</details>
+
+<details>
+  <summary>Gemini Code Assist</summary>
+  Follow the <a href="https://cloud.google.com/gemini/docs/codeassist/use-agentic-chat-pair-programmer#configure-mcp-servers">configure MCP guide</a>
+  using the standard config from above.
+</details>
+
+<details>
+  <summary>JetBrains AI Assistant & Junie</summary>
+
+Go to `Settings | Tools | AI Assistant | Model Context Protocol (MCP)` -> `Add`. Use the config provided above.
+The same way @desplega.ai/qa-use-mcp can be configured for JetBrains Junie in `Settings | Tools | Junie | MCP Settings` -> `Add`. Use the config provided above.
+
+</details>
+
+<details>
+  <summary>Zed</summary>
+  Add to your Zed settings:
 
 ```json
 {
@@ -92,79 +165,20 @@ Add to your Continue config.json:
 }
 ```
 
-### Zed
+</details>
 
-Add to your Zed settings:
+### Your first prompt
 
-```json
-{
-  "mcpServers": {
-    "desplega-qa": {
-      "command": "npx",
-      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
-      "env": {
-        "QA_USE_API_KEY": "your-desplega-ai-api-key"
-      }
-    }
-  }
-}
+Enter the following prompt in your MCP Client to check if everything is working:
+
+```
+Initialize QA server and test the login form at https://app.example.com
 ```
 
-### VS Code with Copilot
+Your MCP client should initialize the server, set up browser automation, and start testing the specified form.
 
-If using VS Code with GitHub Copilot and MCP support:
-
-```json
-{
-  "mcpServers": {
-    "desplega-qa": {
-      "command": "npx",
-      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
-      "env": {
-        "QA_USE_API_KEY": "your-desplega-ai-api-key"
-      }
-    }
-  }
-}
-```
-
-### JetBrains AI Assistant
-
-Configure in your IDE MCP settings:
-
-```json
-{
-  "mcpServers": {
-    "desplega-qa": {
-      "command": "npx",
-      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
-      "env": {
-        "QA_USE_API_KEY": "your-desplega-ai-api-key"
-      }
-    }
-  }
-}
-```
-
-### Other MCP Clients
-
-For any other MCP-compatible client, use this standard configuration:
-
-```json
-{
-  "mcpServers": {
-    "desplega-qa": {
-      "command": "npx",
-      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
-      "env": {
-        "QA_USE_API_KEY": "your-desplega-ai-api-key"
-      }
-    }
-  }
-}
-```
-
-**First Time Setup**: After installing the server, run `init_qa_server` with `interactive=true` to get started, or use `register_user` to create a new account.
+> [!NOTE]
+> The MCP server will start browser and tunnel resources automatically when needed. First-time setup requires running `init_qa_server` with `interactive=true` or providing your desplega.ai API key.
 
 ## Features
 
