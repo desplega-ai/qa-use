@@ -4,7 +4,21 @@ An MCP (Model Context Protocol) server that provides comprehensive browser autom
 
 ## MCP Client Configuration
 
-Configure this server in your MCP client:
+Configure this server in your MCP client. The server requires a desplega.ai API key - you can get one by using the `register_user` tool or by signing up at [desplega.ai](https://desplega.ai).
+
+### Claude Code
+
+Add the server using the CLI:
+
+```bash
+claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest --env QA_USE_API_KEY=your-desplega-ai-api-key
+```
+
+Or add without the API key and configure it later through the interactive setup:
+
+```bash
+claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest
+```
 
 ### Claude Desktop
 
@@ -15,7 +29,7 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "desplega-qa": {
       "command": "npx",
-      "args": ["-y", "@desplega.ai/qa-use-mcp"],
+      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
       "env": {
         "QA_USE_API_KEY": "your-desplega-ai-api-key"
       }
@@ -24,35 +38,133 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-### Claude Code CLI
+### Cline
 
-```bash
-claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp --env QA_USE_API_KEY=your-desplega-ai-api-key
-```
-
-Or add without the API key first and configure it later:
-
-```bash
-claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp
-```
-
-### Other MCP Clients
-
-For other MCP clients (Cline, Cursor, etc.), use the standard configuration:
+Add to your Cline MCP settings:
 
 ```json
 {
   "mcpServers": {
     "desplega-qa": {
       "command": "npx",
-      "args": ["-y", "@desplega.ai/qa-use-mcp"],
+      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
       "env": {
-        "QA_USE_API_KEY": "your-api-key"
+        "QA_USE_API_KEY": "your-desplega-ai-api-key"
       }
     }
   }
 }
 ```
+
+### Cursor
+
+Add to your Cursor MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "desplega-qa": {
+      "command": "npx",
+      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
+      "env": {
+        "QA_USE_API_KEY": "your-desplega-ai-api-key"
+      }
+    }
+  }
+}
+```
+
+### Continue
+
+Add to your Continue config.json:
+
+```json
+{
+  "mcpServers": {
+    "desplega-qa": {
+      "command": "npx",
+      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
+      "env": {
+        "QA_USE_API_KEY": "your-desplega-ai-api-key"
+      }
+    }
+  }
+}
+```
+
+### Zed
+
+Add to your Zed settings:
+
+```json
+{
+  "mcpServers": {
+    "desplega-qa": {
+      "command": "npx",
+      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
+      "env": {
+        "QA_USE_API_KEY": "your-desplega-ai-api-key"
+      }
+    }
+  }
+}
+```
+
+### VS Code with Copilot
+
+If using VS Code with GitHub Copilot and MCP support:
+
+```json
+{
+  "mcpServers": {
+    "desplega-qa": {
+      "command": "npx",
+      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
+      "env": {
+        "QA_USE_API_KEY": "your-desplega-ai-api-key"
+      }
+    }
+  }
+}
+```
+
+### JetBrains AI Assistant
+
+Configure in your IDE MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "desplega-qa": {
+      "command": "npx",
+      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
+      "env": {
+        "QA_USE_API_KEY": "your-desplega-ai-api-key"
+      }
+    }
+  }
+}
+```
+
+### Other MCP Clients
+
+For any other MCP-compatible client, use this standard configuration:
+
+```json
+{
+  "mcpServers": {
+    "desplega-qa": {
+      "command": "npx",
+      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
+      "env": {
+        "QA_USE_API_KEY": "your-desplega-ai-api-key"
+      }
+    }
+  }
+}
+```
+
+**First Time Setup**: After installing the server, run `init_qa_server` with `interactive=true` to get started, or use `register_user` to create a new account.
 
 ## Features
 
@@ -290,42 +402,6 @@ Create a `.env` file in your project root or set the following environment varia
 QA_USE_API_KEY=your-desplega-ai-api-key
 ```
 
-### MCP Client Configuration
-
-To use this server with MCP clients like Claude Desktop, add the following to your MCP client configuration:
-
-#### Claude Desktop Configuration
-
-Add to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "qa-use": {
-      "command": "npx",
-      "args": ["-y", "qa-use-mcp"],
-      "capabilities": ["tools"],
-      "env": {
-        "QA_USE_API_KEY": "your-desplega-ai-api-key"
-      }
-    }
-  }
-}
-```
-
-Alternatively, if you have the API key in your system environment:
-
-```json
-{
-  "mcpServers": {
-    "qa-use": {
-      "command": "npx",
-      "args": ["-y", "qa-use-mcp"],
-      "capabilities": ["tools"]
-    }
-  }
-}
-```
 
 ## Usage Examples
 
