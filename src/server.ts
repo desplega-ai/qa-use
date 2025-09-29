@@ -64,6 +64,7 @@ interface InitQaServerParams {
   apiKey?: string;
   forceInstall?: boolean;
   interactive?: boolean;
+  inactivityTimeoutMinutes?: number;
 }
 
 interface RegisterUserParams {
@@ -214,6 +215,11 @@ class QAUseMcpServer {
   private globalApiClient: ApiClient;
   private browserManager: BrowserManager | null = null;
   private tunnelManager: TunnelManager | null = null;
+
+  // Inactivity timeout management
+  private inactivityTimeout: NodeJS.Timeout | null = null;
+  private inactivityTimeoutMs: number = 30 * 60 * 1000; // 30 minutes default
+  private lastActivityTime: number = Date.now();
 
   constructor() {
     this.server = new Server(
@@ -413,6 +419,78 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
 🎯 **Next step**: Session complete! You can now start a new session or view results${liveviewUrl ? ' in the recording' : ''}`;
   }
 
+  private resetInactivityTimeout(): void {
+    // Clear existing timeout
+    if (this.inactivityTimeout) {
+      clearTimeout(this.inactivityTimeout);
+      this.inactivityTimeout = null;
+    }
+
+    // Update last activity time
+    this.lastActivityTime = Date.now();
+
+    // Only set timeout if browser/tunnel are active
+    if (this.browserManager || this.tunnelManager) {
+      this.inactivityTimeout = setTimeout(() => {
+        this.handleInactivityTimeout();
+      }, this.inactivityTimeoutMs);
+    }
+  }
+
+  private async handleInactivityTimeout(): Promise<void> {
+    const inactiveMinutes = Math.round(this.inactivityTimeoutMs / 60000);
+
+    try {
+      // Send notification about cleanup
+      await this.server.notification({
+        method: 'notifications/message',
+        params: {
+          level: 'info',
+          logger: 'resource_cleanup',
+          data: {
+            message: `🧹 Cleaning up browser and tunnel resources after ${inactiveMinutes} minutes of inactivity`,
+            reason: 'inactivity_timeout',
+            inactive_duration_ms: this.inactivityTimeoutMs,
+          },
+        },
+      });
+
+      // Cleanup resources
+      await this.cleanupResources();
+    } catch (error) {
+      // Silent cleanup - don't fail if notification fails
+      await this.cleanupResources();
+    }
+  }
+
+  private async cleanupResources(): Promise<void> {
+    try {
+      // Cleanup tunnel
+      if (this.tunnelManager) {
+        await this.tunnelManager.stopTunnel();
+        this.tunnelManager = null;
+      }
+
+      // Cleanup browser
+      if (this.browserManager) {
+        await this.browserManager.stopBrowser();
+        this.browserManager = null;
+      }
+
+      // Clear timeout
+      if (this.inactivityTimeout) {
+        clearTimeout(this.inactivityTimeout);
+        this.inactivityTimeout = null;
+      }
+    } catch (error) {
+      // Silent cleanup - resources will eventually be garbage collected
+    }
+  }
+
+  private markActivity(): void {
+    this.resetInactivityTimeout();
+  }
+
   private setupTools(): void {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
@@ -436,6 +514,12 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
                 interactive: {
                   type: 'boolean',
                   description: 'Enable interactive mode for API key setup if not provided',
+                },
+                inactivityTimeoutMinutes: {
+                  type: 'number',
+                  description: 'Minutes of inactivity before browser/tunnel cleanup (default: 30)',
+                  minimum: 5,
+                  maximum: 120,
                 },
               },
               required: [],
@@ -778,7 +862,12 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
 
   private async handleInitQaServer(params: InitQaServerParams): Promise<CallToolResult> {
     try {
-      const { apiKey, forceInstall, interactive } = params;
+      const { apiKey, forceInstall, interactive, inactivityTimeoutMinutes } = params;
+
+      // Set custom timeout if provided
+      if (inactivityTimeoutMinutes) {
+        this.inactivityTimeoutMs = inactivityTimeoutMinutes * 60 * 1000;
+      }
       const headless = false; // Always run in visible mode for better debugging
 
       // Use provided API key or fall back to environment variable
@@ -854,11 +943,15 @@ After registration, you'll receive an API key that you can use in Option 1.`,
       const tunnelSession = await this.tunnelManager.startTunnel(browserPort);
       const tunnelWsUrl = this.tunnelManager.getWebSocketUrl(wsEndpoint);
 
+      // Mark activity since browser and tunnel are now initialized
+      this.markActivity();
+
       const apiUrl = this.globalApiClient.getApiUrl();
       const appUrl = ApiClient.getAppUrl();
       const appConfigId = this.globalApiClient.getAppConfigId();
 
-      let initMessage = `QA server initialized successfully. API key validated and browser started.\nAPI URL: ${apiUrl}\nApp URL: ${appUrl}\nLocal Browser WebSocket: ${wsEndpoint}\nTunneled Browser WebSocket: ${tunnelWsUrl}\nTunnel URL: ${tunnelSession.publicUrl}\nHeadless mode: ${headless}`;
+      const timeoutMinutes = Math.round(this.inactivityTimeoutMs / 60000);
+      let initMessage = `QA server initialized successfully. API key validated and browser started.\nAPI URL: ${apiUrl}\nApp URL: ${appUrl}\nLocal Browser WebSocket: ${wsEndpoint}\nTunneled Browser WebSocket: ${tunnelWsUrl}\nTunnel URL: ${tunnelSession.publicUrl}\nHeadless mode: ${headless}\nInactivity timeout: ${timeoutMinutes} minutes`;
 
       if (appConfigId) {
         initMessage += `\nApp Config ID: ${appConfigId}`;
@@ -1107,6 +1200,9 @@ After setup, you can start testing without specifying URLs:
           dependencyId,
         });
 
+        // Mark activity since a new QA session is starting
+        this.markActivity();
+
         const sessionId = session.data?.agent_id;
         const result = {
           success: true,
@@ -1165,6 +1261,9 @@ After setup, you can start testing without specifying URLs:
   private async handleMonitorQaSession(params: MonitorQaSessionParams): Promise<CallToolResult> {
     try {
       const { sessionId, autoRespond = true, wait_for_completion = false, timeout = 60 } = params;
+
+      // Mark activity since we're actively monitoring sessions
+      this.markActivity();
 
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -1642,6 +1741,9 @@ Please use interact_with_qa_session tool with action="respond" to provide your r
           ws_url: websocketUrl,
           app_config_id,
         });
+
+        // Mark activity since automated tests are running
+        this.markActivity();
 
         if (result.success) {
           return {
