@@ -334,19 +334,48 @@ class QAUseMcpServer {
     const liveviewUrl = session.data?.liveview_url;
     const lastDone = session.data?.last_done;
     const task = session.data?.task;
+    const history = session.data?.history || [];
+    const blocks = session.data?.blocks || [];
 
-    // Build progress context
-    let progressContext = '';
+    // Build rich progress context from last_done and recent history
+    let outcomeMessage = '';
+    let progressSummary = '';
+    let recentSteps = '';
+
+    // Extract outcome from last_done
     if (lastDone) {
-      if (typeof lastDone === 'string') {
-        progressContext = lastDone.length > 100 ? lastDone.substring(0, 100) + '...' : lastDone;
-      } else if (lastDone.action || lastDone.description) {
-        progressContext = lastDone.action || lastDone.description || 'Recent action completed';
-        if (progressContext.length > 100) {
-          progressContext = progressContext.substring(0, 100) + '...';
-        }
+      if (lastDone.message) {
+        outcomeMessage = lastDone.message;
+      }
+      if (lastDone.status) {
+        const statusEmoji =
+          lastDone.status === 'failure' ? '❌' : lastDone.status === 'success' ? '✅' : '📋';
+        outcomeMessage = `${statusEmoji} ${lastDone.status.toUpperCase()}: ${outcomeMessage || 'Session completed'}`;
+      }
+      if (lastDone.reasoning) {
+        progressSummary =
+          lastDone.reasoning.length > 150
+            ? lastDone.reasoning.substring(0, 150) + '...'
+            : lastDone.reasoning;
       }
     }
+
+    // Get recent steps from history
+    if (history.length > 0) {
+      const latestTask = history[history.length - 1];
+      if (latestTask.intents && latestTask.intents.length > 0) {
+        const recentIntents = latestTask.intents.slice(-3); // Last 3 actions
+        const stepNames = recentIntents.map(
+          (intent: any) => intent.intent?.short_name || intent.intent?.type || 'Action'
+        );
+        recentSteps = stepNames.join(' → ');
+      }
+    }
+
+    // Execution stats
+    const totalBlocks = blocks.length;
+    const completedTasks = history.filter((h: any) => h.status === 'completed').length;
+    const failedTasks = history.filter((h: any) => h.status === 'failed').length;
 
     // Format based on whether this is a timeout scenario or instant check
     if (elapsed !== undefined && iterations !== undefined) {
@@ -357,7 +386,13 @@ class QAUseMcpServer {
 
 📍 **Current Status**: ${status}
 
-${progressContext ? `📋 **Recent Progress**: ${progressContext}` : '🔄 **Status**: Working on task...'}
+${outcomeMessage ? `🎯 **Latest Outcome**: ${outcomeMessage}` : ''}
+
+${recentSteps ? `🔄 **Recent Steps**: ${recentSteps}` : ''}
+
+${progressSummary ? `📋 **Progress Details**: ${progressSummary}` : ''}
+
+📊 **Execution Stats**: ${totalBlocks} blocks generated, ${completedTasks} tasks completed${failedTasks > 0 ? `, ${failedTasks} tasks failed` : ''}
 
 ${liveviewUrl ? `👀 **Watch Live**: ${liveviewUrl}` : ''}
 
@@ -370,7 +405,13 @@ ${liveviewUrl ? `👀 **Watch Live**: ${liveviewUrl}` : ''}
 
 🎯 **Task**: ${task || 'QA Testing Session'}
 
-${progressContext ? `📋 **Recent Progress**: ${progressContext}` : '🔄 **Status**: Processing...'}
+${outcomeMessage ? `🎯 **Latest Outcome**: ${outcomeMessage}` : ''}
+
+${recentSteps ? `🔄 **Recent Steps**: ${recentSteps}` : ''}
+
+${progressSummary ? `📋 **Progress Details**: ${progressSummary}` : ''}
+
+📊 **Execution Stats**: ${totalBlocks} blocks generated, ${completedTasks} tasks completed${failedTasks > 0 ? `, ${failedTasks} tasks failed` : ''}
 
 ${liveviewUrl ? `👀 **Watch Live**: ${liveviewUrl}` : ''}
 
