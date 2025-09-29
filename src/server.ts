@@ -322,6 +322,97 @@ class QAUseMcpServer {
     };
   }
 
+  private formatSessionProgress(session: any, elapsed?: number, iterations?: number): string {
+    const status = session.data?.status || session.status;
+    const sessionId = session.id;
+    const liveviewUrl = session.data?.liveview_url;
+    const lastDone = session.data?.last_done;
+    const task = session.data?.task;
+
+    // Build progress context
+    let progressContext = '';
+    if (lastDone) {
+      if (typeof lastDone === 'string') {
+        progressContext = lastDone.length > 100 ? lastDone.substring(0, 100) + '...' : lastDone;
+      } else if (lastDone.action || lastDone.description) {
+        progressContext = lastDone.action || lastDone.description || 'Recent action completed';
+        if (progressContext.length > 100) {
+          progressContext = progressContext.substring(0, 100) + '...';
+        }
+      }
+    }
+
+    // Format based on whether this is a timeout scenario or instant check
+    if (elapsed !== undefined && iterations !== undefined) {
+      // This is a timeout scenario - session still running
+      return `⏳ **Session Still Running** (${elapsed}s elapsed)
+
+🎯 **Task**: ${task || 'QA Testing Session'}
+
+📍 **Current Status**: ${status}
+
+${progressContext ? `📋 **Recent Progress**: ${progressContext}` : '🔄 **Status**: Working on task...'}
+
+${liveviewUrl ? `👀 **Watch Live**: ${liveviewUrl}` : ''}
+
+⏰ **Monitoring Info**: Checked ${iterations} times over ${elapsed}s
+
+🎯 **Next step**: monitor_qa_session({sessionId: "${sessionId}", wait_for_completion: true}) to continue monitoring`;
+    } else {
+      // This is an instant status check
+      return `📊 **Session Status**: ${status}
+
+🎯 **Task**: ${task || 'QA Testing Session'}
+
+${progressContext ? `📋 **Recent Progress**: ${progressContext}` : '🔄 **Status**: Processing...'}
+
+${liveviewUrl ? `👀 **Watch Live**: ${liveviewUrl}` : ''}
+
+${status === 'active' ? '🎯 **Next step**: monitor_qa_session({sessionId: "' + sessionId + '", wait_for_completion: true}) to wait for completion' : ''}
+${status === 'pending' ? '❓ **Needs Input**: Check for pending_user_input and use interact_with_qa_session to respond' : ''}
+${status === 'closed' ? '✅ **Completed**: Session finished successfully' : ''}
+${status === 'idle' ? '⏸️ **Paused**: Session is idle, may need intervention' : ''}`;
+    }
+  }
+
+  private formatSessionCompletion(session: any, elapsed: number, iterations: number): string {
+    const status = session.data?.status || session.status;
+    const sessionId = session.id;
+    const liveviewUrl = session.data?.liveview_url;
+    const lastDone = session.data?.last_done;
+    const task = session.data?.task;
+
+    // Build final result context
+    let resultContext = '';
+    if (lastDone) {
+      if (typeof lastDone === 'string') {
+        resultContext = lastDone.length > 150 ? lastDone.substring(0, 150) + '...' : lastDone;
+      } else if (lastDone.action || lastDone.description) {
+        resultContext = lastDone.action || lastDone.description || 'Session completed';
+        if (resultContext.length > 150) {
+          resultContext = resultContext.substring(0, 150) + '...';
+        }
+      }
+    }
+
+    const statusEmoji = status === 'closed' ? '✅' : '⏸️';
+    const statusText = status === 'closed' ? 'Completed Successfully' : 'Paused';
+
+    return `${statusEmoji} **Session ${statusText}** (${elapsed}s total)
+
+🎯 **Task**: ${task || 'QA Testing Session'}
+
+📍 **Final Status**: ${status}
+
+${resultContext ? `📋 **Final Result**: ${resultContext}` : '✅ **Status**: Session completed'}
+
+${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
+
+⏰ **Session Info**: Monitored for ${elapsed}s with ${iterations} status checks
+
+🎯 **Next step**: Session complete! You can now start a new session or view results${liveviewUrl ? ' in the recording' : ''}`;
+  }
+
   private setupTools(): void {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
@@ -1132,11 +1223,14 @@ Please provide your response below, and it will be automatically sent to the ses
           };
         }
 
+        // Create conversational status with context
+        const statusText = this.formatSessionProgress(session);
+
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(result, null, 2),
+              text: statusText,
             },
           ],
         };
@@ -1220,20 +1314,14 @@ Please provide your response below, and it will be automatically sent to the ses
               note: `Session completed with status: ${status}`,
             };
 
+            // Create conversational completion message
+            const completionText = this.formatSessionCompletion(session, elapsed, iteration);
+
             return {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify(
-                    {
-                      success: true,
-                      message: `✅ Session ${sessionId} completed successfully!`,
-                      result,
-                      progressLog: `Monitored for ${elapsed} seconds with ${iteration} checks`,
-                    },
-                    null,
-                    2
-                  ),
+                  text: completionText,
                 },
               ],
             };
@@ -1288,26 +1376,14 @@ Please use interact_with_qa_session tool with action="respond" to provide your r
         const session = await this.globalApiClient.getSession(sessionId);
         const status = session.data?.status || session.status;
 
+        // Create conversational timeout message with context
+        const timeoutText = this.formatSessionProgress(session, elapsed, iteration);
+
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(
-                {
-                  success: false,
-                  message: `⏳ Session ${sessionId} is still running after ${elapsed}s (Status: ${status})`,
-                  sessionId,
-                  currentStatus: status,
-                  elapsed,
-                  iterations: iteration,
-                  note: `MCP timeout protection: monitored for ${elapsed}s. Call monitor_qa_session again with wait_for_completion=true to continue monitoring, or use without wait_for_completion for manual checking.`,
-                  hasPendingInput: !!session.data?.pending_user_input,
-                  pendingInput: session.data?.pending_user_input,
-                  liveviewUrl: session.data?.liveview_url,
-                },
-                null,
-                2
-              ),
+              text: timeoutText,
             },
           ],
           isError: false, // Not an error, just incomplete
