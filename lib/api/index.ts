@@ -1,40 +1,32 @@
 import axios from 'axios';
 import type { AxiosInstance, AxiosResponse } from 'axios';
 import 'dotenv/config';
+import type {
+  TestAgentV2Session,
+  IssueType,
+  Severity,
+  IssueReport,
+  TestCreatorDoneIntent,
+} from '../../src/types.js';
+import {
+  generateEnhancedTestSummary,
+  formatEnhancedTestReport,
+  generateIssueStatistics,
+  categorizeIssues,
+} from '../../src/utils/summary.js';
+import type { EnhancedTestSummary, BlockSummary } from '../../src/utils/summary.js';
 
-export interface QASession {
-  id: string;
-  status: string;
-  createdAt: string;
-  data?: {
-    status?: string;
-    wsUrl?: string;
-    url?: string;
-    task?: string;
-    pending_user_input?: {
-      question?: string;
-      priority?: string;
-      reasoning?: string;
-      memory?: any;
-      confidence?: string;
-      description?: string;
-      tasks_pending?: boolean;
-      previous_step_analysis?: string;
-    };
-    last_done?: any;
-    liveview_url?: string;
-    test_id?: string;
-    agent_id?: string;
-    blocks?: any[];
-    history?: any[];
-    model_name?: string;
-    recording_path?: string;
-    app_config_id?: string;
-    organization_id?: string;
-    dependency_test_ids?: any[];
-  };
-  source?: string;
-}
+// Re-export new types for external consumers
+export type { IssueType, Severity, IssueReport, TestCreatorDoneIntent };
+export type { EnhancedTestSummary, BlockSummary };
+
+// Re-export utility functions for external consumers
+export {
+  generateEnhancedTestSummary,
+  formatEnhancedTestReport,
+  generateIssueStatistics,
+  categorizeIssues,
+};
 
 export interface CreateSessionOptions {
   url?: string;
@@ -345,7 +337,7 @@ export class ApiClient {
     }
   }
 
-  async listSessions(options: ListOptions = {}): Promise<QASession[]> {
+  async listSessions(options: ListOptions = {}): Promise<TestAgentV2Session[]> {
     try {
       const params = new URLSearchParams();
 
@@ -358,7 +350,7 @@ export class ApiClient {
       const response: AxiosResponse = await this.client.get(
         `/vibe-qa/sessions?${params.toString()}`
       );
-      return response.data as QASession[];
+      return response.data as TestAgentV2Session[];
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;
@@ -371,7 +363,7 @@ export class ApiClient {
     }
   }
 
-  async getSession(sessionId: string, selfOnly: boolean = true): Promise<QASession> {
+  async getSession(sessionId: string, selfOnly: boolean = true): Promise<TestAgentV2Session> {
     try {
       const params = new URLSearchParams();
 
@@ -383,7 +375,7 @@ export class ApiClient {
         `/vibe-qa/sessions/${sessionId}?${params.toString()}`
       );
 
-      return response.data as QASession;
+      return response.data as TestAgentV2Session;
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;

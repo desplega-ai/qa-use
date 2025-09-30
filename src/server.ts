@@ -8,57 +8,20 @@ import {
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import type {
-  CallToolResult,
-  TextContent,
-  ProgressToken,
-  Resource,
-  Prompt,
-} from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 import { BrowserManager } from '../lib/browser/index.js';
 import { TunnelManager } from '../lib/tunnel/index.js';
 import { ApiClient } from '../lib/api/index.js';
 import { getName, getVersion } from './utils/package.js';
-
-// TypeScript interfaces based on Python models
-interface UserInputIntent {
-  question?: string;
-  priority?: string;
-  reasoning?: string;
-  memory?: unknown;
-  confidence?: string;
-  description?: string;
-  tasks_pending?: boolean;
-  previous_step_analysis?: string;
-}
-
-interface SessionData {
-  status?: string;
-  wsUrl?: string;
-  url?: string;
-  task?: string;
-  pending_user_input?: UserInputIntent;
-  last_done?: unknown;
-  liveview_url?: string;
-  test_id?: string;
-  agent_id?: string;
-  blocks?: unknown[];
-  history?: unknown[];
-  model_name?: string;
-  recording_path?: string;
-  app_config_id?: string;
-  organization_id?: string;
-  dependency_test_ids?: string[];
-}
-
-interface QASessionResponse {
-  id: string;
-  status: string;
-  createdAt: string;
-  data?: SessionData;
-  source?: string;
-}
+import type { TestAgentV2Session, UserInputIntent } from './types.js';
+import { isTestCreatorDoneIntent } from './types.js';
+import {
+  generateEnhancedTestSummary,
+  formatEnhancedTestReport,
+  generateIssueStatistics,
+  categorizeIssues,
+} from './utils/summary.js';
 
 interface InitQaServerParams {
   apiKey?: string;
@@ -242,18 +205,21 @@ class QAUseMcpServer {
     this.setupPrompts();
   }
 
-  private createSessionSummary(session: QASessionResponse): SessionSummary {
+  private createSessionSummary(session: TestAgentV2Session) {
+    let task = '<Not specified>';
+
+    if (session.data.history?.length > 0) {
+      task = session.data.history[0].task;
+    }
+
     return {
       id: session.id,
       status: session.status,
-      createdAt: session.createdAt,
+      createdAt: session.created_at,
       data: {
         status: session.data?.status,
-        url: session.data?.url,
-        task:
-          session.data?.task && session.data.task.length > 50
-            ? session.data.task.substring(0, 50) + '...'
-            : session.data?.task,
+        url: session.data?.liveview_url,
+        task,
         test_id: session.data?.test_id,
         agent_id: session.data?.agent_id,
         liveview_url: session.data?.liveview_url,
@@ -264,7 +230,7 @@ class QAUseMcpServer {
       },
       source: session.source,
       note: 'Use monitor_qa_session for full details including history and blocks',
-    };
+    } as SessionSummary;
   }
 
   private createTestSummary(test: {
@@ -342,6 +308,29 @@ class QAUseMcpServer {
     const completedTasks = history.filter((h: any) => h.status === 'completed').length;
     const failedTasks = history.filter((h: any) => h.status === 'failed').length;
 
+    // Check for enhanced test results
+    let enhancedTestInfo = '';
+    if (lastDone && isTestCreatorDoneIntent(lastDone)) {
+      const testType = lastDone.is_positive ? 'Positive' : 'Negative';
+      const resultIcon = lastDone.status === 'success' ? '✅' : '❌';
+      enhancedTestInfo = `\n${resultIcon} **${testType} Test**: ${lastDone.status.toUpperCase()}`;
+      if (lastDone.issues && lastDone.issues.length > 0) {
+        const categorized = categorizeIssues(lastDone.issues);
+        const criticalCount = categorized.critical.length;
+        const highCount = categorized.high.length;
+        enhancedTestInfo += `\n🔍 **Issues Found**: ${lastDone.issues.length} total`;
+        if (criticalCount > 0) enhancedTestInfo += ` (${criticalCount} critical)`;
+        if (highCount > 0) enhancedTestInfo += ` (${highCount} high)`;
+      }
+      if (lastDone.explanation) {
+        const shortExplanation =
+          lastDone.explanation.length > 100
+            ? lastDone.explanation.substring(0, 100) + '...'
+            : lastDone.explanation;
+        enhancedTestInfo += `\n📝 **Explanation**: ${shortExplanation}`;
+      }
+    }
+
     // Format based on whether this is a timeout scenario or instant check
     if (elapsed !== undefined && iterations !== undefined) {
       // This is a timeout scenario - session still running
@@ -356,6 +345,7 @@ ${outcomeMessage ? `🎯 **Latest Outcome**: ${outcomeMessage}` : ''}
 ${recentSteps ? `🔄 **Recent Steps**: ${recentSteps}` : ''}
 
 ${progressSummary ? `📋 **Progress Details**: ${progressSummary}` : ''}
+${enhancedTestInfo}
 
 📊 **Execution Stats**: ${totalBlocks} blocks generated, ${completedTasks} tasks completed${failedTasks > 0 ? `, ${failedTasks} tasks failed` : ''}
 
@@ -375,6 +365,7 @@ ${outcomeMessage ? `🎯 **Latest Outcome**: ${outcomeMessage}` : ''}
 ${recentSteps ? `🔄 **Recent Steps**: ${recentSteps}` : ''}
 
 ${progressSummary ? `📋 **Progress Details**: ${progressSummary}` : ''}
+${enhancedTestInfo}
 
 📊 **Execution Stats**: ${totalBlocks} blocks generated, ${completedTasks} tasks completed${failedTasks > 0 ? `, ${failedTasks} tasks failed` : ''}
 
@@ -410,7 +401,7 @@ ${status === 'idle' ? '⏸️ **Paused**: Session is idle, may need intervention
     const statusEmoji = status === 'closed' ? '✅' : '⏸️';
     const statusText = status === 'closed' ? 'Completed Successfully' : 'Paused';
 
-    return `${statusEmoji} **Session ${statusText}** (${elapsed}s total)
+    let baseReport = `${statusEmoji} **Session ${statusText}** (${elapsed}s total)
 
 🎯 **Task**: ${task || 'QA Testing Session'}
 
@@ -423,6 +414,29 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
 ⏰ **Session Info**: Monitored for ${elapsed}s with ${iterations} status checks
 
 🎯 **Next step**: Session complete! You can now start a new session or view results${liveviewUrl ? ' in the recording' : ''}`;
+
+    // Add enhanced summary if TestCreatorDoneIntent is available
+    if (lastDone && isTestCreatorDoneIntent(lastDone)) {
+      try {
+        const enhancedSummary = generateEnhancedTestSummary(session.data);
+        const enhancedReport = formatEnhancedTestReport(enhancedSummary);
+        baseReport += '\n\n---\n\n' + enhancedReport;
+
+        // Add issue statistics if issues were found
+        if (enhancedSummary.discoveredIssues.length > 0) {
+          const stats = generateIssueStatistics(enhancedSummary.discoveredIssues);
+          baseReport += `\n\n## Issue Statistics\n`;
+          baseReport += `- Total Issues: ${stats.totalIssues}\n`;
+          baseReport += `- Critical/Blocker: ${stats.criticalCount}\n`;
+          baseReport += `- Most Common Type: ${stats.mostCommonType || 'N/A'}\n`;
+        }
+      } catch (error) {
+        // Silently fail if enhanced summary generation fails
+        console.error('Failed to generate enhanced summary:', error);
+      }
+    }
+
+    return baseReport;
   }
 
   private resetInactivityTimeout(): void {
@@ -1064,6 +1078,103 @@ After setup, you can start testing without specifying URLs:
     }
   }
 
+  private async ensureInitialized(): Promise<CallToolResult> {
+    // Check if already initialized
+    const isInitialized =
+      this.globalApiClient.getApiKey() &&
+      this.browserManager &&
+      this.browserManager.isActive() &&
+      this.tunnelManager &&
+      this.tunnelManager.isActive();
+
+    if (isInitialized) {
+      return {
+        content: [{ type: 'text', text: 'Already initialized' }],
+      };
+    }
+
+    // Check for API key
+    if (!this.globalApiClient.getApiKey()) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'API key not configured. Please set QA_USE_API_KEY environment variable or run init_qa_server with an API key.',
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    // Auto-initialize
+    try {
+      const headless = false;
+
+      // Validate API key
+      const authResult = await this.globalApiClient.validateApiKey();
+      if (!authResult.success) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `API key validation failed: ${authResult.message}. Please run init_qa_server with a valid API key.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Initialize BrowserManager if needed
+      if (!this.browserManager || !this.browserManager.isActive()) {
+        this.browserManager = new BrowserManager();
+        const browserSession = await this.browserManager.startBrowser({ headless });
+      }
+
+      // Initialize TunnelManager if needed
+      if (!this.tunnelManager || !this.tunnelManager.isActive()) {
+        const wsEndpoint = this.browserManager!.getWebSocketEndpoint();
+        if (!wsEndpoint) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Failed to get browser WebSocket endpoint during auto-initialization.',
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        this.tunnelManager = new TunnelManager();
+        const wsUrl = new URL(wsEndpoint);
+        const browserPort = parseInt(wsUrl.port);
+        await this.tunnelManager.startTunnel(browserPort);
+      }
+
+      // Mark activity
+      this.markActivity();
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: '✓ Auto-initialized QA server (browser and tunnel started)',
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Auto-initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please run init_qa_server manually.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
   private async handleListQaSessions(params: ListQaSessionsParams): Promise<CallToolResult> {
     try {
       if (!this.globalApiClient.getApiKey()) {
@@ -1136,43 +1247,13 @@ After setup, you can start testing without specifying URLs:
     try {
       const { url, task, dependencyId } = params;
 
-      if (!this.globalApiClient.getApiKey()) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'API key not configured. Please run init_qa_server first with an API key.',
-            },
-          ],
-          isError: true,
-        };
+      // Auto-initialize if not already done
+      const initResult = await this.ensureInitialized();
+      if (initResult.isError) {
+        return initResult;
       }
 
-      if (!this.browserManager || !this.browserManager.isActive()) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Browser not initialized. Please run init_qa_server first to start the browser.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      if (!this.tunnelManager || !this.tunnelManager.isActive()) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Tunnel not initialized. Please run init_qa_server first to create the tunnel.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      const localWsUrl = this.browserManager.getWebSocketEndpoint();
+      const localWsUrl = this.browserManager!.getWebSocketEndpoint();
       if (!localWsUrl) {
         return {
           content: [
@@ -1185,7 +1266,7 @@ After setup, you can start testing without specifying URLs:
         };
       }
 
-      const wsUrl = this.tunnelManager.getWebSocketUrl(localWsUrl);
+      const wsUrl = this.tunnelManager!.getWebSocketUrl(localWsUrl);
       if (!wsUrl) {
         return {
           content: [
@@ -1209,11 +1290,18 @@ After setup, you can start testing without specifying URLs:
         // Mark activity since a new QA session is starting
         this.markActivity();
 
+        // Check if this was an auto-init
+        const initText = initResult.content[0]?.text || '';
+        const autoInitMessage =
+          typeof initText === 'string' && initText.includes('Auto-initialized')
+            ? '\n\n' + initText
+            : '';
+
         const result = {
           success: true,
           message: 'QA session started successfully',
           sessionId: sessionId,
-          note: `Use sessionId "${sessionId}" for monitoring, responding, and controlling this session. This session uses App Config ID: ${appConfigId}.`,
+          note: `Use sessionId "${sessionId}" for monitoring, responding, and controlling this session. This session uses App Config ID: ${appConfigId}.${autoInitMessage}`,
         };
 
         return {
@@ -3070,7 +3158,7 @@ while (status !== 'closed' && status !== 'idle') {
   async start(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.info(`${getName()} running (PID: ${process.pid}, Version: ${getVersion()})`);
+    // console.debug(`${getName()} running (PID: ${process.pid}, Version: ${getVersion()})`);
 
     // Handle graceful shutdown
     process.on('SIGINT', async () => {
