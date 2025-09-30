@@ -43,6 +43,11 @@ export interface CreateSessionOptions {
   dependencyId?: string;
 }
 
+export interface CreateSessionResponse {
+  sessionId: string;
+  appConfigId: string;
+}
+
 export interface SendMessageOptions {
   sessionId: string;
   action: 'pause' | 'response' | 'close';
@@ -53,6 +58,7 @@ export interface ListOptions {
   limit?: number;
   offset?: number;
   query?: string;
+  self_only?: boolean;
 }
 
 export interface RunTestsOptions {
@@ -68,41 +74,27 @@ export interface RunTestsResponse {
   sessions?: any[];
 }
 
-export interface AuthResponse {
-  success: boolean;
-  message?: string;
-  apiKey?: string;
-  data?: {
-    api_key?: {
-      id: string;
-      name: string;
-      scope: string;
-      status: string;
-      created_at: string;
-      organization_id: string;
-      app_config_id: string;
-      expiration_date?: string;
-    };
-    app_config?: {
-      id: string;
-      name: string;
-      base_url: string;
-      login_url: string;
-      login_username: string;
-      login_password: string;
-      login_instructions: string;
-      login_steps: any[];
-      organization_id: string;
-      status: string;
-      vp_type: string;
-      width?: number;
-      height?: number;
-      remove_popups: boolean;
-      failure_status: string;
-      created_at: string;
-      updated_at?: string;
-    };
-  };
+export type APIKeyScope = 'admin' | 'recordings' | 'webhooks' | 'api' | 'mcp';
+
+export type APIKeySource = 'app' | 'api' | 'vibe-qa' | 'mcp' | 'other';
+
+export interface APIKey {
+  id: string;
+
+  name: string;
+  key: string;
+
+  expiration_date?: string | null; // ISO datetime string
+
+  scope: APIKeyScope; // default "admin"
+
+  source?: APIKeySource | null; // optional
+
+  last_used_at?: string | null; // ISO datetime string
+  last_used_by?: string | null;
+  last_used_ip?: string | null;
+
+  app_config_id?: string | null;
 }
 
 export interface RegisterResponse {
@@ -173,6 +165,7 @@ export interface ListTestRunsOptions {
 }
 
 export type ViewportConfigType = 'big_desktop' | 'desktop' | 'mobile' | 'tablet';
+export type AppConfigType = 'production' | 'staging' | 'development' | 'local';
 
 export interface UpdateAppConfigSchema {
   base_url?: string;
@@ -180,6 +173,7 @@ export interface UpdateAppConfigSchema {
   login_username?: string;
   login_password?: string;
   vp_type?: ViewportConfigType;
+  cfg_type?: AppConfigType;
 }
 
 export interface UpdateAppConfigResponse {
@@ -199,7 +193,8 @@ export interface AppConfig {
   login_steps: any[];
   organization_id: string;
   status: string;
-  vp_type: string;
+  vp_type: ViewportConfigType;
+  cfg_type?: AppConfigType | null;
   width?: number;
   height?: number;
   remove_popups: boolean;
@@ -212,10 +207,22 @@ export interface AppConfig {
   deleted_by?: string;
 }
 
+export interface AuthResponse {
+  success: boolean;
+  message?: string;
+  apiKey?: string;
+  data?: {
+    api_key?: APIKey;
+    app_config?: AppConfig;
+  };
+}
+
 export interface ListAppConfigsOptions {
   limit?: number;
   offset?: number;
   query?: string;
+  source?: APIKeySource;
+  cfg_type?: AppConfigType;
 }
 
 export class ApiClient {
@@ -310,24 +317,22 @@ export class ApiClient {
     }
   }
 
-  async createSession(options: CreateSessionOptions): Promise<QASession> {
+  async createSession(options: CreateSessionOptions): Promise<CreateSessionResponse> {
     try {
       const sessionData = {
         url: options.url,
         task: options.task,
         ws_url: options.wsUrl,
         dep_id: options.dependencyId,
+        source: 'mcp',
       };
 
       const response: AxiosResponse = await this.client.post('/vibe-qa/sessions', sessionData);
 
       return {
-        id: response.data.data.id,
-        status: response.data.data.status,
-        createdAt: response.data.data.created_at,
-        data: response.data.data,
-        source: response.data.data.source,
-      };
+        sessionId: response.data.data.agent_id,
+        appConfigId: response.data.data.app_config_id,
+      } as CreateSessionResponse;
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;
@@ -343,20 +348,17 @@ export class ApiClient {
   async listSessions(options: ListOptions = {}): Promise<QASession[]> {
     try {
       const params = new URLSearchParams();
+
       if (options.limit !== undefined) params.append('limit', options.limit.toString());
       if (options.offset !== undefined) params.append('offset', options.offset.toString());
       if (options.query) params.append('query', options.query);
 
+      params.append('self_only', 'true');
+
       const response: AxiosResponse = await this.client.get(
         `/vibe-qa/sessions?${params.toString()}`
       );
-      return response.data.map((session: any) => ({
-        id: session.id,
-        status: session.status,
-        createdAt: session.created_at,
-        data: session.data,
-        source: session.source,
-      }));
+      return response.data as QASession[];
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;
@@ -369,16 +371,19 @@ export class ApiClient {
     }
   }
 
-  async getSession(sessionId: string): Promise<QASession> {
+  async getSession(sessionId: string, selfOnly: boolean = true): Promise<QASession> {
     try {
-      const response: AxiosResponse = await this.client.get(`/vibe-qa/sessions/${sessionId}`);
-      return {
-        id: response.data.id,
-        status: response.data.status,
-        createdAt: response.data.created_at,
-        data: response.data.data,
-        source: response.data.source,
-      };
+      const params = new URLSearchParams();
+
+      if (selfOnly) {
+        params.append('self_only', 'true');
+      }
+
+      const response: AxiosResponse = await this.client.get(
+        `/vibe-qa/sessions/${sessionId}?${params.toString()}`
+      );
+
+      return response.data as QASession;
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;
@@ -429,6 +434,8 @@ export class ApiClient {
     try {
       const response: AxiosResponse = await this.client.post('/vibe-qa/register', {
         email,
+        cfg_type: 'local',
+        source: 'mcp',
       });
 
       return {
@@ -463,21 +470,14 @@ export class ApiClient {
       if (options.offset !== undefined) params.append('offset', options.offset.toString());
       if (options.query) params.append('query', options.query);
 
+      if (options.self_only === undefined || options.self_only === true) {
+        params.append('self_only', 'true');
+      } else {
+        params.append('self_only', 'false');
+      }
+
       const response: AxiosResponse = await this.client.get(`/vibe-qa/tests?${params.toString()}`);
-      return response.data.map((test: any) => ({
-        id: test.id,
-        name: test.name,
-        description: test.description,
-        url: test.url,
-        task: test.task,
-        status: test.status,
-        created_at: test.created_at,
-        updated_at: test.updated_at,
-        organization_id: test.organization_id,
-        app_config_id: test.app_config_id,
-        dependency_test_ids: test.dependency_test_ids,
-        metadata: test.metadata,
-      }));
+      return response.data as AutomatedTest[];
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;
@@ -490,23 +490,19 @@ export class ApiClient {
     }
   }
 
-  async getTest(testId: string): Promise<AutomatedTest> {
+  async getTest(testId: string, selfOnly: boolean = true): Promise<AutomatedTest> {
     try {
-      const response: AxiosResponse = await this.client.get(`/vibe-qa/tests/${testId}`);
-      return {
-        id: response.data.id,
-        name: response.data.name,
-        description: response.data.description,
-        url: response.data.url,
-        task: response.data.task,
-        status: response.data.status,
-        created_at: response.data.created_at,
-        updated_at: response.data.updated_at,
-        organization_id: response.data.organization_id,
-        app_config_id: response.data.app_config_id,
-        dependency_test_ids: response.data.dependency_test_ids,
-        metadata: response.data.metadata,
-      };
+      const params = new URLSearchParams();
+
+      if (selfOnly) {
+        params.append('self_only', 'true');
+      }
+
+      const response: AxiosResponse = await this.client.get(
+        `/vibe-qa/tests/${testId}?${params.toString()}`
+      );
+
+      return response.data as AutomatedTest;
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;
@@ -571,37 +567,7 @@ export class ApiClient {
       const response: AxiosResponse = await this.client.get(
         `/vibe-qa/tests-runs?${params.toString()}`
       );
-      return response.data.map((testRun: any) => ({
-        id: testRun.id,
-        rerun_id: testRun.rerun_id,
-        name: testRun.name,
-        external_id: testRun.external_id,
-        matrix_option_id: testRun.matrix_option_id,
-        test_id: testRun.test_id,
-        test_version_hash: testRun.test_version_hash,
-        test_suite_id: testRun.test_suite_id,
-        test_suite_run_id: testRun.test_suite_run_id,
-        used_variables: testRun.used_variables,
-        run_status: testRun.run_status,
-        final_run_status: testRun.final_run_status,
-        final_comment_id: testRun.final_comment_id,
-        allow_fix: testRun.allow_fix,
-        result: testRun.result,
-        error_message: testRun.error_message,
-        recording_path: testRun.recording_path,
-        har_path: testRun.har_path,
-        live_view_url: testRun.live_view_url,
-        start_time: testRun.start_time,
-        end_time: testRun.end_time,
-        duration_seconds: testRun.duration_seconds,
-        pfs_score: testRun.pfs_score,
-        pfs_bad_state_prob: testRun.pfs_bad_state_prob,
-        pfs_confidence_lower: testRun.pfs_confidence_lower,
-        pfs_confidence_upper: testRun.pfs_confidence_upper,
-        pfs_num_observations: testRun.pfs_num_observations,
-        created_at: testRun.created_at,
-        updated_at: testRun.updated_at,
-      }));
+      return response.data as TestRun[];
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;
@@ -627,6 +593,7 @@ export class ApiClient {
       const configWithDefaults = {
         ...config,
         vp_type: config.vp_type || 'desktop',
+        cfg_type: config.cfg_type || 'local',
       };
 
       const response: AxiosResponse = await this.client.post(
@@ -670,34 +637,14 @@ export class ApiClient {
       if (options.limit !== undefined) params.append('limit', options.limit.toString());
       if (options.offset !== undefined) params.append('offset', options.offset.toString());
       if (options.query) params.append('query', options.query);
+      if (options.source) params.append('source', options.source);
+      if (options.cfg_type) params.append('cfg_type', options.cfg_type);
 
       const response: AxiosResponse = await this.client.get(
         `/vibe-qa/app-configs?${params.toString()}`
       );
 
-      return response.data.map((config: any) => ({
-        id: config.id,
-        name: config.name,
-        base_url: config.base_url,
-        login_url: config.login_url,
-        login_username: config.login_username,
-        login_password: config.login_password,
-        login_instructions: config.login_instructions,
-        login_steps: config.login_steps,
-        organization_id: config.organization_id,
-        status: config.status,
-        vp_type: config.vp_type,
-        width: config.width,
-        height: config.height,
-        remove_popups: config.remove_popups,
-        failure_status: config.failure_status,
-        created_at: config.created_at,
-        updated_at: config.updated_at,
-        created_by: config.created_by,
-        updated_by: config.updated_by,
-        deleted_at: config.deleted_at,
-        deleted_by: config.deleted_by,
-      }));
+      return response.data as AppConfig[];
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;

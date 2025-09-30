@@ -267,41 +267,6 @@ class QAUseMcpServer {
     };
   }
 
-  private createSessionDetails(session: QASessionResponse): SessionDetails {
-    const result = {
-      id: session.id,
-      status: session.status,
-      createdAt: session.createdAt,
-      data: {
-        status: session.data?.status,
-        url: session.data?.url,
-        task: session.data?.task,
-        test_id: session.data?.test_id,
-        agent_id: session.data?.agent_id,
-        liveview_url: session.data?.liveview_url,
-        pending_user_input: session.data?.pending_user_input,
-        last_done: session.data?.last_done,
-        model_name: session.data?.model_name,
-        recording_path: session.data?.recording_path,
-        dependency_test_ids: session.data?.dependency_test_ids,
-        // Limit history to last 5 entries
-        history: session.data?.history?.slice(-5) ?? [],
-        historyNote:
-          session.data?.history && session.data.history.length > 5
-            ? `Showing last 5 of ${session.data.history.length} total history entries`
-            : undefined,
-        // Limit blocks to last 10 entries
-        blocks: session.data?.blocks?.slice(-10) ?? [],
-        blocksNote:
-          session.data?.blocks && session.data.blocks.length > 10
-            ? `Showing last 10 of ${session.data.blocks.length} total blocks`
-            : undefined,
-      },
-      source: session.source,
-    };
-    return result;
-  }
-
   private createTestSummary(test: {
     id: string;
     name: string;
@@ -1234,7 +1199,7 @@ After setup, you can start testing without specifying URLs:
       }
 
       try {
-        const session = await this.globalApiClient.createSession({
+        const { sessionId, appConfigId } = await this.globalApiClient.createSession({
           url,
           task,
           wsUrl,
@@ -1244,27 +1209,11 @@ After setup, you can start testing without specifying URLs:
         // Mark activity since a new QA session is starting
         this.markActivity();
 
-        const sessionId = session.data?.agent_id;
         const result = {
           success: true,
           message: 'QA session started successfully',
           sessionId: sessionId,
-          note: `Use sessionId "${sessionId}" for monitoring, responding, and controlling this session`,
-          session: {
-            id: session.id,
-            status: session.status,
-            createdAt: session.createdAt,
-            data: {
-              agent_id: session.data?.agent_id,
-              test_id: session.data?.test_id,
-              url: session.data?.url,
-              task: session.data?.task,
-              status: session.data?.status,
-              liveview_url: session.data?.liveview_url,
-              dependency_test_ids: session.data?.dependency_test_ids,
-            },
-            source: session.source,
-          },
+          note: `Use sessionId "${sessionId}" for monitoring, responding, and controlling this session. This session uses App Config ID: ${appConfigId}.`,
         };
 
         return {
