@@ -72,7 +72,6 @@ interface SearchAutomatedTestsParams {
 
 interface RunAutomatedTestsParams {
   test_ids: string[];
-  ws_url?: string;
   app_config_id?: string;
 }
 
@@ -171,18 +170,64 @@ interface StartSessionResult {
   };
 }
 
+type SessionType = 'dev' | 'automated' | 'test_run';
+
+class BrowserSession {
+  session_id: string;
+  created_at: number;
+  browser: BrowserManager;
+  tunnel: TunnelManager;
+  ttl: number;
+  deadline: number;
+  session_type: SessionType;
+
+  constructor(
+    sessionId: string,
+    browser: BrowserManager,
+    tunnel: TunnelManager,
+    sessionType: SessionType,
+    ttl: number = 30 * 60 * 1000 // 30 minutes default
+  ) {
+    this.session_id = sessionId;
+    this.created_at = Date.now();
+    this.browser = browser;
+    this.tunnel = tunnel;
+    this.ttl = ttl;
+    this.deadline = this.created_at + ttl;
+    this.session_type = sessionType;
+  }
+
+  refreshDeadline(): void {
+    this.deadline = Date.now() + this.ttl;
+  }
+
+  isExpired(): boolean {
+    return Date.now() > this.deadline;
+  }
+
+  async cleanup(): Promise<void> {
+    try {
+      await this.tunnel.stopTunnel();
+    } catch (error) {
+      // Ignore cleanup errors
+    }
+    try {
+      await this.browser.stopBrowser();
+    } catch (error) {
+      // Ignore cleanup errors
+    }
+  }
+}
+
 class QAUseMcpServer {
   private server: Server;
   private globalApiClient: ApiClient;
-  private automatedBrowserManager: BrowserManager | null = null;
-  private automatedTunnelManager: TunnelManager | null = null;
-  private devBrowserManager: BrowserManager | null = null;
-  private devTunnelManager: TunnelManager | null = null;
 
-  // Inactivity timeout management
-  private inactivityTimeout: NodeJS.Timeout | null = null;
-  private inactivityTimeoutMs: number = 30 * 60 * 1000; // 30 minutes default
-  private lastActivityTime: number = Date.now();
+  private browserSessions: BrowserSession[] = [];
+  private readonly MAX_SESSIONS = 10;
+  private readonly DEFAULT_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+  private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     this.server = new Server(
@@ -203,6 +248,7 @@ class QAUseMcpServer {
     this.setupTools();
     this.setupResources();
     this.setupPrompts();
+    this.startCleanupTask();
   }
 
   private createSessionSummary(session: TestAgentV2Session) {
@@ -439,89 +485,111 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
     return baseReport;
   }
 
-  private resetInactivityTimeout(): void {
-    // Clear existing timeout
-    if (this.inactivityTimeout) {
-      clearTimeout(this.inactivityTimeout);
-      this.inactivityTimeout = null;
-    }
+  private startCleanupTask(): void {
+    // Check for expired sessions every minute
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredSessions();
+    }, 60 * 1000);
+  }
 
-    // Update last activity time
-    this.lastActivityTime = Date.now();
+  private async cleanupExpiredSessions(): Promise<void> {
+    const expiredSessions = this.browserSessions.filter((session) => session.isExpired());
 
-    // Only set timeout if browser/tunnel are active
-    if (
-      this.automatedBrowserManager ||
-      this.automatedTunnelManager ||
-      this.devBrowserManager ||
-      this.devTunnelManager
-    ) {
-      this.inactivityTimeout = setTimeout(() => {
-        this.handleInactivityTimeout();
-      }, this.inactivityTimeoutMs);
+    for (const session of expiredSessions) {
+      try {
+        // For dev/automated sessions, try to close gracefully via API
+        if (session.session_type === 'dev' || session.session_type === 'automated') {
+          try {
+            await this.globalApiClient.sendMessage({
+              sessionId: session.session_id,
+              action: 'close',
+              data: 'Session expired due to inactivity',
+            });
+          } catch (error) {
+            // If API call fails, continue with cleanup
+          }
+        }
+
+        // Always cleanup browser and tunnel
+        await session.cleanup();
+
+        // Remove from array
+        this.browserSessions = this.browserSessions.filter(
+          (s) => s.session_id !== session.session_id
+        );
+      } catch (error) {
+        // Silent cleanup - continue with next session
+      }
     }
   }
 
-  private async handleInactivityTimeout(): Promise<void> {
-    const inactiveMinutes = Math.round(this.inactivityTimeoutMs / 60000);
-
-    try {
-      // Send notification about cleanup
-      await this.server.notification({
-        method: 'notifications/message',
-        params: {
-          level: 'info',
-          logger: 'resource_cleanup',
-          data: {
-            message: `🧹 Cleaning up browser and tunnel resources after ${inactiveMinutes} minutes of inactivity`,
-            reason: 'inactivity_timeout',
-            inactive_duration_ms: this.inactivityTimeoutMs,
-          },
-        },
-      });
-
-      // Cleanup resources
-      await this.cleanupResources();
-    } catch (error) {
-      // Silent cleanup - don't fail if notification fails
-      await this.cleanupResources();
-    }
+  private getBrowserSession(sessionId: string): BrowserSession | null {
+    return this.browserSessions.find((s) => s.session_id === sessionId) || null;
   }
 
-  private async cleanupResources(): Promise<void> {
-    try {
-      // Cleanup automated tunnel and browser
-      if (this.automatedTunnelManager) {
-        await this.automatedTunnelManager.stopTunnel();
-        this.automatedTunnelManager = null;
-      }
-      if (this.automatedBrowserManager) {
-        await this.automatedBrowserManager.stopBrowser();
-        this.automatedBrowserManager = null;
-      }
-
-      // Cleanup dev tunnel and browser
-      if (this.devTunnelManager) {
-        await this.devTunnelManager.stopTunnel();
-        this.devTunnelManager = null;
-      }
-      if (this.devBrowserManager) {
-        await this.devBrowserManager.stopBrowser();
-        this.devBrowserManager = null;
-      }
-
-      // Clear timeout
-      if (this.inactivityTimeout) {
-        clearTimeout(this.inactivityTimeout);
-        this.inactivityTimeout = null;
-      }
-    } catch (error) {
-      // Silent cleanup - resources will eventually be garbage collected
+  private async createBrowserAndTunnel(
+    headless: boolean = false
+  ): Promise<{ browser: BrowserManager; tunnel: TunnelManager; wsUrl: string }> {
+    // Check session limit
+    if (this.browserSessions.length >= this.MAX_SESSIONS) {
+      throw new Error(
+        `Maximum number of browser sessions (${this.MAX_SESSIONS}) reached. Please use reset_browser_sessions tool to clean up old sessions before creating new ones.`
+      );
     }
+
+    // Create new browser and tunnel
+    const browser = new BrowserManager();
+    const browserResult = await browser.startBrowser({ headless });
+    const wsEndpoint = browserResult.wsEndpoint;
+
+    const tunnel = new TunnelManager();
+    const wsUrl = new URL(wsEndpoint);
+    const browserPort = parseInt(wsUrl.port);
+    await tunnel.startTunnel(browserPort);
+
+    const localWsUrl = browser.getWebSocketEndpoint();
+    if (!localWsUrl) {
+      await tunnel.stopTunnel();
+      await browser.stopBrowser();
+      throw new Error('Failed to get browser WebSocket endpoint');
+    }
+
+    const tunneledWsUrl = tunnel.getWebSocketUrl(localWsUrl);
+    if (!tunneledWsUrl) {
+      await tunnel.stopTunnel();
+      await browser.stopBrowser();
+      throw new Error('Failed to create tunneled WebSocket URL');
+    }
+
+    return { browser, tunnel, wsUrl: tunneledWsUrl };
   }
 
-  private markActivity(): void {
-    this.resetInactivityTimeout();
+  private addBrowserSession(
+    sessionId: string,
+    browser: BrowserManager,
+    tunnel: TunnelManager,
+    sessionType: SessionType
+  ): BrowserSession {
+    const session = new BrowserSession(
+      sessionId,
+      browser,
+      tunnel,
+      sessionType,
+      this.DEFAULT_TTL_MS
+    );
+    this.browserSessions.push(session);
+    return session;
+  }
+
+  private async resetAllBrowserSessions(): Promise<void> {
+    for (const session of this.browserSessions) {
+      try {
+        await session.cleanup();
+      } catch (error) {
+        // Silent cleanup
+      }
+    }
+    this.browserSessions = [];
   }
 
   private setupTools(): void {
@@ -741,11 +809,6 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
                   description: 'Array of test IDs to execute',
                   minItems: 1,
                 },
-                ws_url: {
-                  type: 'string',
-                  description:
-                    'Optional WebSocket URL override (uses global tunnel URL by default)',
-                },
                 app_config_id: {
                   type: 'string',
                   description:
@@ -822,6 +885,15 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
               properties: {},
             },
           },
+          {
+            name: 'reset_browser_sessions',
+            description:
+              'Reset and cleanup all active browser sessions. This will kill all browsers and tunnels. Use this when you hit the maximum session limit or need to free up resources.',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
         ],
       };
     });
@@ -877,6 +949,10 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
 
       if (name === 'get_configuration') {
         return this.handleGetConfiguration();
+      }
+
+      if (name === 'reset_browser_sessions') {
+        return this.handleResetBrowserSessions();
       }
 
       return {
@@ -1138,55 +1214,11 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
         return initResult;
       }
 
-      // Initialize browser and tunnel for automated sessions if not already started
-      if (!this.automatedBrowserManager || !this.automatedBrowserManager.isActive()) {
-        this.automatedBrowserManager = new BrowserManager();
-        const browserSession = await this.automatedBrowserManager.startBrowser({ headless });
-        const wsEndpoint = browserSession.wsEndpoint;
-
-        // Create tunnel
-        this.automatedTunnelManager = new TunnelManager();
-        const wsUrl = new URL(wsEndpoint);
-        const browserPort = parseInt(wsUrl.port);
-        await this.automatedTunnelManager.startTunnel(browserPort);
-      } else if (!this.automatedTunnelManager || !this.automatedTunnelManager.isActive()) {
-        // Browser exists but tunnel is dead - recreate tunnel
-        const localWsUrl = this.automatedBrowserManager.getWebSocketEndpoint();
-        if (localWsUrl) {
-          this.automatedTunnelManager = new TunnelManager();
-          const wsUrl = new URL(localWsUrl);
-          const browserPort = parseInt(wsUrl.port);
-          await this.automatedTunnelManager.startTunnel(browserPort);
-        }
-      }
-
-      const localWsUrl = this.automatedBrowserManager.getWebSocketEndpoint();
-      if (!localWsUrl) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Browser WebSocket endpoint not available.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      const wsUrl = this.automatedTunnelManager!.getWebSocketUrl(localWsUrl);
-      if (!wsUrl) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Failed to create tunneled WebSocket URL.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
       try {
+        // Create browser and tunnel first
+        const { browser, tunnel, wsUrl } = await this.createBrowserAndTunnel(headless);
+
+        // Create session via API with the actual wsUrl
         const { sessionId, appConfigId } = await this.globalApiClient.createSession({
           url,
           task,
@@ -1195,15 +1227,17 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
           devMode: false, // Automated session
         });
 
-        // Mark activity
-        this.markActivity();
+        // Wrap browser and tunnel in a BrowserSession
+        this.addBrowserSession(sessionId, browser, tunnel, 'automated');
 
         const result = {
           success: true,
           message: 'Automated test session started successfully',
           sessionId: sessionId,
           sessionType: 'automated',
-          note: `Use sessionId "${sessionId}" for monitoring and interaction. This automated session uses App Config ID: ${appConfigId}.`,
+          // TODO(1): For automated test sessions, use monitor_session to track progress.
+          // For test runs created via run_automated_tests, use search_automated_test_runs instead.
+          note: `Use sessionId "${sessionId}" for monitoring and interaction. This automated session uses App Config ID: ${appConfigId}. Monitor with monitor_session tool.`,
         };
 
         return {
@@ -1215,6 +1249,22 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
           ],
         };
       } catch (error) {
+        // Check if it's the session limit error
+        if (
+          error instanceof Error &&
+          error.message.includes('Maximum number of browser sessions')
+        ) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: error.message,
+              },
+            ],
+            isError: true,
+          };
+        }
+
         return {
           content: [
             {
@@ -1249,56 +1299,11 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
         return initResult;
       }
 
-      // Initialize browser and tunnel for dev sessions if not already started
-      if (!this.devBrowserManager || !this.devBrowserManager.isActive()) {
-        this.devBrowserManager = new BrowserManager();
-        const browserSession = await this.devBrowserManager.startBrowser({ headless });
-        const wsEndpoint = browserSession.wsEndpoint;
-
-        // Create tunnel
-        this.devTunnelManager = new TunnelManager();
-        const wsUrl = new URL(wsEndpoint);
-        const browserPort = parseInt(wsUrl.port);
-        await this.devTunnelManager.startTunnel(browserPort);
-      } else if (!this.devTunnelManager || !this.devTunnelManager.isActive()) {
-        // Browser exists but tunnel is dead - recreate tunnel
-        const localWsUrl = this.devBrowserManager.getWebSocketEndpoint();
-        if (localWsUrl) {
-          this.devTunnelManager = new TunnelManager();
-          const wsUrl = new URL(localWsUrl);
-          const browserPort = parseInt(wsUrl.port);
-          await this.devTunnelManager.startTunnel(browserPort);
-        }
-      }
-
-      const localWsUrl = this.devBrowserManager.getWebSocketEndpoint();
-
-      if (!localWsUrl) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Browser WebSocket endpoint not available.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      const wsUrl = this.devTunnelManager!.getWebSocketUrl(localWsUrl);
-      if (!wsUrl) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Failed to create tunneled WebSocket URL.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
       try {
+        // Create browser and tunnel first
+        const { browser, tunnel, wsUrl } = await this.createBrowserAndTunnel(headless);
+
+        // Create session via API with the actual wsUrl
         const { sessionId, appConfigId } = await this.globalApiClient.createSession({
           url,
           task,
@@ -1306,8 +1311,8 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
           devMode: true, // Development session
         });
 
-        // Mark activity
-        this.markActivity();
+        // Wrap browser and tunnel in a BrowserSession
+        this.addBrowserSession(sessionId, browser, tunnel, 'dev');
 
         const result = {
           success: true,
@@ -1326,6 +1331,22 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
           ],
         };
       } catch (error) {
+        // Check if it's the session limit error
+        if (
+          error instanceof Error &&
+          error.message.includes('Maximum number of browser sessions')
+        ) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: error.message,
+              },
+            ],
+            isError: true,
+          };
+        }
+
         return {
           content: [
             {
@@ -1353,9 +1374,6 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
     try {
       const { sessionId, wait = false, timeout = 60 } = params;
 
-      // Mark activity since we're actively monitoring sessions
-      this.markActivity();
-
       if (!this.globalApiClient.getApiKey()) {
         return {
           content: [
@@ -1376,6 +1394,22 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
         const session = await this.globalApiClient.getSession(sessionId);
 
         const status = session.data?.status || session.status;
+
+        // Refresh deadline if session is not closed
+        if (status !== 'closed') {
+          const browserSession = this.getBrowserSession(sessionId);
+          if (browserSession) {
+            browserSession.refreshDeadline();
+          }
+        } else {
+          // Session is closed, clean it up
+          const browserSession = this.getBrowserSession(sessionId);
+          if (browserSession) {
+            await browserSession.cleanup();
+            this.browserSessions = this.browserSessions.filter((s) => s.session_id !== sessionId);
+          }
+        }
+
         const result = {
           sessionId: session.id,
           status: status,
@@ -1632,6 +1666,12 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
           data: message,
         });
 
+        // Refresh deadline on interaction (always)
+        const browserSession = this.getBrowserSession(sessionId);
+        if (browserSession) {
+          browserSession.refreshDeadline();
+        }
+
         // Create conversational output based on action
         let responseText = '';
         switch (action) {
@@ -1774,7 +1814,7 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
 
   private async handleRunAutomatedTests(params: RunAutomatedTestsParams): Promise<CallToolResult> {
     try {
-      const { test_ids, ws_url, app_config_id } = params;
+      const { test_ids, app_config_id } = params;
 
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -1788,58 +1828,22 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
         };
       }
 
-      // If no ws_url provided, ensure browser and tunnel are initialized
-      let websocketUrl: string | null = ws_url ?? null;
-
-      if (!websocketUrl) {
-        // Initialize browser and tunnel for automated tests if not already started
-        if (!this.automatedBrowserManager || !this.automatedBrowserManager.isActive()) {
-          this.automatedBrowserManager = new BrowserManager();
-          const browserSession = await this.automatedBrowserManager.startBrowser({
-            headless: true,
-          });
-          const wsEndpoint = browserSession.wsEndpoint;
-
-          // Create tunnel
-          this.automatedTunnelManager = new TunnelManager();
-          const wsUrl = new URL(wsEndpoint);
-          const browserPort = parseInt(wsUrl.port);
-          await this.automatedTunnelManager.startTunnel(browserPort);
-        } else if (!this.automatedTunnelManager || !this.automatedTunnelManager.isActive()) {
-          // Browser exists but tunnel is dead - recreate tunnel
-          const localWsUrl = this.automatedBrowserManager.getWebSocketEndpoint();
-          if (localWsUrl) {
-            this.automatedTunnelManager = new TunnelManager();
-            const wsUrl = new URL(localWsUrl);
-            const browserPort = parseInt(wsUrl.port);
-            await this.automatedTunnelManager.startTunnel(browserPort);
-          }
-        }
-
-        websocketUrl = this.getGlobalWebSocketUrl();
-      }
-
-      if (!websocketUrl) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Failed to create WebSocket URL for automated tests.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
       try {
+        // Create browser and tunnel for test runs
+        const { browser, tunnel, wsUrl } = await this.createBrowserAndTunnel(true); // headless for test runs
+
+        // Run tests with the wsUrl
         const result = await this.globalApiClient.runTests({
           test_ids,
-          ws_url: websocketUrl,
+          ws_url: wsUrl,
           app_config_id,
         });
 
-        // Mark activity since automated tests are running
-        this.markActivity();
+        // For test runs, we store the browser/tunnel with a generic test_run session type
+        // We'll use the test_run_id as the session identifier
+        if (result.success && result.test_run_id) {
+          this.addBrowserSession(result.test_run_id, browser, tunnel, 'test_run');
+        }
 
         if (result.success) {
           return {
@@ -1852,10 +1856,9 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
                     message: `✅ Successfully started ${test_ids.length} automated tests`,
                     test_run_id: result.test_run_id,
                     test_ids: test_ids,
-                    ws_url: websocketUrl,
                     app_config_id: app_config_id || 'Using API key default config',
                     sessions: result.sessions,
-                    note: 'Tests are now running. Use list_qa_sessions to monitor progress or monitor_qa_session with individual session IDs.',
+                    note: 'Tests are now running. Use search_automated_test_runs with the test_run_id or test_id to monitor progress.',
                   },
                   null,
                   2
@@ -1864,6 +1867,10 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
             ],
           };
         } else {
+          // Cleanup browser/tunnel if test run failed
+          await tunnel.stopTunnel();
+          await browser.stopBrowser();
+
           return {
             content: [
               {
@@ -1873,7 +1880,6 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
                     success: false,
                     message: result.message || 'Failed to start tests',
                     test_ids: test_ids,
-                    ws_url: websocketUrl,
                   },
                   null,
                   2
@@ -1884,6 +1890,22 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
           };
         }
       } catch (error) {
+        // Check if it's the session limit error
+        if (
+          error instanceof Error &&
+          error.message.includes('Maximum number of browser sessions')
+        ) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: error.message,
+              },
+            ],
+            isError: true,
+          };
+        }
+
         return {
           content: [
             {
@@ -2112,18 +2134,30 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
     }
   }
 
-  private getGlobalWebSocketUrl(): string | null {
-    // Use automated browser for running automated tests
-    if (!this.automatedTunnelManager || !this.automatedBrowserManager) {
-      return null;
-    }
+  private async handleResetBrowserSessions(): Promise<CallToolResult> {
+    try {
+      const sessionCount = this.browserSessions.length;
+      await this.resetAllBrowserSessions();
 
-    const browserWsUrl = this.automatedBrowserManager.getWebSocketEndpoint();
-    if (!browserWsUrl) {
-      return null;
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `✅ Successfully reset ${sessionCount} browser session(s). All browsers and tunnels have been cleaned up.`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to reset browser sessions: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
     }
-
-    return this.automatedTunnelManager.getWebSocketUrl(browserWsUrl);
   }
 
   private setupResources(): void {
@@ -2622,18 +2656,14 @@ For more detailed examples, see the Getting Started and Workflows guides.
   }
 
   private async cleanup(): Promise<void> {
-    if (this.automatedTunnelManager) {
-      await this.automatedTunnelManager.stopTunnel();
+    // Clear cleanup interval
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
     }
-    if (this.automatedBrowserManager) {
-      await this.automatedBrowserManager.stopBrowser();
-    }
-    if (this.devTunnelManager) {
-      await this.devTunnelManager.stopTunnel();
-    }
-    if (this.devBrowserManager) {
-      await this.devBrowserManager.stopBrowser();
-    }
+
+    // Cleanup all browser sessions
+    await this.resetAllBrowserSessions();
   }
 }
 

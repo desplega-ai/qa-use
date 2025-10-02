@@ -186,6 +186,10 @@ Your MCP client should initialize the server, set up browser automation, and sta
 - **Tunneling**: Create public tunnels for browser WebSocket endpoints using localtunnel
 - **API Integration**: Full integration with desplega.ai API for comprehensive QA testing workflows
 - **Session Management**: Create, monitor, and control multiple QA testing sessions with real-time status
+  - Smart session lifecycle management with automatic cleanup
+  - Up to 10 concurrent browser sessions with clear error handling
+  - 30-minute default TTL with automatic deadline refresh on interaction
+  - Background cleanup task for expired sessions
 - **Progress Monitoring**: Real-time progress notifications with MCP timeout protection (25s max per call)
 - **Batch Test Execution**: Run multiple automated tests simultaneously with dependency management
 - **Interactive Elicitation**: Intelligent prompts when remote sessions need user input to continue
@@ -264,6 +268,11 @@ Update application configuration settings including base URL, login credentials,
 
 #### `get_configuration`
 Get the current application configuration details including base URL, login settings, and viewport.
+
+**Parameters:** None
+
+#### `reset_browser_sessions`
+Reset and cleanup all active browser sessions. This will kill all browsers and tunnels. Use this when you hit the maximum session limit or need to free up resources.
 
 **Parameters:** None
 
@@ -417,6 +426,15 @@ search_automated_test_runs with limit=50
 Use prompt: aaa_test with test_type="login" and url="https://app.example.com/login" and feature="user authentication"
 ```
 
+### Resource Management
+```bash
+# When you hit the 10 session limit or need to free up resources
+reset_browser_sessions
+
+# This will clean up all active browsers and tunnels
+# Useful when sessions aren't closing properly or you need to restart fresh
+```
+
 ## Testing
 
 Use the provided test scripts to test MCP server functionality:
@@ -442,6 +460,10 @@ The project is organized into modular components:
 - **`src/`**: Main MCP server implementation with comprehensive tool handlers
   - MCP protocol implementation with tools, resources, and prompts
   - Session management and monitoring with timeout protection
+  - BrowserSession management with automatic lifecycle tracking
+    - Each session wraps browser + tunnel with TTL and deadline tracking
+    - Session types: 'dev', 'automated', and 'test_run'
+    - Automatic cleanup on expiration or completion
   - Real-time progress notifications using MCP logging specification
   - AAA framework prompt templates for structured testing
 - **`lib/browser/`**: Browser management functionality using Playwright
