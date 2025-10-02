@@ -195,56 +195,6 @@ Your MCP client should initialize the server, set up browser automation, and sta
 - **User Registration**: Built-in user registration system for new desplega.ai accounts
 - **Comprehensive Documentation**: Built-in MCP resources with guides, workflows, and best practices
 
-## Quick Start
-
-### 1. Initialize Server
-```
-init_qa_server with interactive=true
-```
-Or with direct API key:
-```
-init_qa_server with apiKey="your-api-key"
-```
-
-### 2. Register New Account (if needed)
-```
-register_user with email="your-email@example.com"
-```
-
-### 3. Configure App Settings (one-time setup)
-```
-update_app_config with base_url="https://example.com" and login_url="https://example.com/login" and login_username="user@example.com" and vp_type="desktop"
-```
-
-### 4. Start Testing Session
-```
-start_qa_session with task="test the login form"
-```
-Or with URL override:
-```
-start_qa_session with url="https://specific-page.com" and task="test specific page"
-```
-
-### 5. Monitor Progress (with timeout protection)
-```
-monitor_qa_session with sessionId="session-id" and wait_for_completion=true and timeout=180
-```
-
-### 5. Use AAA Framework Templates
-Generate structured test prompts:
-```
-Use prompt: aaa_login_test with url="https://app.example.com/login"
-```
-
-### 6. Run Batch Tests
-```
-run_automated_tests with test_ids=["test-1", "test-2", "test-3"]
-```
-
-### 7. View Test History
-```
-list_test_runs with test_id="test-123" and limit=20
-```
 
 ## Installation
 
@@ -283,19 +233,18 @@ Start the development server:
 pnpm dev
 ```
 
+<!-- AUTO-GENERATED-TOOLS-START -->
 ## MCP Tools
 
-The server exposes comprehensive MCP tools for browser automation and QA testing:
+The server exposes the following MCP tools for browser automation and QA testing:
 
-### Core Server Management
+### Setup & Configuration
 
-#### `init_qa_server`
-Initialize the QA server environment with API credentials and browser setup.
+#### `ensure_installed`
+Ensure API key is set, validate authentication, and install Playwright browsers.
 
 **Parameters:**
-- `apiKey` (string, optional): API key for desplega.ai (uses env var if not provided)
-- `forceInstall` (boolean, optional): Force reinstall of Playwright browsers
-- `interactive` (boolean, optional): Enable interactive setup for missing credentials
+- `apiKey` (string, optional): API key for desplega.ai (optional if QA_USE_API_KEY env var is set)
 
 #### `register_user`
 Register a new user account with desplega.ai and receive an API key.
@@ -303,92 +252,93 @@ Register a new user account with desplega.ai and receive an API key.
 **Parameters:**
 - `email` (string, required): Email address for registration
 
+#### `update_configuration`
+Update application configuration settings including base URL, login credentials, and viewport type.
+
+**Parameters:**
+- `base_url` (string, optional): Base URL for the application being tested
+- `login_url` (string, optional): Login page URL for the application
+- `login_username` (string, optional): Default username for login testing
+- `login_password` (string, optional): Default password for login testing
+- `vp_type` (string, optional): Viewport configuration type: big_desktop, desktop, mobile, or tablet (default: desktop)
+
+#### `get_configuration`
+Get the current application configuration details including base URL, login settings, and viewport.
+
+**Parameters:** None
+
 ### Session Management
 
-#### `list_qa_sessions`
-List QA testing sessions with pagination and search capabilities.
+#### `search_sessions`
+Search and list all sessions (automated tests and development sessions) with pagination and filtering.
 
 **Parameters:**
-- `limit` (number, optional): Maximum sessions to return (default: 10)
-- `offset` (number, optional): Number of sessions to skip (default: 0)
-- `query` (string, optional): Search query for filtering sessions
+- `limit` (number, optional): Maximum number of sessions to return (default: 10, min: 1)
+- `offset` (number, optional): Number of sessions to skip (default: 0, min: 0)
+- `query` (string, optional): Search query to filter sessions by task, URL, or status
 
-#### `start_qa_session`
-Start a new QA testing session with browser automation.
+#### `start_automated_session`
+Start an automated E2E test session for QA flows and automated testing. Returns sessionId for monitoring.
 
 **Parameters:**
-- `url` (string, optional): The URL to test (uses app config base_url if not provided)
-- `task` (string, required): The testing task description
-- `dependencyId` (string, optional): Test ID that this session depends on
+- `task` (string, required): The testing task or scenario to execute
+- `url` (string, optional): Optional URL to test (overrides app config base_url if provided)
+- `dependencyId` (string, optional): Optional test ID that this session depends on
+- `headless` (boolean, optional): Run browser in headless mode (default: false for better visibility)
 
-#### `monitor_qa_session`
-Monitor session progress with MCP timeout protection and real-time notifications.
+#### `start_dev_session`
+Start an interactive development session for debugging and exploration. Session will not auto-pilot and allows manual browser interaction.
+
+**Parameters:**
+- `task` (string, required): Description of what you want to explore or debug. Can be a placeholder like "Waiting for user input"
+- `url` (string, optional): Optional URL to start from (overrides app config base_url if provided)
+- `headless` (boolean, optional): Run browser in headless mode (default: false for development visibility)
+
+#### `monitor_session`
+Monitor a session status. Keep calling until status is "closed". Will alert if session needs user input, is idle, or pending.
 
 **Parameters:**
 - `sessionId` (string, required): The session ID to monitor
-- `autoRespond` (boolean, optional): Auto-format response instructions (default: true)
-- `wait_for_completion` (boolean, optional): Wait for completion with timeout protection
-- `timeout` (number, optional): User timeout in seconds (default: 60, max 25s per MCP call)
+- `wait` (boolean, optional): Wait for session to reach any non-running state with MCP timeout protection (max 25s per call)
+- `timeout` (number, optional): User timeout in seconds for wait mode (default: 60)
 
-#### `interact_with_qa_session`
-Interact with a QA session - respond to questions, pause, or close session.
+#### `interact_with_session`
+Interact with a session - respond to questions, pause, or close the session.
 
 **Parameters:**
 - `sessionId` (string, required): The session ID to interact with
-- `action` (string, required): Action to perform - "respond", "pause", or "close"
-- `message` (string, optional): Your response message (required for "respond" action)
+- `action` (string, required): Action to perform: respond (answer question), pause (stop session), or close (end session)
+- `message` (string, optional): Your response message (required for "respond" action, optional for others)
 
 ### Test Management
 
-#### `find_automated_test`
-Find automated tests by ID or search query. Smart tool that returns detailed info if testId provided, otherwise searches tests.
+#### `search_automated_tests`
+Search for automated tests by ID or query. If testId provided, returns detailed info for that test. Otherwise searches with optional query/pagination.
 
 **Parameters:**
-- `testId` (string, optional): Specific test ID to get detailed information (if provided, other params ignored)
-- `query` (string, optional): Search query to filter tests by name, description, URL, or task
-- `limit` (number, optional): Maximum tests to return (default: 10)
-- `offset` (number, optional): Number of tests to skip (default: 0)
+- `testId` (string, optional): Specific test ID to retrieve detailed information for (if provided, other params ignored)
+- `query` (string, optional): Search query to filter tests by name, description, URL, or task (ignored if testId provided)
+- `limit` (number, optional): Maximum number of tests to return (default: 10, min: 1) (ignored if testId provided)
+- `offset` (number, optional): Number of tests to skip (default: 0, min: 0) (ignored if testId provided)
 
 #### `run_automated_tests`
-Execute multiple automated tests simultaneously with dependency management.
+Execute multiple automated tests simultaneously.
 
 **Parameters:**
 - `test_ids` (array, required): Array of test IDs to execute
-- `app_config_id` (string, optional): Override app config for this test run
+- `app_config_id` (string, optional): Optional app config ID to run tests against (uses API key default config if not provided)
+- `ws_url` (string, optional): Optional WebSocket URL override (uses global tunnel URL by default)
 
-### App Configuration Management
-
-#### `update_app_config`
-Update your application configuration settings (one-time setup).
-
-**Parameters:**
-- `base_url` (string, optional): Default URL for testing sessions
-- `login_url` (string, optional): Login page URL for authentication
-- `login_username` (string, optional): Username for login credentials
-- `login_password` (string, optional): Password for login credentials
-- `vp_type` (string, optional): Viewport type - "mobile" or "desktop" (default: "desktop")
-
-#### `list_app_configs`
-List your saved app configurations.
+#### `search_automated_test_runs`
+Search automated test runs with optional filtering by test ID or run ID.
 
 **Parameters:**
-- `limit` (number, optional): Maximum configs to return (default: 10)
-- `offset` (number, optional): Number of configs to skip (default: 0)
+- `test_id` (string, optional): Filter test runs by specific test ID
+- `run_id` (string, optional): Filter test runs by specific run ID
+- `limit` (number, optional): Maximum number of test runs to return (default: 10, min: 1)
+- `offset` (number, optional): Number of tests to skip (default: 0, min: 0)
 
-#### `get_current_app_config`
-Get details about your current active app configuration.
-
-**Parameters:**
-- None (no parameters required)
-
-#### `list_test_runs`
-List test run history with performance metrics and filtering capabilities.
-
-**Parameters:**
-- `test_id` (string, optional): Filter by specific test ID
-- `run_id` (string, optional): Filter by specific run ID
-- `limit` (number, optional): Maximum test runs to return (default: 10)
-- `offset` (number, optional): Number of test runs to skip (default: 0)
+<!-- AUTO-GENERATED-TOOLS-END -->
 
 ### Built-in Documentation
 
@@ -397,14 +347,10 @@ The server includes comprehensive MCP resources and prompts:
 #### MCP Resources
 - **Getting Started Guide**: Complete setup and usage instructions
 - **Testing Workflows**: Common patterns for interactive, batch, and development testing
-- **Session Monitoring Guide**: Best practices for monitoring and timeout management
+- **Tool Reference**: Detailed documentation for all available MCP tools
 
-#### MCP Prompts (AAA Framework Templates)
-- **`aaa_login_test`**: Generate login tests using Arrange-Act-Assert framework
-- **`aaa_form_test`**: Generate form submission tests with validation
-- **`aaa_ecommerce_test`**: Generate e-commerce workflow tests (add to cart, checkout, search)
-- **`aaa_navigation_test`**: Generate navigation and menu testing scenarios
-- **`comprehensive_test_scenario`**: Generate comprehensive tests for authentication, validation, accessibility, performance, or mobile testing
+#### MCP Prompts
+- **`aaa_test`**: Generate structured test scenarios using the Arrange-Act-Assert (AAA) framework with customizable parameters
 
 ## Configuration
 
@@ -421,59 +367,53 @@ QA_USE_API_KEY=your-desplega-ai-api-key
 
 ### Interactive Testing Workflow
 ```bash
-# 1. Initialize server
-init_qa_server with interactive=true
+# 1. Initialize server and install browsers
+ensure_installed
 
 # 2. Configure app settings (one-time setup)
-update_app_config with base_url="https://app.example.com" and login_url="https://app.example.com/login" and login_username="testuser@example.com"
+update_configuration with base_url="https://app.example.com" and login_url="https://app.example.com/login" and login_username="testuser@example.com"
 
-# 3. Start a test session (URL is now optional)
-start_qa_session with task="Test user registration flow"
+# 3. Start an automated test session
+start_automated_session with task="Test user registration flow"
 
-# 4. Monitor with automatic waiting
-monitor_qa_session with sessionId="session-123" and wait_for_completion=true and timeout=300
+# 4. Monitor session progress
+monitor_session with sessionId="session-123" and wait=true and timeout=300
 
-# 5. Interact with session (respond, pause, or close)
-interact_with_qa_session with sessionId="session-123" and action="respond" and message="john.doe@example.com"
+# 5. Interact with session if needed (respond, pause, or close)
+interact_with_session with sessionId="session-123" and action="respond" and message="john.doe@example.com"
+```
+
+### Development & Debugging Workflow
+```bash
+# 1. Start an interactive dev session (no auto-pilot)
+start_dev_session with task="Exploring the checkout flow" and url="https://app.example.com/cart"
+
+# 2. Monitor and interact as needed
+monitor_session with sessionId="dev-session-456"
+
+# 3. Close when done
+interact_with_session with sessionId="dev-session-456" and action="close"
 ```
 
 ### Batch Testing Workflow
 ```bash
 # 1. Find available tests
-find_automated_test with query="login" and limit=10
+search_automated_tests with query="login" and limit=10
 
 # 2. Run multiple tests simultaneously
 run_automated_tests with test_ids=["login-test-1", "signup-test-2", "checkout-test-3"]
 
 # 3. Monitor progress
-list_qa_sessions with limit=20
+search_sessions with limit=20
 
 # 4. Check test run history
-list_test_runs with limit=50
+search_automated_test_runs with limit=50
 ```
 
-### Using AAA Framework Templates
+### Using AAA Framework Template
 ```bash
-# Generate a login test using AAA framework
-Use prompt: aaa_login_test with url="https://app.example.com/login" and username="testuser" and expected_redirect="/dashboard"
-
-# Generate an e-commerce test
-Use prompt: aaa_ecommerce_test with product_url="https://shop.example.com/widget" and workflow_type="add_to_cart" and quantity="2"
-
-# Generate a comprehensive accessibility test
-Use prompt: comprehensive_test_scenario with scenario_type="accessibility" and url="https://app.example.com" and browser_type="desktop"
-```
-
-### Test Run Analytics
-```bash
-# View test runs for a specific test
-list_test_runs with test_id="login-test-123" and limit=20
-
-# Filter by run status or time period
-list_test_runs with limit=50 and offset=0
-
-# Get specific test run details with PFS metrics
-list_test_runs with run_id="run-456"
+# Generate a structured test using AAA framework
+Use prompt: aaa_test with test_type="login" and url="https://app.example.com/login" and feature="user authentication"
 ```
 
 ## Testing

@@ -25,7 +25,6 @@ import {
 
 interface EnsureInstalledParams {
   apiKey?: string;
-  forceInstall?: boolean;
 }
 
 interface RegisterUserParams {
@@ -531,7 +530,7 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
           {
             name: 'ensure_installed',
             description:
-              'Ensure API key is set, validate authentication, and install Playwright browsers if needed. Does not start browsers (lazy initialization on session start).',
+              'Ensure API key is set, validate authentication, and install Playwright browsers. Does not start browsers (lazy initialization on session start).',
             inputSchema: {
               type: 'object',
               properties: {
@@ -539,10 +538,6 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
                   type: 'string',
                   description:
                     'API key for desplega.ai (optional if QA_USE_API_KEY env var is set)',
-                },
-                forceInstall: {
-                  type: 'boolean',
-                  description: 'Force reinstall of Playwright browsers',
                 },
               },
               required: [],
@@ -891,7 +886,7 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
 
   private async handleEnsureInstalled(params: EnsureInstalledParams): Promise<CallToolResult> {
     try {
-      const { apiKey, forceInstall } = params;
+      const { apiKey } = params;
 
       // Use provided API key or fall back to environment variable
       if (apiKey) {
@@ -921,26 +916,9 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
         };
       }
 
-      // Install Playwright browsers if needed
-      if (forceInstall) {
-        const browserManager = new BrowserManager();
-        await browserManager.installPlaywrightBrowsers();
-      } else {
-        // Check if browsers are installed
-        const browserManager = new BrowserManager();
-        const installStatus = await browserManager.checkBrowserInstallation();
-        if (!installStatus.installed) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: 'Playwright browsers not installed. Run with forceInstall=true to install browsers.',
-              },
-            ],
-            isError: true,
-          };
-        }
-      }
+      // Always install Playwright browsers (no-op if already installed)
+      const browserManager = new BrowserManager();
+      await browserManager.installPlaywrightBrowsers();
 
       const apiUrl = this.globalApiClient.getApiUrl();
       const appUrl = ApiClient.getAppUrl();
@@ -2159,9 +2137,9 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
             mimeType: 'text/markdown',
           },
           {
-            uri: 'qa-use://guides/monitoring',
-            name: 'Session Monitoring Guide',
-            description: 'How to effectively monitor and manage QA sessions',
+            uri: 'qa-use://guides/tools',
+            name: 'Tool Reference',
+            description: 'Detailed documentation for all available MCP tools',
             mimeType: 'text/markdown',
           },
         ],
@@ -2195,13 +2173,13 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
             ],
           };
 
-        case 'qa-use://guides/monitoring':
+        case 'qa-use://guides/tools':
           return {
             contents: [
               {
                 uri,
                 mimeType: 'text/markdown',
-                text: this.getMonitoringGuide(),
+                text: this.getToolsGuide(),
               },
             ],
           };
@@ -2218,112 +2196,14 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
       return {
         prompts: [
           {
-            name: 'aaa_login_test',
-            description: 'Generate a login test using AAA (Arrange-Act-Assert) framework',
+            name: 'aaa_test',
+            description:
+              'Generate a structured test scenario using the AAA (Arrange-Act-Assert) framework',
             arguments: [
               {
-                name: 'url',
-                description: 'The login page URL',
-                required: true,
-              },
-              {
-                name: 'username',
-                description: 'Test username/email',
-                required: false,
-              },
-              {
-                name: 'password',
-                description: 'Test password',
-                required: false,
-              },
-              {
-                name: 'expected_redirect',
-                description: 'Expected URL or page after successful login',
-                required: false,
-              },
-            ],
-          },
-          {
-            name: 'aaa_form_test',
-            description: 'Generate a form submission test using AAA framework',
-            arguments: [
-              {
-                name: 'url',
-                description: 'The form page URL',
-                required: true,
-              },
-              {
-                name: 'form_type',
-                description: 'Type of form (contact, registration, checkout, etc.)',
-                required: true,
-              },
-              {
-                name: 'required_fields',
-                description: 'Comma-separated list of required field names',
-                required: false,
-              },
-              {
-                name: 'success_message',
-                description: 'Expected success message after submission',
-                required: false,
-              },
-            ],
-          },
-          {
-            name: 'aaa_ecommerce_test',
-            description: 'Generate an e-commerce workflow test using AAA framework',
-            arguments: [
-              {
-                name: 'product_url',
-                description: 'Product page URL',
-                required: true,
-              },
-              {
-                name: 'workflow_type',
-                description: 'E-commerce workflow (add_to_cart, checkout, search, etc.)',
-                required: true,
-              },
-              {
-                name: 'product_name',
-                description: 'Product name for testing',
-                required: false,
-              },
-              {
-                name: 'quantity',
-                description: 'Quantity to add to cart',
-                required: false,
-              },
-            ],
-          },
-          {
-            name: 'aaa_navigation_test',
-            description: 'Generate a navigation test using AAA framework',
-            arguments: [
-              {
-                name: 'base_url',
-                description: 'Website base URL',
-                required: true,
-              },
-              {
-                name: 'menu_items',
-                description: 'Comma-separated list of menu items to test',
-                required: false,
-              },
-              {
-                name: 'navigation_type',
-                description: 'Type of navigation (main_menu, footer, breadcrumb, etc.)',
-                required: false,
-              },
-            ],
-          },
-          {
-            name: 'comprehensive_test_scenario',
-            description: 'Generate a comprehensive test scenario for specific use case',
-            arguments: [
-              {
-                name: 'scenario_type',
+                name: 'test_type',
                 description:
-                  'Type of scenario (authentication, validation, accessibility, performance, mobile)',
+                  'Type of test (login, form, navigation, e-commerce, accessibility, etc.)',
                 required: true,
               },
               {
@@ -2332,13 +2212,13 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
                 required: true,
               },
               {
-                name: 'specific_feature',
+                name: 'feature',
                 description: 'Specific feature or functionality to test',
                 required: false,
               },
               {
-                name: 'browser_type',
-                description: 'Browser or device type (desktop, mobile, tablet)',
+                name: 'expected_outcome',
+                description: 'Expected outcome or success criteria',
                 required: false,
               },
             ],
@@ -2352,71 +2232,15 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
       const { name, arguments: args } = request.params;
 
       switch (name) {
-        case 'aaa_login_test':
+        case 'aaa_test':
           return {
-            description: 'AAA framework login test',
+            description: 'AAA framework test',
             messages: [
               {
                 role: 'user',
                 content: {
                   type: 'text',
-                  text: this.generateLoginTestPrompt(args),
-                },
-              },
-            ],
-          };
-
-        case 'aaa_form_test':
-          return {
-            description: 'AAA framework form test',
-            messages: [
-              {
-                role: 'user',
-                content: {
-                  type: 'text',
-                  text: this.generateFormTestPrompt(args),
-                },
-              },
-            ],
-          };
-
-        case 'aaa_ecommerce_test':
-          return {
-            description: 'AAA framework e-commerce test',
-            messages: [
-              {
-                role: 'user',
-                content: {
-                  type: 'text',
-                  text: this.generateEcommerceTestPrompt(args),
-                },
-              },
-            ],
-          };
-
-        case 'aaa_navigation_test':
-          return {
-            description: 'AAA framework navigation test',
-            messages: [
-              {
-                role: 'user',
-                content: {
-                  type: 'text',
-                  text: this.generateNavigationTestPrompt(args),
-                },
-              },
-            ],
-          };
-
-        case 'comprehensive_test_scenario':
-          return {
-            description: 'Comprehensive test scenario',
-            messages: [
-              {
-                role: 'user',
-                content: {
-                  type: 'text',
-                  text: this.generateComprehensiveTestPrompt(args),
+                  text: this.generateAAATestPrompt(args),
                 },
               },
             ],
@@ -2428,318 +2252,57 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
     });
   }
 
-  private generateLoginTestPrompt(args: Record<string, unknown> = {}): string {
-    const url = String(args.url || 'https://example.com/login');
-    const username = String(args.username || 'testuser@example.com');
-    const password = String(args.password || 'securepass123');
-    const expectedRedirect = String(args.expected_redirect || '/dashboard');
-
-    return `Create a comprehensive login test using the AAA (Arrange-Act-Assert) framework for QA-Use MCP server.
-
-**ARRANGE:**
-Navigate to the login page at ${url} and prepare test credentials. Verify the page has loaded correctly and the login form is visible with username/email and password fields.
-
-**ACT:**
-Enter username "${username}" in the email/username field, enter password "${password}" in the password field, and click the "Sign In" or "Login" button to submit the form.
-
-**ASSERT:**
-Verify that the page redirects to ${expectedRedirect}, check that the user is properly authenticated (look for user menu, welcome message, or logout option), and confirm no error messages are displayed.
-
-**QA-Use Implementation Tips:**
-- Use specific selectors: reference exact input labels like "Email" or "Username"
-- Wait for state changes: ensure page load is complete before acting
-- Verify multiple aspects: URL change, UI elements, and authentication state
-- Handle loading states: account for any loading spinners or async operations
-- **Setup Required**: First configure your app using update_app_config with login credentials and base URL
-
-**Example workflow:**
-1. **Configure app first:**
-\`\`\`json
-{
-  "tool": "update_app_config",
-  "params": {
-    "base_url": "${url}",
-    "login_url": "${url}",
-    "login_username": "${username}",
-    "login_password": "${password}"
-  }
-}
-\`\`\`
-
-2. **Then start testing:**
-\`\`\`json
-{
-  "tool": "start_qa_session",
-  "params": {
-    "task": "Test login functionality using configured credentials"
-  }
-}
-\`\`\`
-
-Write the task description for start_qa_session following this AAA structure.`;
-  }
-
-  private generateFormTestPrompt(args: Record<string, unknown> = {}): string {
-    const url = String(args.url || 'https://example.com/contact');
-    const formType = String(args.form_type || 'contact');
-    const requiredFields = String(args.required_fields || 'name, email, message');
-    const successMessage = String(args.success_message || 'Message sent successfully');
-
-    return `Create a comprehensive ${formType} form test using the AAA (Arrange-Act-Assert) framework for QA-Use MCP server.
-
-**ARRANGE:**
-Navigate to the ${formType} form at ${url} and prepare test data. Verify the form is loaded with all required fields visible: ${requiredFields}. Ensure the form is empty and ready for input.
-
-**ACT:**
-Fill out the ${formType} form with appropriate test data for each required field (${requiredFields}). Submit the form by clicking the submit button (commonly labeled "Send", "Submit", or "Send Message").
-
-**ASSERT:**
-Verify that a success message appears stating "${successMessage}", check that the form submission was processed correctly, and confirm the form either clears or shows appropriate confirmation state.
-
-**QA-Use Implementation Tips:**
-- Be specific with field selectors: use exact labels like "Full Name", "Email Address", "Your Message"
-- Test data should be realistic: use proper email formats, appropriate text lengths
-- Wait for submission: account for any loading states or async form processing
-- Verify thoroughly: check success message, form state, and any redirect behavior
-
-Additional validation tests to consider:
-- Required field validation (leave fields empty)
-- Email format validation (enter invalid email)
-- Character limit validation (exceed maximum length)
-
-Write the task description for start_qa_session following this AAA structure.`;
-  }
-
-  private generateEcommerceTestPrompt(args: Record<string, unknown> = {}): string {
-    const productUrl = String(args.product_url || 'https://shop.example.com/products/widget-123');
-    const workflowType = String(args.workflow_type || 'add_to_cart');
-    const productName = String(args.product_name || 'Test Widget');
-    const quantity = String(args.quantity || '1');
-
-    const workflows = {
-      add_to_cart: {
-        arrange: `Navigate to the product page at ${productUrl} and verify "${productName}" is displayed and in stock. Check that product options (size, color, quantity) are available for selection.`,
-        act: `Select appropriate product options, set quantity to "${quantity}", and click the "Add to Cart" button. Wait for the add-to-cart action to complete.`,
-        assert: `Verify the cart icon updates to show the correct item count, check that a confirmation notification appears, and confirm the product appears in the cart dropdown or mini-cart view.`,
-      },
-      checkout: {
-        arrange: `Add "${productName}" to cart from ${productUrl}, navigate to the checkout page, and verify cart contents are correct. Ensure checkout form fields are displayed.`,
-        act: `Fill out shipping information (name, address, contact details), select payment method, review order details, and click "Place Order" or "Complete Purchase".`,
-        assert: `Verify order confirmation page displays, check that order number is generated, confirm total amount is correct, and verify confirmation email is mentioned.`,
-      },
-      search: {
-        arrange: `Navigate to the homepage or main shop page and locate the search functionality. Verify the search bar is visible and functional.`,
-        act: `Enter "${productName}" in the search field and submit the search by clicking the search button or pressing Enter.`,
-        assert: `Verify search results page loads, check that relevant products are displayed, confirm search term is shown in results, and verify product links are working.`,
-      },
-    };
-
-    const workflow = workflows[workflowType as keyof typeof workflows] || workflows.add_to_cart;
-
-    return `Create a comprehensive e-commerce ${workflowType} test using the AAA (Arrange-Act-Assert) framework for QA-Use MCP server.
-
-**ARRANGE:**
-${workflow.arrange}
-
-**ACT:**
-${workflow.act}
-
-**ASSERT:**
-${workflow.assert}
-
-**QA-Use Implementation Tips:**
-- Use specific selectors: reference exact button text like "Add to Cart", size options like "Medium", color names
-- Wait for updates: cart count updates and page transitions may be asynchronous
-- Verify multiple elements: cart count, notifications, product visibility, pricing
-- Handle dynamic content: product availability, price changes, inventory updates
-- Account for loading states: product images, cart updates, checkout processing
-
-**E-commerce Specific Considerations:**
-- Product availability may change during testing
-- Cart persistence across page navigation
-- Price calculations and tax handling
-- Inventory management and stock levels
-- Payment processing simulation (if applicable)
-
-Write the task description for start_qa_session following this AAA structure.`;
-  }
-
-  private generateNavigationTestPrompt(args: Record<string, unknown> = {}): string {
-    const baseUrl = String(args.base_url || 'https://example.com');
-    const menuItems = String(args.menu_items || 'Home, About, Services, Products, Contact');
-    const navigationType = String(args.navigation_type || 'main_menu');
-
-    return `Create a comprehensive ${navigationType} navigation test using the AAA (Arrange-Act-Assert) framework for QA-Use MCP server.
-
-**ARRANGE:**
-Start at the homepage ${baseUrl} and locate the ${navigationType}. Verify the navigation menu is visible and contains the expected items: ${menuItems}. Ensure all menu items are clickable and properly displayed.
-
-**ACT:**
-Click through each ${navigationType} item systematically: ${menuItems}. For each item, navigate to the page, verify it loads, then return to test the next item (or test in sequence if appropriate).
-
-**ASSERT:**
-For each navigation item, verify:
-- The page loads correctly with appropriate content
-- The URL changes to the expected path
-- The page title is relevant and correct
-- The active navigation item is highlighted or styled appropriately
-- Any breadcrumb navigation is accurate
-- The page contains expected content sections
-
-**QA-Use Implementation Tips:**
-- Use exact menu text: "About Us", "Our Services", "Contact Us" as they appear
-- Wait for page loads: ensure each page fully loads before moving to the next
-- Verify visual states: active/current page styling, hover effects
-- Check responsive behavior: mobile menu functionality if applicable
-- Test accessibility: keyboard navigation, focus indicators
-
-**Navigation Specific Tests:**
-- **Main Menu**: Primary site navigation
-- **Footer Menu**: Secondary links and legal pages
-- **Breadcrumb**: Hierarchical navigation path
-- **Mobile Menu**: Hamburger menu and responsive design
-- **Sidebar Menu**: Category or section-based navigation
-
-**Additional Verification Points:**
-- Logo links back to homepage
-- Navigation consistency across pages
-- External links open appropriately
-- Dropdown/submenu functionality (if present)
-- Search functionality integration
-
-Write the task description for start_qa_session following this AAA structure with specific focus on ${navigationType} testing.`;
-  }
-
-  private generateComprehensiveTestPrompt(args: Record<string, unknown> = {}): string {
-    const scenarioType = String(args.scenario_type || 'authentication');
+  private generateAAATestPrompt(args: Record<string, unknown> = {}): string {
+    const testType = String(args.test_type || 'general');
     const url = String(args.url || 'https://example.com');
-    const specificFeature = String(args.specific_feature || 'core functionality');
-    const browserType = String(args.browser_type || 'desktop');
+    const feature = String(args.feature || 'core functionality');
+    const expectedOutcome = String(args.expected_outcome || 'successful completion');
 
-    const scenarios = {
-      authentication: {
-        focus: 'User authentication flow including login, logout, and session management',
-        considerations:
-          'Password requirements, session timeout, remember me functionality, error handling',
-      },
-      validation: {
-        focus: 'Form validation and data input handling',
-        considerations:
-          'Required fields, format validation, character limits, error messages, real-time validation',
-      },
-      accessibility: {
-        focus: 'Web accessibility compliance and usability',
-        considerations:
-          'Keyboard navigation, screen reader compatibility, focus indicators, ARIA labels, color contrast',
-      },
-      performance: {
-        focus: 'Page load times, responsiveness, and resource optimization',
-        considerations:
-          'Load times, image optimization, network requests, cache behavior, mobile performance',
-      },
-      mobile: {
-        focus: 'Mobile device compatibility and responsive design',
-        considerations:
-          'Touch interactions, viewport scaling, mobile menu, gesture support, responsive layout',
-      },
-    };
+    return `Create a ${testType} test using the AAA (Arrange-Act-Assert) framework for QA-Use MCP server.
 
-    const scenario = scenarios[scenarioType as keyof typeof scenarios] || scenarios.authentication;
-
-    return `Create a comprehensive ${scenarioType} test scenario using the AAA (Arrange-Act-Assert) framework for QA-Use MCP server.
-
-**Test Focus:** ${scenario.focus}
-**Target:** ${specificFeature} on ${url}
-**Browser/Device:** ${browserType}
+**Test Type:** ${testType}
+**Target URL:** ${url}
+**Feature:** ${feature}
+**Expected Outcome:** ${expectedOutcome}
 
 **ARRANGE:**
-Navigate to ${url} and prepare the testing environment for ${scenarioType} testing. Verify the page loads correctly and the target feature "${specificFeature}" is accessible. Set up any necessary preconditions for ${browserType} testing.
+Navigate to ${url} and prepare the testing environment. Verify the page loads correctly and the "${feature}" is visible and accessible. Set up any necessary preconditions for testing.
 
 **ACT:**
-Execute the primary ${scenarioType} workflow for "${specificFeature}". This should include the main user interaction flow and any edge cases relevant to ${scenarioType} testing.
+Execute the primary ${testType} workflow for "${feature}". Interact with the feature following the expected user flow.
 
 **ASSERT:**
-Verify that the ${scenarioType} requirements are met:
-- Core functionality works as expected
-- ${scenario.considerations}
-- User experience is appropriate for ${browserType}
-- No errors or accessibility issues are present
-
-**${scenarioType.toUpperCase()} Specific Testing Guidelines:**
-
-${this.getScenarioSpecificGuidelines(scenarioType, browserType)}
+Verify that the expected outcome is achieved: ${expectedOutcome}
+- Check that the feature works as expected
+- Verify no errors are displayed
+- Confirm the UI state is correct
+- Validate any expected changes (URL, content, state)
 
 **QA-Use Implementation Tips:**
-- Use specific selectors appropriate for ${browserType} testing
-- Account for ${scenarioType}-specific timing and loading requirements
-- Verify multiple aspects: functionality, usability, and compliance
+- Use specific, descriptive selectors (button text, labels, headings)
+- Wait for page loads and state changes before acting
+- Verify multiple aspects: functionality, UI state, and user feedback
+- Handle async operations and loading states appropriately
 - Test edge cases and error conditions
-- Ensure comprehensive coverage of the ${specificFeature}
 
 **Success Criteria:**
-- All ${scenarioType} requirements are validated
-- The feature works correctly across different conditions
-- User experience is optimized for ${browserType}
-- No critical issues or blockers are identified
+- The ${testType} test completes successfully
+- All assertions pass
+- The feature "${feature}" works as expected
+- Expected outcome "${expectedOutcome}" is achieved
 
-Write the task description for start_qa_session following this AAA structure with comprehensive ${scenarioType} testing focus.`;
-  }
-
-  private getScenarioSpecificGuidelines(scenarioType: string, browserType: string): string {
-    const guidelines = {
-      authentication: `
-- Test successful login with valid credentials
-- Verify failed login with invalid credentials
-- Check session persistence and timeout behavior
-- Test logout functionality and session cleanup
-- Verify password reset and account recovery flows
-- Check remember me functionality if available`,
-
-      validation: `
-- Test all required field validations
-- Verify email format and other input format validations
-- Check character limits and boundary conditions
-- Test real-time validation feedback
-- Verify error message clarity and positioning
-- Test form submission with various input combinations`,
-
-      accessibility: `
-- Navigate using only keyboard (Tab, Enter, Arrow keys)
-- Test screen reader compatibility with ARIA labels
-- Verify focus indicators are visible and logical
-- Check color contrast meets WCAG guidelines
-- Test with assistive technology simulation
-- Verify semantic HTML structure and headings`,
-
-      performance: `
-- Measure and verify page load times under 3 seconds
-- Check image loading and optimization
-- Monitor network requests and resource sizes
-- Test performance under different network conditions
-- Verify caching behavior and subsequent load times
-- Check for performance bottlenecks and optimization opportunities`,
-
-      mobile: `
-- Test touch interactions and gesture support
-- Verify responsive design across different screen sizes
-- Check mobile menu and navigation functionality
-- Test form interactions with mobile keyboards
-- Verify pinch-to-zoom and scrolling behavior
-- Check orientation changes (portrait/landscape)`,
-    };
-
-    return guidelines[scenarioType as keyof typeof guidelines] || guidelines.authentication;
+Write the task description for start_automated_session following this AAA structure.`;
   }
 
   private getGettingStartedGuide(): string {
     return `# QA-Use MCP Server - Getting Started Guide
 
-## Quick Setup (New App Config Workflow)
+## Quick Setup
 
 ### 1. Initialize the Server
 \`\`\`json
 {
-  "tool": "init_qa_server",
+  "tool": "ensure_installed",
   "params": {
     "apiKey": "your-api-key"
   }
@@ -2749,7 +2312,7 @@ Write the task description for start_qa_session following this AAA structure wit
 ### 2. Configure Your App (One-time setup)
 \`\`\`json
 {
-  "tool": "update_app_config",
+  "tool": "update_configuration",
   "params": {
     "base_url": "https://your-app.com",
     "login_url": "https://your-app.com/login",
@@ -2763,7 +2326,7 @@ Write the task description for start_qa_session following this AAA structure wit
 ### 3. Start Testing (URL optional - uses app config)
 \`\`\`json
 {
-  "tool": "start_qa_session",
+  "tool": "start_automated_session",
   "params": {
     "task": "Test login functionality using configured credentials"
   }
@@ -2773,60 +2336,60 @@ Write the task description for start_qa_session following this AAA structure wit
 ### 4. Monitor Progress
 \`\`\`json
 {
-  "tool": "monitor_qa_session",
+  "tool": "monitor_session",
   "params": {
     "sessionId": "session-id-from-start-response",
-    "wait_for_completion": true,
+    "wait": true,
     "timeout": 120
   }
 }
 \`\`\`
 
-## New Workflow Benefits
+## Workflow Benefits
 
 - **One-time Setup**: Configure your app once, test repeatedly
 - **User Isolation**: Each user has their own app config
 - **Simplified Testing**: No need to pass URL/credentials every time
 - **Flexible Overrides**: Can still specify URL for specific tests
-- **Multi-Config Support**: Test against different environments
+- **Session Types**: Automated (hands-off) or Dev (interactive)
 
 ## Core Concepts
 
-- **App Configs**: Centralized configuration for your testing environment
-- **Sessions**: Individual QA testing instances using your app config
-- **Tunneling**: Automatic browser WebSocket URL tunneling for remote access
+- **App Configuration**: Centralized configuration for your testing environment
+- **Automated Sessions**: QA testing that runs without user interaction
+- **Dev Sessions**: Interactive sessions for manual testing and debugging
 - **Monitoring**: Real-time session progress tracking
 - **Batch Testing**: Execute multiple automated tests simultaneously
 
-## New User Journey
+## User Journey
 
-1. **Register** → Get API key (if needed)
-2. **Initialize** → \`init_qa_server\` with API key
-3. **Configure** → \`update_app_config\` with your app settings
-4. **Test** → \`start_qa_session\` (URL optional)
-5. **Monitor** → \`list_app_configs\` to see available configs
-6. **Batch** → \`run_automated_tests\` with optional app_config_id
+1. **Register** → Get API key with \`register_user\` (if needed)
+2. **Initialize** → \`ensure_installed\` with API key
+3. **Configure** → \`update_configuration\` with your app settings
+4. **Test** → \`start_automated_session\` or \`start_dev_session\`
+5. **Monitor** → \`monitor_session\` to track progress
+6. **Batch** → \`run_automated_tests\` to run multiple tests
 
 ## Next Steps
 
-1. Read the Workflows guide for app config patterns
-2. Check out AAA Framework templates for effective test writing
-3. Explore monitoring best practices
-4. Use \`list_app_configs\` to see other available configurations
+1. Read the Workflows guide for testing patterns
+2. Check out the Tools Reference for detailed documentation
+3. Use the AAA prompt template for structured test scenarios
+4. Use \`get_configuration\` to view your current setup
 `;
   }
 
   private getWorkflowsGuide(): string {
     return `# QA-Use Testing Workflows
 
-## New Workflow: App Config-Based Testing
-*Recommended workflow with centralized configuration*
+## Workflow 1: Automated Testing
+*Recommended for repeatable QA tests*
 
-1. **Initialize** → \`init_qa_server\` with API key
-2. **Configure** → \`update_app_config\` (one-time setup)
-3. **Test** → \`start_qa_session\` (URL optional)
-4. **Monitor** → \`monitor_qa_session\`
-5. **Explore** → \`list_app_configs\` to see other environments
+1. **Initialize** → \`ensure_installed\` with API key
+2. **Configure** → \`update_configuration\` (one-time setup)
+3. **Test** → \`start_automated_session\` (URL optional)
+4. **Monitor** → \`monitor_session\` with wait=true
+5. **Explore** → \`get_configuration\` to see your setup
 
 ### App Config Setup Example
 \`\`\`json
@@ -2913,200 +2476,124 @@ Write the task description for start_qa_session following this AAA structure wit
 `;
   }
 
-  private getMonitoringGuide(): string {
-    return `# Session Monitoring Guide
+  private getToolsGuide(): string {
+    return `# MCP Tools Reference
 
-## Monitoring Strategies
+This guide provides detailed documentation for all available QA-Use MCP tools.
 
-### 1. Manual Monitoring (Interactive)
-Best for development and debugging:
+## Setup & Configuration
 
-\`\`\`json
-{
-  "tool": "monitor_qa_session",
-  "params": {
-    "sessionId": "your-session-id",
-    "autoRespond": true
-  }
-}
+### ensure_installed
+Ensure API key is set, validate authentication, and install Playwright browsers.
+- **Parameters**: apiKey (optional)
+- **Usage**: Run this first to set up your environment
+
+### register_user
+Register a new user account with desplega.ai and receive an API key.
+- **Parameters**: email (required)
+- **Usage**: For new users who need an API key
+
+### update_configuration
+Update application configuration settings including base URL, login credentials, and viewport type.
+- **Parameters**: base_url, login_url, login_username, login_password, vp_type (all optional)
+- **Usage**: One-time setup for your application under test
+
+### get_configuration
+Get the current application configuration details.
+- **Parameters**: None
+- **Usage**: View your current app configuration
+
+## Session Management
+
+### search_sessions
+Search and list all sessions (automated tests and development sessions) with pagination and filtering.
+- **Parameters**: limit, offset, query (all optional)
+- **Usage**: View all your testing sessions
+
+### start_automated_session
+Start an automated E2E test session for QA flows. Returns sessionId for monitoring.
+- **Parameters**: task (required), url, dependencyId, headless (optional)
+- **Usage**: Run automated tests that execute without user interaction
+
+### start_dev_session
+Start an interactive development session for debugging and exploration.
+- **Parameters**: task (required), url, headless (optional)
+- **Usage**: Manual testing and debugging with browser control
+
+### monitor_session
+Monitor a session status. Keep calling until status is "closed".
+- **Parameters**: sessionId (required), wait, timeout (optional)
+- **Usage**: Track test execution progress
+
+### interact_with_session
+Interact with a session - respond to questions, pause, or close.
+- **Parameters**: sessionId, action (required), message (optional)
+- **Actions**: respond, pause, close
+- **Usage**: Provide input when session asks questions
+
+## Test Management
+
+### search_automated_tests
+Search for automated tests by ID or query.
+- **Parameters**: testId, query, limit, offset (all optional)
+- **Usage**: Find existing automated tests
+
+### run_automated_tests
+Execute multiple automated tests simultaneously.
+- **Parameters**: test_ids (required), app_config_id, ws_url (optional)
+- **Usage**: Run batch tests in parallel
+
+### search_automated_test_runs
+Search automated test runs with optional filtering.
+- **Parameters**: test_id, run_id, limit, offset (all optional)
+- **Usage**: View test execution history and results
+
+## Common Usage Patterns
+
+### Pattern 1: First-Time Setup
+\`\`\`
+1. ensure_installed
+2. update_configuration (set base_url, login credentials)
+3. start_automated_session (begin testing)
+4. monitor_session (track progress)
 \`\`\`
 
-**When to use**: Development, debugging, interactive testing
-**Frequency**: Call repeatedly until status is "closed" or "idle"
-
-### 2. Automatic Monitoring (Fire-and-forget)
-Best for production and batch testing:
-
-\`\`\`json
-{
-  "tool": "monitor_qa_session",
-  "params": {
-    "sessionId": "your-session-id",
-    "wait_for_completion": true,
-    "timeout": 300
-  }
-}
+### Pattern 2: Development Testing
+\`\`\`
+1. start_dev_session (with task and url)
+2. monitor_session (watch execution)
+3. interact_with_session (provide input if needed)
 \`\`\`
 
-**When to use**: Batch testing, CI/CD, unattended runs
-**Timeout recommendations**:
-- Simple tests: 60-120 seconds
-- Complex workflows: 180-300 seconds
-- Deep testing: 300-600 seconds
-
-### 3. Batch Monitoring
-Monitor multiple sessions efficiently:
-
-\`\`\`json
-{
-  "tool": "list_qa_sessions",
-  "params": {
-    "limit": 20,
-    "offset": 0
-  }
-}
+### Pattern 3: Batch Testing
+\`\`\`
+1. search_automated_tests (find tests to run)
+2. run_automated_tests (execute multiple tests)
+3. search_sessions (monitor all running sessions)
+4. search_automated_test_runs (view results)
 \`\`\`
 
 ## Session Status Guide
 
-| Status | Meaning | Action Required |
-|--------|---------|----------------|
-| \`active\` | Running normally | Continue monitoring |
-| \`pending\` | Waiting for user input | Use \`interact_with_qa_session\` with action="respond" |
-| \`closed\` | ✅ Completed successfully | Review results |
-| \`idle\` | ⏸️ Paused/waiting | May need intervention |
-| \`failed\` | ❌ Error occurred | Check logs, retry |
+| Status | Meaning | Next Action |
+|--------|---------|------------|
+| running | Test executing | Continue monitoring |
+| needs_user_input | Waiting for input | Use interact_with_session |
+| closed | Completed | Review results |
+| idle | Paused | Check status or close |
+| pending | Queued | Wait or monitor |
 
 ## Best Practices
 
-### Monitoring Frequency
-- **Interactive**: Every 5-10 seconds
-- **Automatic**: Let \`wait_for_completion\` handle it
-- **Batch**: Every 30-60 seconds for overview
+1. **Always set up configuration first** using update_configuration
+2. **Use wait=true** for monitor_session in automated workflows
+3. **Set appropriate timeouts** based on test complexity
+4. **Handle user input promptly** when sessions need it
+5. **Use dev sessions** for exploration and debugging
+6. **Use automated sessions** for repeatable QA tests
+7. **Search test runs** to analyze test history and flakiness
 
-### Timeout Management
-\`\`\`javascript
-// Good timeout settings
-{
-  "simple_login": 60,      // Basic form interactions
-  "e_commerce": 180,       // Shopping flow with payments
-  "complex_workflow": 300, // Multi-step processes
-  "integration_test": 600  // Full system tests
-}
-\`\`\`
-
-### Error Handling
-1. **Session Not Found**: Check session ID, may have expired
-2. **Timeout**: Increase timeout or break into smaller tests
-3. **Pending Input**: Always respond promptly to avoid blocking
-4. **API Errors**: Check API key and network connectivity
-
-### Response Handling
-When session requires input:
-
-\`\`\`json
-{
-  "tool": "interact_with_qa_session",
-  "params": {
-    "sessionId": "session-id",
-    "action": "respond",
-    "message": "Your specific response based on the question"
-  }
-}
-\`\`\`
-
-## Common Patterns
-
-### Pattern 1: App Config-Based Testing (Recommended)
-\`\`\`javascript
-// 1. Configure once (if not already done)
-update_app_config({
-  base_url: "https://staging.app.com",
-  login_username: "test@company.com",
-  login_password: "secure-password"
-})
-
-// 2. Start session (URL optional - uses app config)
-start_qa_session({task: "Test user registration flow"})
-
-// 3. Get session ID from response.data.agent_id
-const sessionId = response.data.agent_id
-
-// 4. Wait for completion
-monitor_qa_session({
-  sessionId,
-  wait_for_completion: true,
-  timeout: 180
-})
-\`\`\`
-
-### Pattern 2: URL Override Testing
-\`\`\`javascript
-// Test specific page while keeping app config for credentials
-start_qa_session({
-  url: "https://app.com/special-feature",
-  task: "Test special feature page"
-})
-
-// Monitor as usual
-monitor_qa_session({sessionId, wait_for_completion: true})
-\`\`\`
-
-### Pattern 3: Multi-Environment Batch Testing
-\`\`\`javascript
-// 1. See available configurations
-const configs = list_app_configs({limit: 10})
-
-// 2. Run tests against specific config
-run_automated_tests({
-  test_ids: ['test1', 'test2', 'test3'],
-  app_config_id: 'staging-config-id'
-})
-
-// 3. Monitor all sessions
-const sessions = list_qa_sessions({limit: 50})
-sessions.forEach(session => {
-  if (session.status === 'active') {
-    monitor_qa_session({
-      sessionId: session.id,
-      wait_for_completion: true
-    })
-  }
-})
-\`\`\`
-
-### Pattern 4: Interactive Testing
-\`\`\`javascript
-// 1. Start session with app config
-start_qa_session({task: "Interactive exploration"})
-
-// 2. Monitor with auto-respond
-while (status !== 'closed' && status !== 'idle') {
-  const result = monitor_qa_session({sessionId, autoRespond: true})
-  if (result.hasPendingInput) {
-    // Handle user input prompt
-    interact_with_qa_session({sessionId, action: "respond", message: response})
-  }
-  wait(5000) // Wait 5 seconds
-}
-\`\`\`
-
-## Troubleshooting
-
-### Session Stuck in "active"
-- Increase timeout
-- Check if user input is required
-- Verify browser connectivity
-
-### High Response Times
-- Use pagination for large session lists
-- Monitor fewer sessions simultaneously
-- Check network connectivity
-
-### Memory Usage
-- Clean up completed sessions regularly
-- Use appropriate timeouts
-- Avoid monitoring too many sessions concurrently
+For more detailed examples, see the Getting Started and Workflows guides.
 `;
   }
 

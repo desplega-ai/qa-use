@@ -1,6 +1,6 @@
 {
   "name": "@desplega.ai/qa-use-mcp",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "MCP server for browser automation and QA testing",
   "type": "module",
   "main": "dist/src/index.js",
@@ -30,6 +30,7 @@
     "lint:fix": "eslint \"src/**/*.{ts,tsx,js,jsx}\" \"lib/**/*.{ts,tsx,js,jsx}\" --fix",
     "typecheck": "tsc --noEmit",
     "test": "echo \"Error: no test specified\" && exit 1",
+    "generate:readme": "node scripts/generate-readme-tools.js",
     "prepublishOnly": "pnpm build && pnpm lint && pnpm typecheck"
   },
   "keywords": [

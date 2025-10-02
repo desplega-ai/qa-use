@@ -1,7 +1,6 @@
 import { chromium } from 'playwright';
 import type { BrowserServer, Browser } from 'playwright';
 import { spawn } from 'child_process';
-import { promisify } from 'util';
 
 export interface BrowserSession {
   browserServer: BrowserServer;
@@ -24,9 +23,6 @@ export class BrowserManager {
     if (this.session) {
       throw new Error('Browser session already active');
     }
-
-    // Ensure browsers are installed
-    await this.ensureBrowsersInstalled();
 
     const defaultArgs = [
       '--disable-dev-shm-usage',
@@ -62,9 +58,12 @@ export class BrowserManager {
 
       return this.session;
     } catch (error: any) {
-      if (error.message.includes("Executable doesn't exist")) {
+      if (
+        error.message.includes("Executable doesn't exist") ||
+        error.message.includes('browserType.launch')
+      ) {
         throw new Error(
-          'Chromium browser is not installed. Run with forceInstall=true to install browsers automatically.'
+          'Chromium browser is not installed. Please run ensure_installed to install browsers.'
         );
       }
       throw error;
@@ -110,22 +109,9 @@ export class BrowserManager {
     return this.session?.wsEndpoint ?? null;
   }
 
-  private async ensureBrowsersInstalled(): Promise<void> {
-    try {
-      // Test if chromium is available by trying to get the executable path
-      await chromium.executablePath();
-    } catch (error) {
-      // Browser not installed, but we'll let the user handle installation
-      // through the forceInstall option in the MCP tool
-      throw new Error(
-        'Chromium browser is not installed. Please install Playwright browsers first.'
-      );
-    }
-  }
-
   async installPlaywrightBrowsers(): Promise<void> {
     return new Promise((resolve, reject) => {
-      // Install browsers using npx playwright install
+      // Always run install - it's a no-op if already installed
       const installProcess = spawn('npx', ['playwright', 'install', 'chromium'], {
         stdio: 'pipe',
         shell: true,
@@ -135,11 +121,15 @@ export class BrowserManager {
       let stderr = '';
 
       installProcess.stdout?.on('data', (data) => {
-        stdout += data.toString();
+        const message = data.toString();
+        stdout += message;
+        console.error(message); // Log progress to stderr
       });
 
       installProcess.stderr?.on('data', (data) => {
-        stderr += data.toString();
+        const message = data.toString();
+        stderr += message;
+        console.error(message); // Log errors to stderr
       });
 
       installProcess.on('close', (code) => {
@@ -155,20 +145,5 @@ export class BrowserManager {
         reject(new Error(`Failed to start browser installation: ${error.message}`));
       });
     });
-  }
-
-  async checkBrowserInstallation(): Promise<{ installed: boolean; version?: string }> {
-    try {
-      const executablePath = await chromium.executablePath();
-      // If we get here, browser is installed
-      return {
-        installed: true,
-        version: 'installed', // Could get actual version if needed
-      };
-    } catch (error) {
-      return {
-        installed: false,
-      };
-    }
   }
 }
