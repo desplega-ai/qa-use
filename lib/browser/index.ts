@@ -1,6 +1,9 @@
 import { chromium } from 'playwright';
 import type { BrowserServer, Browser } from 'playwright';
-import { spawn } from 'child_process';
+import { fork } from 'child_process';
+import path from 'path';
+import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
 
 export interface BrowserSession {
   browserServer: BrowserServer;
@@ -111,39 +114,50 @@ export class BrowserManager {
 
   async installPlaywrightBrowsers(): Promise<void> {
     return new Promise((resolve, reject) => {
-      // Always run install - it's a no-op if already installed
-      const installProcess = spawn('npx', ['playwright', 'install', 'chromium'], {
-        stdio: 'pipe',
-        shell: true,
-      });
+      try {
+        // Use the LOCAL playwright installation from package.json
+        // This ensures consistency between install and launch
+        // Create require function for ES modules
+        const require = createRequire(import.meta.url);
+        const playwrightPackagePath = require.resolve('playwright/package.json');
+        const cliPath = path.join(path.dirname(playwrightPackagePath), 'cli.js');
 
-      let stdout = '';
-      let stderr = '';
+        console.error(`Installing browsers using local Playwright at: ${cliPath}`);
 
-      installProcess.stdout?.on('data', (data) => {
-        const message = data.toString();
-        stdout += message;
-        console.error(message); // Log progress to stderr
-      });
+        // Fork the local Playwright CLI to install chromium
+        const child = fork(cliPath, ['install', 'chromium'], {
+          stdio: 'pipe',
+        });
 
-      installProcess.stderr?.on('data', (data) => {
-        const message = data.toString();
-        stderr += message;
-        console.error(message); // Log errors to stderr
-      });
+        const output: string[] = [];
 
-      installProcess.on('close', (code) => {
-        if (code === 0) {
-          console.error('Playwright browsers installed successfully');
-          resolve();
-        } else {
-          reject(new Error(`Browser installation failed: ${stderr || stdout}`));
-        }
-      });
+        child.stdout?.on('data', (data) => {
+          const message = data.toString();
+          output.push(message);
+          console.error(message); // Log progress to stderr
+        });
 
-      installProcess.on('error', (error) => {
-        reject(new Error(`Failed to start browser installation: ${error.message}`));
-      });
+        child.stderr?.on('data', (data) => {
+          const message = data.toString();
+          output.push(message);
+          console.error(message); // Log errors to stderr
+        });
+
+        child.on('close', (code) => {
+          if (code === 0) {
+            console.error('✅ Playwright browsers installed successfully');
+            resolve();
+          } else {
+            reject(new Error(`Failed to install browser: ${output.join('')}`));
+          }
+        });
+
+        child.on('error', (error) => {
+          reject(new Error(`Failed to start browser installation: ${error.message}`));
+        });
+      } catch (error: any) {
+        reject(new Error(`Failed to locate Playwright CLI: ${error.message}`));
+      }
     });
   }
 }
