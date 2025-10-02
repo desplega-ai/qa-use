@@ -64,7 +64,7 @@ const toolDefinitions = {
     parameters: [
       { name: 'task', type: 'string', required: true, description: 'The testing task or scenario to execute' },
       { name: 'url', type: 'string', required: false, description: 'Optional URL to test (overrides app config base_url if provided)' },
-      { name: 'dependencyId', type: 'string', required: false, description: 'Optional test ID that this session depends on' },
+      { name: 'dependencyId', type: 'string', required: false, description: 'Optional test ID that this session depends on (must be a self test ID created by your app configuration)' },
       { name: 'headless', type: 'boolean', required: false, description: 'Run browser in headless mode (default: false for better visibility)' }
     ]
   },
@@ -98,7 +98,8 @@ const toolDefinitions = {
       { name: 'testId', type: 'string', required: false, description: 'Specific test ID to retrieve detailed information for (if provided, other params ignored)' },
       { name: 'query', type: 'string', required: false, description: 'Search query to filter tests by name, description, URL, or task (ignored if testId provided)' },
       { name: 'limit', type: 'number', required: false, description: 'Maximum number of tests to return (default: 10, min: 1) (ignored if testId provided)' },
-      { name: 'offset', type: 'number', required: false, description: 'Number of tests to skip (default: 0, min: 0) (ignored if testId provided)' }
+      { name: 'offset', type: 'number', required: false, description: 'Number of tests to skip (default: 0, min: 0) (ignored if testId provided)' },
+      { name: 'self_only', type: 'boolean', required: false, description: 'Filter tests by app configuration. When true, only returns tests created by your application configuration. Default: false to allow running tests from other configs locally.' }
     ]
   },
   'run_automated_tests': {

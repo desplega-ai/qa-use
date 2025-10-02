@@ -283,7 +283,7 @@ Start an automated E2E test session for QA flows and automated testing. Returns 
 **Parameters:**
 - `task` (string, required): The testing task or scenario to execute
 - `url` (string, optional): Optional URL to test (overrides app config base_url if provided)
-- `dependencyId` (string, optional): Optional test ID that this session depends on
+- `dependencyId` (string, optional): Optional test ID that this session depends on (must be a self test ID created by your app configuration)
 - `headless` (boolean, optional): Run browser in headless mode (default: false for better visibility)
 
 #### `start_dev_session`
@@ -320,6 +320,7 @@ Search for automated tests by ID or query. If testId provided, returns detailed 
 - `query` (string, optional): Search query to filter tests by name, description, URL, or task (ignored if testId provided)
 - `limit` (number, optional): Maximum number of tests to return (default: 10, min: 1) (ignored if testId provided)
 - `offset` (number, optional): Number of tests to skip (default: 0, min: 0) (ignored if testId provided)
+- `self_only` (boolean, optional): Filter tests by app configuration. When true, only returns tests created by your application configuration. Default: false to allow running tests from other configs locally.
 
 #### `run_automated_tests`
 Execute multiple automated tests simultaneously.

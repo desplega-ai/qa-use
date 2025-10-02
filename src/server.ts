@@ -67,6 +67,7 @@ interface SearchAutomatedTestsParams {
   query?: string;
   limit?: number;
   offset?: number;
+  self_only?: boolean;
 }
 
 interface RunAutomatedTestsParams {
@@ -598,7 +599,8 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
                 },
                 dependencyId: {
                   type: 'string',
-                  description: 'Optional test ID that this session depends on',
+                  description:
+                    'Optional test ID that this session depends on (must be a self test ID created by your app configuration)',
                 },
                 headless: {
                   type: 'boolean',
@@ -715,6 +717,11 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
                   description:
                     'Number of tests to skip (default: 0, min: 0) (ignored if testId provided)',
                   minimum: 0,
+                },
+                self_only: {
+                  type: 'boolean',
+                  description:
+                    'Filter tests by app configuration. When true, only returns tests created by your application configuration. Default: false to allow running tests from other configs locally.',
                 },
               },
             },
@@ -1687,7 +1694,7 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
         };
       }
 
-      const { testId, query, limit = 10, offset = 0 } = params;
+      const { testId, query, limit = 10, offset = 0, self_only = false } = params;
 
       try {
         // If testId provided, get specific test details
@@ -1704,7 +1711,7 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
         }
 
         // Otherwise, search for tests
-        const options = { limit, offset, query: query || '' };
+        const options = { limit, offset, query: query || '', self_only };
         const tests = await this.globalApiClient.listTests(options);
         const testSummaries = tests.map((test) => this.createTestSummary(test));
 
