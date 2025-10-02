@@ -33,6 +33,7 @@ export interface CreateSessionOptions {
   task: string;
   wsUrl?: string;
   dependencyId?: string;
+  devMode?: boolean;
 }
 
 export interface CreateSessionResponse {
@@ -317,7 +318,16 @@ export class ApiClient {
         ws_url: options.wsUrl,
         dep_id: options.dependencyId,
         source: 'mcp',
+        autopilot: true,
+        use_storage_path: false,
+        persist: true,
       };
+
+      if (options.devMode) {
+        sessionData.autopilot = false;
+        sessionData.use_storage_path = true;
+        sessionData.persist = false;
+      }
 
       const response: AxiosResponse = await this.client.post('/vibe-qa/sessions', sessionData);
 

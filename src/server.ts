@@ -23,43 +23,47 @@ import {
   categorizeIssues,
 } from './utils/summary.js';
 
-interface InitQaServerParams {
+interface EnsureInstalledParams {
   apiKey?: string;
   forceInstall?: boolean;
-  interactive?: boolean;
-  inactivityTimeoutMinutes?: number;
 }
 
 interface RegisterUserParams {
   email: string;
 }
 
-interface ListQaSessionsParams {
+interface SearchSessionsParams {
   limit?: number;
   offset?: number;
   query?: string;
 }
 
-interface StartQaSessionParams {
+interface StartAutomatedSessionParams {
   url?: string;
   task: string;
   dependencyId?: string;
+  headless?: boolean;
 }
 
-interface MonitorQaSessionParams {
+interface StartDevSessionParams {
+  url?: string;
+  task: string;
+  headless?: boolean;
+}
+
+interface MonitorSessionParams {
   sessionId: string;
-  autoRespond?: boolean;
-  wait_for_completion?: boolean;
+  wait?: boolean;
   timeout?: number;
 }
 
-interface InteractWithQaSessionParams {
+interface InteractWithSessionParams {
   sessionId: string;
   action: 'respond' | 'pause' | 'close';
   message?: string;
 }
 
-interface FindAutomatedTestParams {
+interface SearchAutomatedTestsParams {
   testId?: string;
   query?: string;
   limit?: number;
@@ -72,7 +76,7 @@ interface RunAutomatedTestsParams {
   app_config_id?: string;
 }
 
-interface ListTestRunsParams {
+interface SearchAutomatedTestRunsParams {
   test_id?: string;
   run_id?: string;
   limit?: number;
@@ -81,18 +85,12 @@ interface ListTestRunsParams {
 
 type ViewportConfigType = 'big_desktop' | 'desktop' | 'mobile' | 'tablet';
 
-interface UpdateAppConfigParams {
+interface UpdateConfigurationParams {
   base_url?: string;
   login_url?: string;
   login_username?: string;
   login_password?: string;
   vp_type?: ViewportConfigType;
-}
-
-interface ListAppConfigsParams {
-  limit?: number;
-  offset?: number;
-  query?: string;
 }
 
 interface SessionSummary {
@@ -176,8 +174,10 @@ interface StartSessionResult {
 class QAUseMcpServer {
   private server: Server;
   private globalApiClient: ApiClient;
-  private browserManager: BrowserManager | null = null;
-  private tunnelManager: TunnelManager | null = null;
+  private automatedBrowserManager: BrowserManager | null = null;
+  private automatedTunnelManager: TunnelManager | null = null;
+  private devBrowserManager: BrowserManager | null = null;
+  private devTunnelManager: TunnelManager | null = null;
 
   // Inactivity timeout management
   private inactivityTimeout: NodeJS.Timeout | null = null;
@@ -450,7 +450,12 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
     this.lastActivityTime = Date.now();
 
     // Only set timeout if browser/tunnel are active
-    if (this.browserManager || this.tunnelManager) {
+    if (
+      this.automatedBrowserManager ||
+      this.automatedTunnelManager ||
+      this.devBrowserManager ||
+      this.devTunnelManager
+    ) {
       this.inactivityTimeout = setTimeout(() => {
         this.handleInactivityTimeout();
       }, this.inactivityTimeoutMs);
@@ -485,16 +490,24 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
 
   private async cleanupResources(): Promise<void> {
     try {
-      // Cleanup tunnel
-      if (this.tunnelManager) {
-        await this.tunnelManager.stopTunnel();
-        this.tunnelManager = null;
+      // Cleanup automated tunnel and browser
+      if (this.automatedTunnelManager) {
+        await this.automatedTunnelManager.stopTunnel();
+        this.automatedTunnelManager = null;
+      }
+      if (this.automatedBrowserManager) {
+        await this.automatedBrowserManager.stopBrowser();
+        this.automatedBrowserManager = null;
       }
 
-      // Cleanup browser
-      if (this.browserManager) {
-        await this.browserManager.stopBrowser();
-        this.browserManager = null;
+      // Cleanup dev tunnel and browser
+      if (this.devTunnelManager) {
+        await this.devTunnelManager.stopTunnel();
+        this.devTunnelManager = null;
+      }
+      if (this.devBrowserManager) {
+        await this.devBrowserManager.stopBrowser();
+        this.devBrowserManager = null;
       }
 
       // Clear timeout
@@ -516,9 +529,9 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
       return {
         tools: [
           {
-            name: 'init_qa_server',
+            name: 'ensure_installed',
             description:
-              'Initialize QA server environment and start browser. Browser runs in visible mode for better debugging.',
+              'Ensure API key is set, validate authentication, and install Playwright browsers if needed. Does not start browsers (lazy initialization on session start).',
             inputSchema: {
               type: 'object',
               properties: {
@@ -530,16 +543,6 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
                 forceInstall: {
                   type: 'boolean',
                   description: 'Force reinstall of Playwright browsers',
-                },
-                interactive: {
-                  type: 'boolean',
-                  description: 'Enable interactive mode for API key setup if not provided',
-                },
-                inactivityTimeoutMinutes: {
-                  type: 'number',
-                  description: 'Minutes of inactivity before browser/tunnel cleanup (default: 30)',
-                  minimum: 5,
-                  maximum: 120,
                 },
               },
               required: [],
@@ -560,8 +563,9 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
             },
           },
           {
-            name: 'list_qa_sessions',
-            description: 'List QA testing sessions with pagination and search',
+            name: 'search_sessions',
+            description:
+              'Search and list all sessions (automated tests and development sessions) with pagination and filtering',
             inputSchema: {
               type: 'object',
               properties: {
@@ -583,9 +587,9 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
             },
           },
           {
-            name: 'start_qa_session',
+            name: 'start_automated_session',
             description:
-              'Start a new QA testing session. Returns sessionId (data.agent_id) for subsequent operations. URL is optional - if not provided, uses the app config base_url. Use update_app_config to set login credentials and base URL first.',
+              'Start an automated E2E test session for QA flows and automated testing. Returns sessionId (data.agent_id) for monitoring. URL is optional - uses app config base_url if not provided.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -595,20 +599,51 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
                 },
                 task: {
                   type: 'string',
-                  description: 'The testing task description',
+                  description: 'The testing task or scenario to execute',
                 },
                 dependencyId: {
                   type: 'string',
                   description: 'Optional test ID that this session depends on',
+                },
+                headless: {
+                  type: 'boolean',
+                  description:
+                    'Run browser in headless mode (default: false for better visibility)',
                 },
               },
               required: ['task'],
             },
           },
           {
-            name: 'monitor_qa_session',
+            name: 'start_dev_session',
             description:
-              'Monitor a session for pending user input and track completion. Keep calling until status is "closed" or "idle". Use wait_for_completion to automatically wait.',
+              'Start an interactive development session for debugging and exploration. Session will not auto-pilot and allows manual browser interaction.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                url: {
+                  type: 'string',
+                  description:
+                    'Optional URL to start from (overrides app config base_url if provided)',
+                },
+                task: {
+                  type: 'string',
+                  description:
+                    'Description of what you want to explore or debug. Generally you can leave it blank or with a placeholder like "Waiting for user input" if you just want to start a blank session.',
+                },
+                headless: {
+                  type: 'boolean',
+                  description:
+                    'Run browser in headless mode (default: false for development visibility)',
+                },
+              },
+              required: ['task'],
+            },
+          },
+          {
+            name: 'monitor_session',
+            description:
+              'Monitor a session status. Keep calling until status is "closed". Will alert if session needs user input, is idle, or pending.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -616,20 +651,15 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
                   type: 'string',
                   description: 'The session ID to monitor',
                 },
-                autoRespond: {
+                wait: {
                   type: 'boolean',
                   description:
-                    'Automatically check for pending input and format response instructions',
-                },
-                wait_for_completion: {
-                  type: 'boolean',
-                  description:
-                    'Wait for session to complete (closed/idle) with MCP timeout protection (max 25s per call)',
+                    'Wait for session to reach any non-running state (closed, idle, needs_user_input, pending) with MCP timeout protection (max 25s per call)',
                 },
                 timeout: {
                   type: 'number',
                   description:
-                    'User timeout in seconds for wait_for_completion (default: 60). Note: MCP timeout protection limits each call to 25s max.',
+                    'User timeout in seconds for wait mode (default: 60). Note: MCP timeout protection limits each call to 25s max.',
                   minimum: 1,
                 },
               },
@@ -637,9 +667,9 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
             },
           },
           {
-            name: 'interact_with_qa_session',
+            name: 'interact_with_session',
             description:
-              'Interact with a QA session - respond to questions, pause, or close session',
+              'Interact with a session - respond to questions, pause, or close the session',
             inputSchema: {
               type: 'object',
               properties: {
@@ -663,9 +693,9 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
             },
           },
           {
-            name: 'find_automated_test',
+            name: 'search_automated_tests',
             description:
-              'Find automated tests by ID or search query. If testId provided, returns detailed info for that test. Otherwise searches with optional query/pagination.',
+              'Search for automated tests by ID or query. If testId provided, returns detailed info for that test. Otherwise searches with optional query/pagination.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -724,8 +754,8 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
             },
           },
           {
-            name: 'list_test_runs',
-            description: 'List test runs with optional filtering by test ID or run ID',
+            name: 'search_automated_test_runs',
+            description: 'Search automated test runs with optional filtering by test ID or run ID',
             inputSchema: {
               type: 'object',
               properties: {
@@ -751,9 +781,9 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
             },
           },
           {
-            name: 'update_app_config',
+            name: 'update_configuration',
             description:
-              'Update app configuration settings (base URL, login settings, viewport type)',
+              'Update application configuration settings including base URL, login credentials, and viewport type',
             inputSchema: {
               type: 'object',
               properties: {
@@ -782,32 +812,9 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
             },
           },
           {
-            name: 'list_app_configs',
-            description: 'List app configurations with pagination and search filtering',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                limit: {
-                  type: 'number',
-                  description: 'Maximum number of app configs to return (default: 10, min: 1)',
-                  minimum: 1,
-                },
-                offset: {
-                  type: 'number',
-                  description: 'Number of app configs to skip (default: 0, min: 0)',
-                  minimum: 0,
-                },
-                query: {
-                  type: 'string',
-                  description: 'Search query to filter app configs by name, base URL, or status',
-                },
-              },
-            },
-          },
-          {
-            name: 'get_current_app_config',
+            name: 'get_configuration',
             description:
-              'Get the current app configuration details (equivalent to /check endpoint)',
+              'Get the current application configuration details including base URL, login settings, and viewport',
             inputSchema: {
               type: 'object',
               properties: {},
@@ -820,52 +827,54 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: params } = request.params;
 
-      if (name === 'init_qa_server') {
-        return this.handleInitQaServer(params as unknown as InitQaServerParams);
+      if (name === 'ensure_installed') {
+        return this.handleEnsureInstalled(params as unknown as EnsureInstalledParams);
       }
 
       if (name === 'register_user') {
         return this.handleRegisterUser(params as unknown as RegisterUserParams);
       }
 
-      if (name === 'list_qa_sessions') {
-        return this.handleListQaSessions(params as unknown as ListQaSessionsParams);
+      if (name === 'search_sessions') {
+        return this.handleSearchSessions(params as unknown as SearchSessionsParams);
       }
 
-      if (name === 'start_qa_session') {
-        return this.handleStartQaSession(params as unknown as StartQaSessionParams);
+      if (name === 'start_automated_session') {
+        return this.handleStartAutomatedSession(params as unknown as StartAutomatedSessionParams);
       }
 
-      if (name === 'monitor_qa_session') {
-        return this.handleMonitorQaSession(params as unknown as MonitorQaSessionParams);
+      if (name === 'start_dev_session') {
+        return this.handleStartDevSession(params as unknown as StartDevSessionParams);
       }
 
-      if (name === 'interact_with_qa_session') {
-        return this.handleInteractWithQaSession(params as unknown as InteractWithQaSessionParams);
+      if (name === 'monitor_session') {
+        return this.handleMonitorSession(params as unknown as MonitorSessionParams);
       }
 
-      if (name === 'find_automated_test') {
-        return this.handleFindAutomatedTest(params as unknown as FindAutomatedTestParams);
+      if (name === 'interact_with_session') {
+        return this.handleInteractWithSession(params as unknown as InteractWithSessionParams);
+      }
+
+      if (name === 'search_automated_tests') {
+        return this.handleSearchAutomatedTests(params as unknown as SearchAutomatedTestsParams);
       }
 
       if (name === 'run_automated_tests') {
         return this.handleRunAutomatedTests(params as unknown as RunAutomatedTestsParams);
       }
 
-      if (name === 'list_test_runs') {
-        return this.handleListTestRuns(params as unknown as ListTestRunsParams);
+      if (name === 'search_automated_test_runs') {
+        return this.handleSearchAutomatedTestRuns(
+          params as unknown as SearchAutomatedTestRunsParams
+        );
       }
 
-      if (name === 'update_app_config') {
-        return this.handleUpdateAppConfig(params as unknown as UpdateAppConfigParams);
+      if (name === 'update_configuration') {
+        return this.handleUpdateConfiguration(params as unknown as UpdateConfigurationParams);
       }
 
-      if (name === 'list_app_configs') {
-        return this.handleListAppConfigs(params as unknown as ListAppConfigsParams);
-      }
-
-      if (name === 'get_current_app_config') {
-        return this.handleGetCurrentAppConfig();
+      if (name === 'get_configuration') {
+        return this.handleGetConfiguration();
       }
 
       return {
@@ -880,53 +889,23 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
     });
   }
 
-  private async handleInitQaServer(params: InitQaServerParams): Promise<CallToolResult> {
+  private async handleEnsureInstalled(params: EnsureInstalledParams): Promise<CallToolResult> {
     try {
-      const { apiKey, forceInstall, interactive, inactivityTimeoutMinutes } = params;
-
-      // Set custom timeout if provided
-      if (inactivityTimeoutMinutes) {
-        this.inactivityTimeoutMs = inactivityTimeoutMinutes * 60 * 1000;
-      }
-      const headless = false; // Always run in visible mode for better debugging
+      const { apiKey, forceInstall } = params;
 
       // Use provided API key or fall back to environment variable
       if (apiKey) {
         this.globalApiClient.setApiKey(apiKey);
       } else if (!this.globalApiClient.getApiKey()) {
-        if (interactive) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `🚀 Welcome to QA-Use MCP Server!
-
-To get started, you need an API key from desplega.ai.
-
-**Do you already have an API key?**
-
-**Option 1: I have an API key**
-Run: \`{"method": "tools/call", "params": {"name": "init_qa_server", "arguments": {"apiKey": "your-api-key-here"}}}\`
-
-**Option 2: I need to register**
-If you don't have an account yet, you can register with your email:
-Run: \`{"method": "tools/call", "params": {"name": "register_user", "arguments": {"email": "your-email@example.com"}}}\`
-
-After registration, you'll receive an API key that you can use in Option 1.`,
-              },
-            ],
-          };
-        } else {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: 'No API key provided and QA_USE_API_KEY environment variable not set. Please provide an API key, set the environment variable, or use interactive=true for setup assistance.',
-              },
-            ],
-            isError: true,
-          };
-        }
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'No API key provided and QA_USE_API_KEY environment variable not set. Please provide an API key or set the environment variable.',
+            },
+          ],
+          isError: true,
+        };
       }
 
       const authResult = await this.globalApiClient.validateApiKey();
@@ -942,87 +921,58 @@ After registration, you'll receive an API key that you can use in Option 1.`,
         };
       }
 
-      // Initialize BrowserManager
-      this.browserManager = new BrowserManager();
-
+      // Install Playwright browsers if needed
       if (forceInstall) {
-        await this.browserManager.installPlaywrightBrowsers();
+        const browserManager = new BrowserManager();
+        await browserManager.installPlaywrightBrowsers();
+      } else {
+        // Check if browsers are installed
+        const browserManager = new BrowserManager();
+        const installStatus = await browserManager.checkBrowserInstallation();
+        if (!installStatus.installed) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Playwright browsers not installed. Run with forceInstall=true to install browsers.',
+              },
+            ],
+            isError: true,
+          };
+        }
       }
-
-      // Start the browser
-      const browserSession = await this.browserManager.startBrowser({ headless });
-      const wsEndpoint = browserSession.wsEndpoint;
-
-      // Initialize TunnelManager and create tunnel for browser WebSocket
-      this.tunnelManager = new TunnelManager();
-
-      // Extract port from WebSocket URL (e.g., ws://127.0.0.1:9222/devtools/browser/xxx)
-      const wsUrl = new URL(wsEndpoint);
-      const browserPort = parseInt(wsUrl.port);
-
-      const tunnelSession = await this.tunnelManager.startTunnel(browserPort);
-      const tunnelWsUrl = this.tunnelManager.getWebSocketUrl(wsEndpoint);
-
-      // Mark activity since browser and tunnel are now initialized
-      this.markActivity();
 
       const apiUrl = this.globalApiClient.getApiUrl();
       const appUrl = ApiClient.getAppUrl();
       const appConfigId = this.globalApiClient.getAppConfigId();
 
-      const timeoutMinutes = Math.round(this.inactivityTimeoutMs / 60000);
-      let initMessage = `QA server initialized successfully. API key validated and browser started.\nAPI URL: ${apiUrl}\nApp URL: ${appUrl}\nLocal Browser WebSocket: ${wsEndpoint}\nTunneled Browser WebSocket: ${tunnelWsUrl}\nTunnel URL: ${tunnelSession.publicUrl}\nHeadless mode: ${headless}\nInactivity timeout: ${timeoutMinutes} minutes`;
+      let message = `✅ Environment ready!\nAPI Key: Valid\nAPI URL: ${apiUrl}\nApp URL: ${appUrl}\nBrowsers: Installed`;
 
       if (appConfigId) {
-        initMessage += `\nApp Config ID: ${appConfigId}`;
+        message += `\nApp Config ID: ${appConfigId}`;
       }
 
       // Include app config details if available
       if (authResult.data?.app_config) {
         const appConfig = authResult.data.app_config;
-        initMessage += `\nApp Config: ${appConfig.name} (${appConfig.base_url})`;
+        message += `\nApp Config: ${appConfig.name} (${appConfig.base_url})`;
         if (appConfig.login_url) {
-          initMessage += `\nLogin URL: ${appConfig.login_url}`;
+          message += `\nLogin URL: ${appConfig.login_url}`;
         }
 
         // Check if app config needs setup
         if (!appConfig.base_url || appConfig.base_url.trim() === '') {
-          initMessage += `\n\n🔧 **Setup Required**: Your app config needs a base URL. Run this to configure:
-{
-  "tool": "update_app_config",
-  "params": {
-    "base_url": "https://your-app.com",
-    "login_url": "https://your-app.com/login",
-    "login_username": "test@example.com"
-  }
-}`;
+          message += `\n\n🔧 **Setup Required**: Your app config needs a base URL. Run update_configuration to configure.`;
         }
       } else {
-        initMessage += `\n\n🔧 **First Time Setup**: Configure your testing environment:
-{
-  "tool": "update_app_config",
-  "params": {
-    "base_url": "https://your-app.com",
-    "login_url": "https://your-app.com/login",
-    "login_username": "test@example.com",
-    "login_password": "your-password"
-  }
-}
-
-After setup, you can start testing without specifying URLs:
-{
-  "tool": "start_qa_session",
-  "params": {
-    "task": "Test the main functionality"
-  }
-}`;
+        message += `\n\n🔧 **First Time Setup**: Run update_configuration to set your base URL and login credentials.`;
       }
 
       return {
         content: [
           {
             type: 'text',
-            text: initMessage,
+            text: message,
           },
         ],
       };
@@ -1031,7 +981,7 @@ After setup, you can start testing without specifying URLs:
         content: [
           {
             type: 'text',
-            text: `Initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            text: `Environment check failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
           },
         ],
         isError: true,
@@ -1079,95 +1029,43 @@ After setup, you can start testing without specifying URLs:
   }
 
   private async ensureInitialized(): Promise<CallToolResult> {
-    // Check if already initialized
-    const isInitialized =
-      this.globalApiClient.getApiKey() &&
-      this.browserManager &&
-      this.browserManager.isActive() &&
-      this.tunnelManager &&
-      this.tunnelManager.isActive();
-
-    if (isInitialized) {
-      return {
-        content: [{ type: 'text', text: 'Already initialized' }],
-      };
-    }
-
     // Check for API key
     if (!this.globalApiClient.getApiKey()) {
       return {
         content: [
           {
             type: 'text',
-            text: 'API key not configured. Please set QA_USE_API_KEY environment variable or run init_qa_server with an API key.',
+            text: 'API key not configured. Please set QA_USE_API_KEY environment variable or run ensure_installed with an API key.',
           },
         ],
         isError: true,
       };
     }
 
-    // Auto-initialize
+    // Validate API key if not already validated
     try {
-      const headless = false;
-
-      // Validate API key
       const authResult = await this.globalApiClient.validateApiKey();
       if (!authResult.success) {
         return {
           content: [
             {
               type: 'text',
-              text: `API key validation failed: ${authResult.message}. Please run init_qa_server with a valid API key.`,
+              text: `API key validation failed: ${authResult.message}. Please run ensure_installed with a valid API key.`,
             },
           ],
           isError: true,
         };
       }
 
-      // Initialize BrowserManager if needed
-      if (!this.browserManager || !this.browserManager.isActive()) {
-        this.browserManager = new BrowserManager();
-        const browserSession = await this.browserManager.startBrowser({ headless });
-      }
-
-      // Initialize TunnelManager if needed
-      if (!this.tunnelManager || !this.tunnelManager.isActive()) {
-        const wsEndpoint = this.browserManager!.getWebSocketEndpoint();
-        if (!wsEndpoint) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: 'Failed to get browser WebSocket endpoint during auto-initialization.',
-              },
-            ],
-            isError: true,
-          };
-        }
-
-        this.tunnelManager = new TunnelManager();
-        const wsUrl = new URL(wsEndpoint);
-        const browserPort = parseInt(wsUrl.port);
-        await this.tunnelManager.startTunnel(browserPort);
-      }
-
-      // Mark activity
-      this.markActivity();
-
       return {
-        content: [
-          {
-            type: 'text',
-            text: '✓ Auto-initialized QA server (browser and tunnel started)',
-          },
-        ],
+        content: [{ type: 'text', text: 'Initialized' }],
       };
     } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Auto-initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}. Please run init_qa_server manually.`,
+            text: `Initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
           },
         ],
         isError: true,
@@ -1175,7 +1073,7 @@ After setup, you can start testing without specifying URLs:
     }
   }
 
-  private async handleListQaSessions(params: ListQaSessionsParams): Promise<CallToolResult> {
+  private async handleSearchSessions(params: SearchSessionsParams): Promise<CallToolResult> {
     try {
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -1243,36 +1141,60 @@ After setup, you can start testing without specifying URLs:
     }
   }
 
-  private async handleStartQaSession(params: StartQaSessionParams): Promise<CallToolResult> {
+  private async handleStartAutomatedSession(
+    params: StartAutomatedSessionParams
+  ): Promise<CallToolResult> {
     try {
-      const { url, task, dependencyId } = params;
+      const { url, task, dependencyId, headless = false } = params;
 
-      // Auto-initialize if not already done
+      // Ensure API key is set
       const initResult = await this.ensureInitialized();
       if (initResult.isError) {
         return initResult;
       }
 
-      const localWsUrl = this.browserManager!.getWebSocketEndpoint();
+      // Initialize browser and tunnel for automated sessions if not already started
+      if (!this.automatedBrowserManager || !this.automatedBrowserManager.isActive()) {
+        this.automatedBrowserManager = new BrowserManager();
+        const browserSession = await this.automatedBrowserManager.startBrowser({ headless });
+        const wsEndpoint = browserSession.wsEndpoint;
+
+        // Create tunnel
+        this.automatedTunnelManager = new TunnelManager();
+        const wsUrl = new URL(wsEndpoint);
+        const browserPort = parseInt(wsUrl.port);
+        await this.automatedTunnelManager.startTunnel(browserPort);
+      } else if (!this.automatedTunnelManager || !this.automatedTunnelManager.isActive()) {
+        // Browser exists but tunnel is dead - recreate tunnel
+        const localWsUrl = this.automatedBrowserManager.getWebSocketEndpoint();
+        if (localWsUrl) {
+          this.automatedTunnelManager = new TunnelManager();
+          const wsUrl = new URL(localWsUrl);
+          const browserPort = parseInt(wsUrl.port);
+          await this.automatedTunnelManager.startTunnel(browserPort);
+        }
+      }
+
+      const localWsUrl = this.automatedBrowserManager.getWebSocketEndpoint();
       if (!localWsUrl) {
         return {
           content: [
             {
               type: 'text',
-              text: 'Browser WebSocket endpoint not available. Please reinitialize the server.',
+              text: 'Browser WebSocket endpoint not available.',
             },
           ],
           isError: true,
         };
       }
 
-      const wsUrl = this.tunnelManager!.getWebSocketUrl(localWsUrl);
+      const wsUrl = this.automatedTunnelManager!.getWebSocketUrl(localWsUrl);
       if (!wsUrl) {
         return {
           content: [
             {
               type: 'text',
-              text: 'Failed to create tunneled WebSocket URL. Please reinitialize the server.',
+              text: 'Failed to create tunneled WebSocket URL.',
             },
           ],
           isError: true,
@@ -1285,23 +1207,18 @@ After setup, you can start testing without specifying URLs:
           task,
           wsUrl,
           dependencyId,
+          devMode: false, // Automated session
         });
 
-        // Mark activity since a new QA session is starting
+        // Mark activity
         this.markActivity();
-
-        // Check if this was an auto-init
-        const initText = initResult.content[0]?.text || '';
-        const autoInitMessage =
-          typeof initText === 'string' && initText.includes('Auto-initialized')
-            ? '\n\n' + initText
-            : '';
 
         const result = {
           success: true,
-          message: 'QA session started successfully',
+          message: 'Automated test session started successfully',
           sessionId: sessionId,
-          note: `Use sessionId "${sessionId}" for monitoring, responding, and controlling this session. This session uses App Config ID: ${appConfigId}.${autoInitMessage}`,
+          sessionType: 'automated',
+          note: `Use sessionId "${sessionId}" for monitoring and interaction. This automated session uses App Config ID: ${appConfigId}.`,
         };
 
         return {
@@ -1317,7 +1234,7 @@ After setup, you can start testing without specifying URLs:
           content: [
             {
               type: 'text',
-              text: `Failed to start session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              text: `Failed to start automated session: ${error instanceof Error ? error.message : 'Unknown error'}`,
             },
           ],
           isError: true,
@@ -1328,7 +1245,7 @@ After setup, you can start testing without specifying URLs:
         content: [
           {
             type: 'text',
-            text: `Failed to start session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            text: `Failed to start automated session: ${error instanceof Error ? error.message : 'Unknown error'}`,
           },
         ],
         isError: true,
@@ -1336,9 +1253,120 @@ After setup, you can start testing without specifying URLs:
     }
   }
 
-  private async handleMonitorQaSession(params: MonitorQaSessionParams): Promise<CallToolResult> {
+  private async handleStartDevSession(params: StartDevSessionParams): Promise<CallToolResult> {
     try {
-      const { sessionId, autoRespond = true, wait_for_completion = false, timeout = 60 } = params;
+      const { url, task, headless = false } = params;
+
+      // Ensure API key is set
+      const initResult = await this.ensureInitialized();
+
+      if (initResult.isError) {
+        return initResult;
+      }
+
+      // Initialize browser and tunnel for dev sessions if not already started
+      if (!this.devBrowserManager || !this.devBrowserManager.isActive()) {
+        this.devBrowserManager = new BrowserManager();
+        const browserSession = await this.devBrowserManager.startBrowser({ headless });
+        const wsEndpoint = browserSession.wsEndpoint;
+
+        // Create tunnel
+        this.devTunnelManager = new TunnelManager();
+        const wsUrl = new URL(wsEndpoint);
+        const browserPort = parseInt(wsUrl.port);
+        await this.devTunnelManager.startTunnel(browserPort);
+      } else if (!this.devTunnelManager || !this.devTunnelManager.isActive()) {
+        // Browser exists but tunnel is dead - recreate tunnel
+        const localWsUrl = this.devBrowserManager.getWebSocketEndpoint();
+        if (localWsUrl) {
+          this.devTunnelManager = new TunnelManager();
+          const wsUrl = new URL(localWsUrl);
+          const browserPort = parseInt(wsUrl.port);
+          await this.devTunnelManager.startTunnel(browserPort);
+        }
+      }
+
+      const localWsUrl = this.devBrowserManager.getWebSocketEndpoint();
+
+      if (!localWsUrl) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Browser WebSocket endpoint not available.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const wsUrl = this.devTunnelManager!.getWebSocketUrl(localWsUrl);
+      if (!wsUrl) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Failed to create tunneled WebSocket URL.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        const { sessionId, appConfigId } = await this.globalApiClient.createSession({
+          url,
+          task,
+          wsUrl,
+          devMode: true, // Development session
+        });
+
+        // Mark activity
+        this.markActivity();
+
+        const result = {
+          success: true,
+          message: 'Development session started successfully',
+          sessionId: sessionId,
+          sessionType: 'development',
+          note: `Use sessionId "${sessionId}" for monitoring and interaction. This dev session allows manual browser control and uses App Config ID: ${appConfigId}.`,
+        };
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Failed to start dev session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Failed to start dev session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  private async handleMonitorSession(params: MonitorSessionParams): Promise<CallToolResult> {
+    try {
+      const { sessionId, wait = false, timeout = 60 } = params;
 
       // Mark activity since we're actively monitoring sessions
       this.markActivity();
@@ -1348,55 +1376,56 @@ After setup, you can start testing without specifying URLs:
           content: [
             {
               type: 'text',
-              text: 'API key not configured. Please run init_qa_server first with an API key.',
+              text: 'API key not configured. Please run ensure_installed first with an API key.',
             },
           ],
           isError: true,
         };
       }
 
-      if (wait_for_completion) {
-        return this.handleWaitForCompletion(sessionId, timeout, autoRespond);
+      if (wait) {
+        return this.handleWaitForNonRunningState(sessionId, timeout);
       }
 
       try {
         const session = await this.globalApiClient.getSession(sessionId);
 
+        const status = session.data?.status || session.status;
         const result = {
           sessionId: session.id,
-          status: session.data?.status || session.status,
+          status: status,
           hasPendingInput: !!session.data?.pending_user_input,
           pendingInput: session.data?.pending_user_input,
           lastDone: session.data?.last_done,
           liveviewUrl: session.data?.liveview_url,
-          note: 'Keep calling monitor_qa_session until status is "closed" or "idle". Use wait_for_completion=true to automatically wait.',
+          note: 'Keep calling monitor_session until status is "closed".',
         };
 
-        if (autoRespond && session.data?.pending_user_input) {
-          const pendingInput = session.data.pending_user_input;
+        // Alert on specific statuses
+        if (status === 'idle' || status === 'pending' || status === 'need_user_input') {
+          let alertMessage = `⚠️ Session ${sessionId} is in "${status}" state`;
 
-          // Use MCP's elicitation pattern to prompt for user input
-          const elicitationText = `
-🤖 **Session ${sessionId} requires your input to continue!**
-
-**Context:** ${pendingInput.reasoning || 'The QA session needs input to proceed'}
-
-**Question:** ${pendingInput.question || 'Please provide your response'}
-
-**Priority:** ${pendingInput.priority || 'normal'}
-
-Please provide your response below, and it will be automatically sent to the session.`;
+          if (status === 'need_user_input' && session.data?.pending_user_input) {
+            const pendingInput = session.data.pending_user_input;
+            alertMessage += `\n\n**Input Required:**\n`;
+            alertMessage += `Context: ${pendingInput.reasoning || 'Session needs input'}\n`;
+            alertMessage += `Question: ${pendingInput.question || 'Please provide response'}\n`;
+            alertMessage += `Priority: ${pendingInput.priority || 'normal'}\n\n`;
+            alertMessage += `Use interact_with_session to respond.`;
+          } else if (status === 'idle') {
+            alertMessage += `\nSession is waiting but not actively processing.`;
+          } else if (status === 'pending') {
+            alertMessage += `\nSession is pending and may need attention.`;
+          }
 
           return {
             content: [
               {
                 type: 'text',
-                text: elicitationText,
+                text: alertMessage,
               },
             ],
             isError: false,
-            // This indicates to the MCP client that user input is needed
-            // The response will be processed by the client and can trigger follow-up actions
           };
         }
 
@@ -1435,10 +1464,9 @@ Please provide your response below, and it will be automatically sent to the ses
     }
   }
 
-  private async handleWaitForCompletion(
+  private async handleWaitForNonRunningState(
     sessionId: string,
-    timeout: number,
-    autoRespond: boolean
+    timeout: number
   ): Promise<CallToolResult> {
     const startTime = Date.now();
     const timeoutMs = timeout * 1000;
@@ -1477,58 +1505,33 @@ Please provide your response below, and it will be automatically sent to the ses
             },
           });
 
-          // Check if session is complete
-          if (status === 'closed' || status === 'idle') {
-            const result = {
-              sessionId: session.id,
-              status: status,
-              hasPendingInput: !!session.data?.pending_user_input,
-              pendingInput: session.data?.pending_user_input,
-              lastDone: session.data?.last_done,
-              liveviewUrl: session.data?.liveview_url,
-              completedAfter: elapsed,
-              iterations: iteration,
-              note: `Session completed with status: ${status}`,
-            };
+          // Check if session is in non-running state
+          if (status !== 'running') {
+            let message = `Session ${sessionId} reached "${status}" state after ${elapsed} seconds`;
 
-            // Create conversational completion message
-            const completionText = this.formatSessionCompletion(session, elapsed, iteration);
-
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: completionText,
-                },
-              ],
-            };
-          }
-
-          // Check for pending input
-          if (autoRespond && session.data?.pending_user_input) {
-            const pendingInput = session.data.pending_user_input;
-
-            const elicitationText = `
-🤖 **Session ${sessionId} requires your input to continue!**
-
-**Monitoring stopped after ${elapsed} seconds** because the session is waiting for input.
-
-**Context:** ${pendingInput.reasoning || 'The QA session needs input to proceed'}
-
-**Question:** ${pendingInput.question || 'Please provide your response'}
-
-**Priority:** ${pendingInput.priority || 'normal'}
-
-Please use interact_with_qa_session tool with action="respond" to provide your response, then call monitor_qa_session again with wait_for_completion=true to continue monitoring.`;
+            if (status === 'closed') {
+              message = `✅ Session ${sessionId} completed and closed after ${elapsed} seconds`;
+            } else if (status === 'idle') {
+              message = `⚠️ Session ${sessionId} is idle after ${elapsed} seconds`;
+            } else if (status === 'need_user_input' && session.data?.pending_user_input) {
+              const pendingInput = session.data.pending_user_input;
+              message = `⚠️ Session ${sessionId} needs user input after ${elapsed} seconds\n\n`;
+              message += `**Input Required:**\n`;
+              message += `Context: ${pendingInput.reasoning || 'Session needs input'}\n`;
+              message += `Question: ${pendingInput.question || 'Please provide response'}\n`;
+              message += `Priority: ${pendingInput.priority || 'normal'}\n\n`;
+              message += `Use interact_with_session to respond.`;
+            } else if (status === 'pending') {
+              message = `⚠️ Session ${sessionId} is pending after ${elapsed} seconds`;
+            }
 
             return {
               content: [
                 {
                   type: 'text',
-                  text: elicitationText,
+                  text: message,
                 },
               ],
-              isError: false,
             };
           }
 
@@ -1600,8 +1603,8 @@ Please use interact_with_qa_session tool with action="respond" to provide your r
     }
   }
 
-  private async handleInteractWithQaSession(
-    params: InteractWithQaSessionParams
+  private async handleInteractWithSession(
+    params: InteractWithSessionParams
   ): Promise<CallToolResult> {
     try {
       const { sessionId, action, message = '' } = params;
@@ -1638,7 +1641,7 @@ Please use interact_with_qa_session tool with action="respond" to provide your r
         // Map new action format to API format
         const apiAction = action === 'respond' ? 'response' : action;
 
-        const result = await this.globalApiClient.sendMessage({
+        await this.globalApiClient.sendMessage({
           sessionId,
           action: apiAction,
           data: message,
@@ -1690,7 +1693,9 @@ Please use interact_with_qa_session tool with action="respond" to provide your r
     }
   }
 
-  private async handleFindAutomatedTest(params: FindAutomatedTestParams): Promise<CallToolResult> {
+  private async handleSearchAutomatedTests(
+    params: SearchAutomatedTestsParams
+  ): Promise<CallToolResult> {
     try {
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -1798,15 +1803,43 @@ Please use interact_with_qa_session tool with action="respond" to provide your r
         };
       }
 
-      // Use provided ws_url or fall back to the global tunneled URL
-      const websocketUrl = ws_url || this.getGlobalWebSocketUrl();
+      // If no ws_url provided, ensure browser and tunnel are initialized
+      let websocketUrl: string | null = ws_url ?? null;
+
+      if (!websocketUrl) {
+        // Initialize browser and tunnel for automated tests if not already started
+        if (!this.automatedBrowserManager || !this.automatedBrowserManager.isActive()) {
+          this.automatedBrowserManager = new BrowserManager();
+          const browserSession = await this.automatedBrowserManager.startBrowser({
+            headless: true,
+          });
+          const wsEndpoint = browserSession.wsEndpoint;
+
+          // Create tunnel
+          this.automatedTunnelManager = new TunnelManager();
+          const wsUrl = new URL(wsEndpoint);
+          const browserPort = parseInt(wsUrl.port);
+          await this.automatedTunnelManager.startTunnel(browserPort);
+        } else if (!this.automatedTunnelManager || !this.automatedTunnelManager.isActive()) {
+          // Browser exists but tunnel is dead - recreate tunnel
+          const localWsUrl = this.automatedBrowserManager.getWebSocketEndpoint();
+          if (localWsUrl) {
+            this.automatedTunnelManager = new TunnelManager();
+            const wsUrl = new URL(localWsUrl);
+            const browserPort = parseInt(wsUrl.port);
+            await this.automatedTunnelManager.startTunnel(browserPort);
+          }
+        }
+
+        websocketUrl = this.getGlobalWebSocketUrl();
+      }
 
       if (!websocketUrl) {
         return {
           content: [
             {
               type: 'text',
-              text: 'No WebSocket URL available. Please run init_qa_server first to set up browser tunneling, or provide ws_url parameter.',
+              text: 'Failed to create WebSocket URL for automated tests.',
             },
           ],
           isError: true,
@@ -1889,7 +1922,9 @@ Please use interact_with_qa_session tool with action="respond" to provide your r
     }
   }
 
-  private async handleListTestRuns(params: ListTestRunsParams): Promise<CallToolResult> {
+  private async handleSearchAutomatedTestRuns(
+    params: SearchAutomatedTestRunsParams
+  ): Promise<CallToolResult> {
     try {
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -1960,7 +1995,9 @@ Please use interact_with_qa_session tool with action="respond" to provide your r
     }
   }
 
-  private async handleUpdateAppConfig(params: UpdateAppConfigParams): Promise<CallToolResult> {
+  private async handleUpdateConfiguration(
+    params: UpdateConfigurationParams
+  ): Promise<CallToolResult> {
     try {
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -2041,90 +2078,7 @@ Please use interact_with_qa_session tool with action="respond" to provide your r
     }
   }
 
-  private async handleListAppConfigs(params: ListAppConfigsParams): Promise<CallToolResult> {
-    try {
-      if (!this.globalApiClient.getApiKey()) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'API key not configured. Please run init_qa_server first with an API key.',
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      try {
-        // Set defaults: limit=10, offset=0, query=empty
-        const options = {
-          limit: params.limit || 10,
-          offset: params.offset || 0,
-          query: params.query || '',
-        };
-
-        const appConfigs = await this.globalApiClient.listAppConfigs(options);
-
-        // Create summary view for better readability
-        const configSummaries = appConfigs.map((config) => ({
-          id: config.id,
-          name: config.name,
-          base_url: config.base_url,
-          login_url: config.login_url || 'Not configured',
-          login_username: config.login_username || 'Not configured',
-          vp_type: config.vp_type,
-          status: config.status,
-          organization_id: config.organization_id,
-          created_at: config.created_at,
-          updated_at: config.updated_at || 'Never updated',
-          remove_popups: config.remove_popups,
-          failure_status: config.failure_status,
-        }));
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  app_configs: configSummaries,
-                  displayed: appConfigs.length,
-                  limit: options.limit,
-                  offset: options.offset,
-                  query: options.query || 'none',
-                  note: 'App configurations available for your organization. Use update_app_config to modify settings. Use limit/offset for pagination.',
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Failed to fetch app configs: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-    } catch (error) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Failed to list app configs: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-  }
-
-  private async handleGetCurrentAppConfig(): Promise<CallToolResult> {
+  private async handleGetConfiguration(): Promise<CallToolResult> {
     try {
       if (!this.globalApiClient.getApiKey()) {
         return {
@@ -2174,16 +2128,17 @@ Please use interact_with_qa_session tool with action="respond" to provide your r
   }
 
   private getGlobalWebSocketUrl(): string | null {
-    if (!this.tunnelManager || !this.browserManager) {
+    // Use automated browser for running automated tests
+    if (!this.automatedTunnelManager || !this.automatedBrowserManager) {
       return null;
     }
 
-    const browserWsUrl = this.browserManager.getWebSocketEndpoint();
+    const browserWsUrl = this.automatedBrowserManager.getWebSocketEndpoint();
     if (!browserWsUrl) {
       return null;
     }
 
-    return this.tunnelManager.getWebSocketUrl(browserWsUrl);
+    return this.automatedTunnelManager.getWebSocketUrl(browserWsUrl);
   }
 
   private setupResources(): void {
@@ -3173,11 +3128,17 @@ while (status !== 'closed' && status !== 'idle') {
   }
 
   private async cleanup(): Promise<void> {
-    if (this.tunnelManager) {
-      await this.tunnelManager.stopTunnel();
+    if (this.automatedTunnelManager) {
+      await this.automatedTunnelManager.stopTunnel();
     }
-    if (this.browserManager) {
-      await this.browserManager.stopBrowser();
+    if (this.automatedBrowserManager) {
+      await this.automatedBrowserManager.stopBrowser();
+    }
+    if (this.devTunnelManager) {
+      await this.devTunnelManager.stopTunnel();
+    }
+    if (this.devBrowserManager) {
+      await this.devBrowserManager.stopBrowser();
     }
   }
 }

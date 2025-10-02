@@ -24,6 +24,7 @@ export class TunnelManager {
 
     const tunnel = await localtunnel({
       port,
+      host: 'http://lt.desplega.ai:3123',
       subdomain: options.subdomain || `qa-use-${Date.now().toString().slice(-6)}`,
       local_host: options.localHost || 'localhost',
     });

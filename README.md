@@ -534,44 +534,6 @@ The project is organized into modular components:
 - Execution timing and error tracking
 - Filtering and pagination for large datasets
 
-## Recent Updates (v1.2.0)
-
-### Major UX Simplifications
-- **Unified Session Interaction**: Replaced `respond_to_qa_session` + `send_message_to_qa_session` with single `interact_with_qa_session` tool
-- **Smart Test Finding**: Merged `search_automated_tests` + `get_automated_test` into intelligent `find_automated_test` tool
-- **Conversational Outputs**: All tool responses now use emojis and suggest specific next steps
-- **Current Config Access**: Added `get_current_app_config` for easy configuration visibility
-
-### Previous Updates (v1.1.0)
-- **App Configuration System**: One-time setup with `update_app_config` for base URLs and login credentials
-- **Optional URL Parameter**: `start_qa_session` now uses app config base_url by default
-- **Simplified Workflow**: Removed redundant parameters and consolidated tools
-- **Smart Defaults**: Automatic configuration guidance and setup suggestions
-
-## Previous Updates (v1.0.14)
-
-### New Features
-- **Test Run Analytics**: Added `list_test_runs` tool for viewing test execution history
-- **MCP Progress Notifications**: Real-time progress updates during session monitoring
-- **MCP Timeout Protection**: Intelligent 25-second call limits to prevent timeouts
-- **AAA Framework Templates**: 5 pre-built prompts for structured test creation
-- **Batch Test Execution**: Run multiple tests simultaneously with `run_automated_tests`
-- **Enhanced Documentation**: Built-in MCP resources with guides and best practices
-- **User Registration**: Direct account creation with `register_user` tool
-
-### Improvements
-- **Session Monitoring**: Enhanced with automatic continuation support for long sessions
-- **API Response Handling**: Fixed session creation response mapping for better reliability
-- **Error Handling**: Comprehensive error messages and status reporting
-- **Tool Parameters**: Expanded parameter support across all tools
-- **Performance Metrics**: Added PFS (Probabilistic Flakiness Score) tracking
-
-### Technical Enhancements
-- **MCP Protocol**: Full implementation of tools, resources, and prompts capabilities
-- **TypeScript Support**: Complete type safety across all interfaces
-- **Modular Architecture**: Clean separation of browser, tunnel, and API components
-- **Dynamic Configuration**: Environment variable support with fallbacks
-
 ## License
 
 MIT
