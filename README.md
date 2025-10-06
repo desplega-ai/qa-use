@@ -2,6 +2,10 @@
 
 An MCP (Model Context Protocol) server that provides comprehensive browser automation and QA testing capabilities. This server integrates with desplega.ai to offer automated testing, session monitoring, batch test execution, and intelligent test guidance using AAA (Arrange-Act-Assert) framework templates.
 
+<video src="static/demo.mp4" controls></video>
+
+> **Learn more:** Check out our comprehensive [MCP integration guide](https://www.desplega.ai/how-to/mcp) for detailed setup instructions and advanced usage patterns.
+
 ## MCP Client Configuration
 
 The server requires a desplega.ai API key - you can get one by using the `register_user` tool or by signing up at [desplega.ai](https://desplega.ai).
