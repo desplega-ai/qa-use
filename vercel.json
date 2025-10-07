@@ -1,5 +1,6 @@
 {
-  "version": 2,
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "outputDirectory": "dist",
   "routes": [
     {
       "src": "/health",
@@ -13,10 +14,5 @@
       "src": "/(.*)",
       "dest": "/api/mcp"
     }
-  ],
-  "functions": {
-    "api/mcp.ts": {
-      "maxDuration": 60
-    }
-  }
+  ]
 }
