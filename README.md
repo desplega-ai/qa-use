@@ -442,6 +442,38 @@ docker run -d -p 3000:3000 \
   qa-use-mcp
 ```
 
+### Vercel Deployment
+
+Deploy to Vercel for serverless hosting:
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/desplega-ai/qa-use)
+
+**Quick setup:**
+
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy
+vercel --prod
+```
+
+**Vercel Build Settings:**
+- **Build Command**: `pnpm build`
+- **Output Directory**: `dist`
+- **Install Command**: `pnpm install`
+
+**Environment Variables** (set in Vercel dashboard):
+- `QA_USE_API_KEY` - Your desplega.ai API key
+
+⚠️ **Important**: Vercel has execution time limits (60s max on Pro plan) which may affect long-running SSE connections. For production use with long-running sessions, consider:
+- **Railway** - Better for persistent connections
+- **Render** - Supports long-running services
+- **Fly.io** - Full control over processes
+- **Self-hosted VPS** - No limits
+
+See [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md) for detailed deployment guide and limitations.
+
 ### Backward Compatibility
 
 The HTTP server mode is fully backward compatible. Running without the `--http` flag uses the standard MCP stdio transport:

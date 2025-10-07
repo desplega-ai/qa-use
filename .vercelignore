@@ -1,0 +1,13 @@
+node_modules
+.env
+.env.*
+*.log
+.DS_Store
+.vscode
+.idea
+coverage
+*.test.ts
+*.spec.ts
+test-*
+scripts/test-*
+.github

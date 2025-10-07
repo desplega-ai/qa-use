@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/mcp.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/health",
+      "dest": "/api/mcp"
+    },
+    {
+      "src": "/mcp",
+      "dest": "/api/mcp"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/mcp"
+    }
+  ],
+  "functions": {
+    "api/mcp.ts": {
+      "maxDuration": 60
+    }
+  },
+  "env": {
+    "QA_USE_API_KEY": "@qa_use_api_key"
+  }
+}
