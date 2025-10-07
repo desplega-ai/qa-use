@@ -60,6 +60,7 @@
   "packageManager": "pnpm@10.10.0",
   "devDependencies": {
     "@eslint/js": "^9.36.0",
+    "@types/express": "^5.0.0",
     "@types/localtunnel": "^2.0.4",
     "@types/node": "^24.5.2",
     "@types/react": "^19.1.14",
@@ -81,6 +82,7 @@
     "@modelcontextprotocol/sdk": "^1.18.1",
     "axios": "^1.12.2",
     "dotenv": "^16.4.5",
+    "express": "^4.21.2",
     "localtunnel": "^2.0.2",
     "playwright": "1.55.0"
   }

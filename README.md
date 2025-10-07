@@ -2,11 +2,34 @@
 
 An MCP (Model Context Protocol) server that provides comprehensive browser automation and QA testing capabilities. This server integrates with desplega.ai to offer automated testing, session monitoring, batch test execution, and intelligent test guidance using AAA (Arrange-Act-Assert) framework templates.
 
+**Transport Modes:**
+- 📟 **stdio** - Standard MCP transport for local integrations (default)
+- 🌐 **HTTP/SSE** - StreamableHTTP transport for remote access and web integrations
+
 [![QA-Use Demo](static/demo-thumbnail.png)](https://www.youtube.com/watch?v=ts3XsYneiO4)
 
 > **Learn more:** Check out our comprehensive [MCP integration guide](https://www.desplega.ai/how-to/mcp) for detailed setup instructions and advanced usage patterns.
 
-## MCP Client Configuration
+## Quick Start
+
+```bash
+# Run with stdio transport (for MCP clients)
+npx @desplega.ai/qa-use-mcp
+
+# Run with HTTP transport (for web/remote access)
+npx @desplega.ai/qa-use-mcp --http --port 3000
+```
+
+## Table of Contents
+
+- [MCP Client Configuration (stdio mode)](#mcp-client-configuration-stdio-mode)
+- [HTTP Transport Mode (SSE)](#http-transport-mode-sse)
+- [Features](#features)
+- [Installation](#installation)
+- [Development](#development)
+- [Available Tools](#available-tools)
+
+## MCP Client Configuration (stdio mode)
 
 The server requires a desplega.ai API key - you can get one by using the `register_user` tool or by signing up at [desplega.ai](https://desplega.ai).
 
@@ -202,6 +225,236 @@ Your MCP client should initialize the server, set up browser automation, and sta
 - **AAA Framework Templates**: Pre-built prompts for login, forms, e-commerce, navigation, and comprehensive testing scenarios
 - **User Registration**: Built-in user registration system for new desplega.ai accounts
 - **Comprehensive Documentation**: Built-in MCP resources with guides, workflows, and best practices
+
+## HTTP Transport Mode (SSE)
+
+In addition to the standard MCP stdio transport, QA-Use can run with StreamableHTTP transport using Server-Sent Events (SSE). This mode implements the official [MCP Streamable HTTP specification](https://spec.modelcontextprotocol.io/specification/basic/transports/#http-with-sse) and is useful for web-based integrations, remote access, or when you need HTTP-based MCP connectivity.
+
+### When to Use Each Mode
+
+| Feature | stdio (default) | HTTP/SSE |
+|---------|----------------|----------|
+| **Use Case** | Local MCP clients (Claude Desktop, Cline, etc.) | Web apps, remote access, API integrations |
+| **Setup** | Configured in MCP client settings | Start server, connect via HTTP |
+| **Authentication** | Via environment variables | Bearer token on each request |
+| **Network** | Local process only | Can be exposed remotely |
+| **Protocol** | Native MCP stdio | MCP over HTTP with SSE |
+| **Best For** | Desktop IDE integrations | Microservices, web dashboards, custom clients |
+
+### Starting the HTTP Server
+
+Run the server with the `--http` or `--api` flag:
+
+```bash
+# Default port (3000)
+npx @desplega.ai/qa-use-mcp --http
+
+# Custom port
+npx @desplega.ai/qa-use-mcp --http --port 8080
+
+# Show help
+npx @desplega.ai/qa-use-mcp --help
+```
+
+### Authentication
+
+All MCP endpoints (except `/health`) require authentication via Bearer token with a valid desplega.ai API key:
+
+```bash
+# Establish SSE connection
+curl -N -H "Authorization: Bearer YOUR_API_KEY" \
+  http://localhost:3000/mcp
+```
+
+Get your API key by:
+- Using the `register_user` tool
+- Signing up at [desplega.ai](https://desplega.ai)
+
+### MCP Endpoints
+
+This server implements the [MCP Streamable HTTP transport specification](https://spec.modelcontextprotocol.io/specification/basic/transports/#http-with-sse):
+
+#### Health Check
+```bash
+GET /health
+# No authentication required
+# Returns server status and version
+```
+
+#### MCP Protocol Endpoint
+```bash
+# Establish SSE connection for receiving messages
+GET /mcp
+Headers: Authorization: Bearer YOUR_API_KEY
+
+# Send JSON-RPC messages to the server
+POST /mcp
+Headers:
+  Authorization: Bearer YOUR_API_KEY
+  Content-Type: application/json
+Body: JSON-RPC 2.0 message
+
+# Close session
+DELETE /mcp
+Headers:
+  Authorization: Bearer YOUR_API_KEY
+  MCP-Session-ID: <session-id>
+```
+
+### Example Usage
+
+#### Initialize MCP Connection
+```bash
+# Start SSE stream in one terminal
+curl -N -H "Authorization: Bearer YOUR_API_KEY" \
+  http://localhost:3000/mcp
+
+# In another terminal, send initialize message
+curl -X POST http://localhost:3000/mcp \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2024-11-05",
+      "capabilities": {},
+      "clientInfo": {
+        "name": "test-client",
+        "version": "1.0.0"
+      }
+    }
+  }'
+```
+
+#### Call MCP Tools
+```bash
+# List available tools
+curl -X POST http://localhost:3000/mcp \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/list",
+    "params": {}
+  }'
+
+# Start automated test session
+curl -X POST http://localhost:3000/mcp \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 3,
+    "method": "tools/call",
+    "params": {
+      "name": "start_automated_session",
+      "arguments": {
+        "task": "Test login functionality"
+      }
+    }
+  }'
+```
+
+### MCP Client Support
+
+Any MCP client that supports the StreamableHTTP transport can connect to this server. You'll need to:
+
+1. Configure the client with the HTTP endpoint: `http://localhost:3000/mcp`
+2. Add authentication header: `Authorization: Bearer YOUR_API_KEY`
+3. The client will automatically handle SSE streams and JSON-RPC messaging
+
+> **Note:** Most current MCP clients (Claude Desktop, Cline, etc.) use stdio transport by default. The HTTP mode is primarily for:
+> - Custom integrations and web applications
+> - Remote server deployments
+> - Microservices architectures
+> - API gateways and proxies
+
+### Security Considerations
+
+When running in HTTP mode:
+
+- ✅ **Always use HTTPS** in production (consider using a reverse proxy like nginx)
+- ✅ **Protect your API key** - it provides full access to your desplega.ai account
+- ✅ **Use firewall rules** to restrict access to trusted IP addresses
+- ✅ **Consider rate limiting** for public-facing deployments
+- ✅ **Monitor access logs** for suspicious activity
+
+Example nginx configuration for HTTPS:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name qa-mcp.example.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+
+        # Required for SSE
+        proxy_buffering off;
+        proxy_read_timeout 24h;
+    }
+}
+```
+
+### Docker Deployment
+
+The HTTP mode is perfect for containerized deployments. Example Dockerfile:
+
+```dockerfile
+FROM node:18-slim
+
+# Install dependencies for Playwright
+RUN apt-get update && apt-get install -y \
+    libnss3 libatk-bridge2.0-0 libdrm2 libxkbcommon0 \
+    libgbm1 libasound2 libxshmfence1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install qa-use-mcp
+RUN npm install -g @desplega.ai/qa-use-mcp
+
+# Expose port
+EXPOSE 3000
+
+# Set API key via environment variable
+ENV QA_USE_API_KEY=your-api-key-here
+
+# Start in HTTP mode
+CMD ["qa-use-mcp", "--http", "--port", "3000"]
+```
+
+Run the container:
+
+```bash
+docker build -t qa-use-mcp .
+docker run -d -p 3000:3000 \
+  -e QA_USE_API_KEY=your-api-key \
+  qa-use-mcp
+```
+
+### Backward Compatibility
+
+The HTTP server mode is fully backward compatible. Running without the `--http` flag uses the standard MCP stdio transport:
+
+```bash
+# Standard MCP mode (stdio) - default
+npx @desplega.ai/qa-use-mcp
+
+# HTTP transport mode (SSE)
+npx @desplega.ai/qa-use-mcp --http
+```
+
+Both modes support all MCP tools and functionality. The HTTP mode follows the official MCP Streamable HTTP specification.
 
 
 ## Installation

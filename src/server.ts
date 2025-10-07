@@ -2638,6 +2638,10 @@ For more detailed examples, see the Getting Started and Workflows guides.
 `;
   }
 
+  getServer(): Server {
+    return this.server;
+  }
+
   async start(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
@@ -2667,6 +2671,5 @@ For more detailed examples, see the Getting Started and Workflows guides.
   }
 }
 
-// Start the server
-const server = new QAUseMcpServer();
-await server.start();
+// Export the server class for use in different transport modes
+export { QAUseMcpServer };
