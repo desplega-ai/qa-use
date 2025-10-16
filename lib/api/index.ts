@@ -662,4 +662,43 @@ export class ApiClient {
       );
     }
   }
+
+  async setWsUrl(wsUrl: string): Promise<{ success: boolean; message?: string; data?: any }> {
+    try {
+      if (!this.apiKey) {
+        return {
+          success: false,
+          message: 'API key not configured. Please set an API key first.',
+        };
+      }
+
+      const response: AxiosResponse = await this.client.post('/vibe-qa/ws-url', {
+        ws_url: wsUrl,
+      });
+
+      return {
+        success: true,
+        message: response.data.message || 'WebSocket URL set successfully',
+        data: response.data.data,
+      };
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const statusCode = error.response?.status;
+        const errorData = error.response?.data;
+
+        return {
+          success: false,
+          message:
+            errorData?.message ||
+            errorData?.detail ||
+            `HTTP ${statusCode}: Failed to set WebSocket URL`,
+        };
+      }
+
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error setting WebSocket URL',
+      };
+    }
+  }
 }
