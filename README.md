@@ -54,6 +54,8 @@ The server requires a desplega.ai API key - you can get one by using the `regist
 }
 ```
 
+> **Optional:** Add `"QA_USE_REGION": "us"` to the `env` section to use the US region for faster tunnel connections from North America. If not set, defaults to automatic region selection.
+
 <details>
   <summary>Claude Code</summary>
     Use the Claude Code CLI to add the QA-Use MCP server (<a href="https://docs.anthropic.com/en/docs/claude-code/mcp">guide</a>):
@@ -62,7 +64,12 @@ The server requires a desplega.ai API key - you can get one by using the `regist
 claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest --env QA_USE_API_KEY=your-desplega-ai-api-key
 ```
 
-Or add without the API key and configure it later through the interactive setup:
+For US region (optional):
+```bash
+claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest --env QA_USE_API_KEY=your-desplega-ai-api-key --env QA_USE_REGION=us
+```
+
+Or add without environment variables and configure them later through the interactive setup:
 
 ```bash
 claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest
@@ -562,6 +569,14 @@ export QA_USE_API_KEY=your-desplega-ai-api-key
 npx @desplega.ai/qa-use-mcp tunnel
 ```
 
+Optionally configure the US region for better tunnel performance from North America:
+
+```bash
+export QA_USE_API_KEY=your-desplega-ai-api-key
+export QA_USE_REGION=us
+npx @desplega.ai/qa-use-mcp tunnel
+```
+
 ### Options
 
 - **`--visible`**: Show browser window instead of headless mode (useful for debugging)
@@ -783,11 +798,45 @@ The server includes comprehensive MCP resources and prompts:
 
 ### Environment Variables
 
-Create a `.env` file in your project root or set the following environment variable:
+Create a `.env` file in your project root or set the following environment variables:
 
 ```bash
+# Required: Your desplega.ai API key
 QA_USE_API_KEY=your-desplega-ai-api-key
+
+# Optional: Region selection for tunnel and API routing
+# Values: "us" | "auto"
+# Default: "auto" (if not set)
+# - "us": Uses lt.us.desplega.ai for localtunnel and routes to US region
+# - "auto": Uses default lt.desplega.ai and automatic region routing
+QA_USE_REGION=us
+
+# Optional: Custom API endpoint (default: https://api.desplega.ai)
+QA_USE_API_URL=https://api.desplega.ai
+
+# Optional: Custom app URL (default: https://app.desplega.ai)
+QA_USE_APP_URL=https://app.desplega.ai
+
+# Optional: Custom tunnel host (overrides QA_USE_REGION setting)
+TUNNEL_HOST=https://lt.desplega.ai
 ```
+
+#### Regional Configuration
+
+The `QA_USE_REGION` variable allows you to route your tunnel and API requests to specific regions:
+
+- **Not set** (default): Uses automatic region selection (`lt.desplega.ai`)
+- **`QA_USE_REGION=us`**: Uses US-based tunnel host (`lt.us.desplega.ai`) and routes sessions to the US region. Recommended for users primarily testing from North America.
+- **`QA_USE_REGION=auto`**: Explicitly sets automatic region selection (same as not setting it)
+
+Example configuration for US region:
+```bash
+export QA_USE_API_KEY=your-api-key
+export QA_USE_REGION=us
+npx @desplega.ai/qa-use-mcp
+```
+
+> **Note:** If `QA_USE_REGION` is not set, the system automatically defaults to `"auto"` behavior.
 
 
 ## Usage Examples

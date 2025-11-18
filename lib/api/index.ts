@@ -34,6 +34,7 @@ export interface CreateSessionOptions {
   wsUrl?: string;
   dependencyId?: string;
   devMode?: boolean;
+  region?: string;
 }
 
 export interface CreateSessionResponse {
@@ -312,6 +313,9 @@ export class ApiClient {
 
   async createSession(options: CreateSessionOptions): Promise<CreateSessionResponse> {
     try {
+      // Determine region from options or environment variable
+      const region = options.region || process.env.QA_USE_REGION || 'auto';
+
       const sessionData = {
         url: options.url,
         task: options.task,
@@ -321,6 +325,7 @@ export class ApiClient {
         autopilot: true,
         use_storage_path: false,
         persist: true,
+        region: region,
       };
 
       if (options.devMode) {

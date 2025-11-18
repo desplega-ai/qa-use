@@ -56,7 +56,9 @@ export async function startTunnelMode(options: TunnelModeOptions = {}): Promise<
   try {
     browserResult = await browser.startBrowser({ headless });
   } catch (error) {
-    console.error(`❌ Failed to start browser: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error(
+      `❌ Failed to start browser: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
     console.error('');
     process.exit(1);
   }
@@ -72,7 +74,9 @@ export async function startTunnelMode(options: TunnelModeOptions = {}): Promise<
   try {
     await tunnel.startTunnel(browserPort);
   } catch (error) {
-    console.error(`❌ Failed to start tunnel: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error(
+      `❌ Failed to start tunnel: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
     await browser.stopBrowser();
     console.error('');
     process.exit(1);
@@ -156,7 +160,10 @@ export async function startTunnelMode(options: TunnelModeOptions = {}): Promise<
       await tunnel.stopTunnel();
       console.log('✅ Tunnel closed');
     } catch (error) {
-      console.log('⚠ Tunnel cleanup warning:', error instanceof Error ? error.message : 'Unknown error');
+      console.log(
+        '⚠ Tunnel cleanup warning:',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
     }
 
     // Stop browser
@@ -164,7 +171,10 @@ export async function startTunnelMode(options: TunnelModeOptions = {}): Promise<
       await browser.stopBrowser();
       console.log('✅ Browser closed');
     } catch (error) {
-      console.log('⚠ Browser cleanup warning:', error instanceof Error ? error.message : 'Unknown error');
+      console.log(
+        '⚠ Browser cleanup warning:',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
     }
 
     console.log('');
