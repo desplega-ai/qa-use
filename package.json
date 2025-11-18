@@ -31,8 +31,8 @@
     "lint:fix": "eslint \"src/**/*.{ts,tsx,js,jsx}\" \"lib/**/*.{ts,tsx,js,jsx}\" --fix",
     "typecheck": "tsc --noEmit",
     "test": "bun test --preload ./test-setup.ts",
-    "test:unit": "bun test --preload ./test-setup.ts $(find ./lib ./src -name '*.test.ts' -type f 2>/dev/null | grep -v 'integration.test.ts')",
-    "test:integration": "bun test --preload ./test-setup.ts $(find ./lib ./src -name '*.integration.test.ts' -type f 2>/dev/null)",
+    "test:unit": "node scripts/test-unit.js",
+    "test:integration": "node scripts/test-integration.js",
     "test:coverage": "bun test --coverage --preload ./test-setup.ts",
     "generate:readme": "node scripts/generate-readme-tools.js",
     "prepublishOnly": "pnpm build && pnpm lint && pnpm typecheck"

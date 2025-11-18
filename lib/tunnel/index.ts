@@ -82,7 +82,7 @@ export class TunnelManager {
       host,
       subdomain,
       local_host: options.localHost || 'localhost',
-      // auth: true,
+      auth: true,
     });
 
     console.log(`Tunnel started at ${tunnel.url}`);
@@ -164,13 +164,13 @@ export class TunnelManager {
       const wsPath = localWsUrl.pathname;
 
       // Check if the session host is https:// or http:// and replace accordingly
-      if (!hostUrl.protocol.startsWith('http')) {
-        return this.session.publicUrl + wsPath;
+      if (hostUrl.protocol.startsWith('http')) {
+        return (
+          this.session.publicUrl.replace('https://', 'wss://').replace('http://', 'ws://') + wsPath
+        );
       }
 
-      return (
-        this.session.publicUrl.replace('https://', 'wss://').replace('http://', 'ws://') + wsPath
-      );
+      return this.session.publicUrl + wsPath;
     } catch (error) {
       return null;
     }
