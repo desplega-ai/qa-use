@@ -1,0 +1,7 @@
+[test]
+# Coverage configuration
+coverage = true
+coverageDir = "./coverage"
+
+# Exclude directories from test discovery
+exclude = ["node_modules", "dist", "coverage"]

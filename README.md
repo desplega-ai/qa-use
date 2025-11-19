@@ -2,9 +2,10 @@
 
 An MCP (Model Context Protocol) server that provides comprehensive browser automation and QA testing capabilities. This server integrates with desplega.ai to offer automated testing, session monitoring, batch test execution, and intelligent test guidance using AAA (Arrange-Act-Assert) framework templates.
 
-**Transport Modes:**
+**Modes:**
 - 📟 **stdio** - Standard MCP transport for local integrations (default)
 - 🌐 **HTTP/SSE** - StreamableHTTP transport for remote access and web integrations
+- 🔄 **tunnel** - Persistent WebSocket tunnel for backend-initiated tasks
 
 [![QA-Use Demo](static/demo-thumbnail.png)](https://www.youtube.com/watch?v=ts3XsYneiO4)
 
@@ -18,12 +19,16 @@ npx @desplega.ai/qa-use-mcp
 
 # Run with HTTP transport (for web/remote access)
 npx @desplega.ai/qa-use-mcp --http --port 3000
+
+# Run persistent tunnel (for backend-initiated tasks)
+npx @desplega.ai/qa-use-mcp tunnel
 ```
 
 ## Table of Contents
 
 - [MCP Client Configuration (stdio mode)](#mcp-client-configuration-stdio-mode)
 - [HTTP Transport Mode (SSE)](#http-transport-mode-sse)
+- [Tunnel Mode](#tunnel-mode)
 - [Features](#features)
 - [Installation](#installation)
 - [Development](#development)
@@ -49,6 +54,8 @@ The server requires a desplega.ai API key - you can get one by using the `regist
 }
 ```
 
+> **Optional:** Add `"QA_USE_REGION": "us"` to the `env` section to use the US region for faster tunnel connections from North America. If not set, defaults to automatic region selection.
+
 <details>
   <summary>Claude Code</summary>
     Use the Claude Code CLI to add the QA-Use MCP server (<a href="https://docs.anthropic.com/en/docs/claude-code/mcp">guide</a>):
@@ -57,7 +64,12 @@ The server requires a desplega.ai API key - you can get one by using the `regist
 claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest --env QA_USE_API_KEY=your-desplega-ai-api-key
 ```
 
-Or add without the API key and configure it later through the interactive setup:
+For US region (optional):
+```bash
+claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest --env QA_USE_API_KEY=your-desplega-ai-api-key --env QA_USE_REGION=us
+```
+
+Or add without environment variables and configure them later through the interactive setup:
 
 ```bash
 claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest
@@ -232,14 +244,15 @@ In addition to the standard MCP stdio transport, QA-Use can run with StreamableH
 
 ### When to Use Each Mode
 
-| Feature | stdio (default) | HTTP/SSE |
-|---------|----------------|----------|
-| **Use Case** | Local MCP clients (Claude Desktop, Cline, etc.) | Web apps, remote access, API integrations |
-| **Setup** | Configured in MCP client settings | Start server, connect via HTTP |
-| **Authentication** | Via environment variables | Bearer token on each request |
-| **Network** | Local process only | Can be exposed remotely |
-| **Protocol** | Native MCP stdio | MCP over HTTP with SSE |
-| **Best For** | Desktop IDE integrations | Microservices, web dashboards, custom clients |
+| Feature | stdio (default) | HTTP/SSE | Tunnel |
+|---------|----------------|----------|---------|
+| **Use Case** | Local MCP clients (Claude Desktop, Cline, etc.) | Web apps, remote access, API integrations | Backend-initiated tasks, CI/CD |
+| **Setup** | Configured in MCP client settings | Start server, connect via HTTP | Single command, auto-registers |
+| **Authentication** | Via environment variables | Bearer token on each request | Via environment variables |
+| **Network** | Local process only | Can be exposed remotely | Tunneled to backend |
+| **Protocol** | Native MCP stdio | MCP over HTTP with SSE | WebSocket via localtunnel |
+| **Browser** | On-demand | On-demand | Persistent with heartbeat |
+| **Best For** | Desktop IDE integrations | Microservices, web dashboards, custom clients | Backend-controlled testing, CI/CD pipelines |
 
 ### Starting the HTTP Server
 
@@ -476,7 +489,7 @@ See [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md) for detailed deployment guide
 
 ### Backward Compatibility
 
-The HTTP server mode is fully backward compatible. Running without the `--http` flag uses the standard MCP stdio transport:
+All modes are fully backward compatible. Running without flags uses the standard MCP stdio transport:
 
 ```bash
 # Standard MCP mode (stdio) - default
@@ -484,9 +497,139 @@ npx @desplega.ai/qa-use-mcp
 
 # HTTP transport mode (SSE)
 npx @desplega.ai/qa-use-mcp --http
+
+# Tunnel mode (persistent WebSocket)
+npx @desplega.ai/qa-use-mcp tunnel
 ```
 
-Both modes support all MCP tools and functionality. The HTTP mode follows the official MCP Streamable HTTP specification.
+All modes support the complete MCP tools and functionality. The HTTP mode follows the official MCP Streamable HTTP specification.
+
+## Tunnel Mode
+
+The tunnel mode creates a persistent WebSocket tunnel that allows the desplega.ai backend to initiate browser automation tasks using your local browser. This is perfect for scenarios where you want the backend to control test execution while using your local environment's browser.
+
+### When to Use Tunnel Mode
+
+| Scenario | Best Mode |
+|----------|-----------|
+| Backend-initiated tests | **Tunnel** ✅ |
+| CI/CD pipelines with local browsers | **Tunnel** ✅ |
+| Remote test execution on local environment | **Tunnel** ✅ |
+| Interactive MCP client testing | **stdio** |
+| Web dashboard integrations | **HTTP/SSE** |
+
+### How It Works
+
+1. **Start Tunnel**: Creates a Playwright browser and localtunnel
+2. **Register WebSocket**: Sends the tunneled WebSocket URL to desplega.ai backend
+3. **Heartbeat**: Sends keepalive signals every 5 seconds to maintain the connection
+4. **Backend Control**: Backend can now initiate test sessions using your local browser
+
+### Starting Tunnel Mode
+
+```bash
+# Start tunnel with headless browser (default)
+npx @desplega.ai/qa-use-mcp tunnel
+
+# Start tunnel with visible browser
+npx @desplega.ai/qa-use-mcp tunnel --visible
+```
+
+### Example Output
+
+```
+🔧 QA-Use Tunnel Mode
+====================
+Mode: Headless
+
+🔑 Validating API key...
+✅ API key valid
+
+🌐 Starting browser tunnel...
+✅ Browser started
+✅ Tunnel created
+
+📡 WebSocket URL: wss://qa-use-123456.lt.desplega.ai/...
+✅ Registered with backend
+
+🔄 Heartbeat active (every 5s)
+   Press Ctrl+C to stop
+
+[10:30:15] ✓ Heartbeat #1 sent
+[10:30:20] ✓ Heartbeat #2 sent
+[10:30:25] ✓ Heartbeat #3 sent
+```
+
+### Environment Variables
+
+Set your API key before starting tunnel mode:
+
+```bash
+export QA_USE_API_KEY=your-desplega-ai-api-key
+npx @desplega.ai/qa-use-mcp tunnel
+```
+
+Optionally configure the US region for better tunnel performance from North America:
+
+```bash
+export QA_USE_API_KEY=your-desplega-ai-api-key
+export QA_USE_REGION=us
+npx @desplega.ai/qa-use-mcp tunnel
+```
+
+### Options
+
+- **`--visible`**: Show browser window instead of headless mode (useful for debugging)
+
+### Use Cases
+
+#### 1. CI/CD Integration
+Run tunnel mode in your CI/CD pipeline to allow backend-initiated tests:
+
+```yaml
+# .github/workflows/qa.yml
+- name: Start QA Tunnel
+  run: |
+    export QA_USE_API_KEY=${{ secrets.QA_USE_API_KEY }}
+    npx @desplega.ai/qa-use-mcp tunnel &
+    sleep 10  # Wait for tunnel to establish
+```
+
+#### 2. Development Testing
+Keep a tunnel running while developing to allow ad-hoc tests from the backend:
+
+```bash
+# Terminal 1: Keep tunnel running
+npx @desplega.ai/qa-use-mcp tunnel
+
+# Terminal 2: Trigger tests from backend via API/dashboard
+# The backend will use your local browser through the tunnel
+```
+
+#### 3. Debugging with Visible Browser
+When you need to see what's happening:
+
+```bash
+npx @desplega.ai/qa-use-mcp tunnel --visible
+```
+
+### Graceful Shutdown
+
+Press `Ctrl+C` to stop the tunnel. The server will:
+1. Stop sending heartbeats
+2. Close the tunnel
+3. Shutdown the browser
+4. Clean up resources
+
+### Differences from Other Modes
+
+| Feature | stdio | HTTP/SSE | **Tunnel** |
+|---------|-------|----------|------------|
+| **Control** | Local MCP client | HTTP requests | Backend-initiated |
+| **Browser** | On-demand | On-demand | **Persistent** |
+| **Heartbeat** | N/A | N/A | **Every 5s** |
+| **Use Case** | Desktop IDEs | Web apps | **Backend tasks** |
+| **Visibility** | Configurable | Configurable | **Headless default** |
 
 
 ## Installation
@@ -655,11 +798,45 @@ The server includes comprehensive MCP resources and prompts:
 
 ### Environment Variables
 
-Create a `.env` file in your project root or set the following environment variable:
+Create a `.env` file in your project root or set the following environment variables:
 
 ```bash
+# Required: Your desplega.ai API key
 QA_USE_API_KEY=your-desplega-ai-api-key
+
+# Optional: Region selection for tunnel and API routing
+# Values: "us" | "auto"
+# Default: "auto" (if not set)
+# - "us": Uses lt.us.desplega.ai for localtunnel and routes to US region
+# - "auto": Uses default lt.desplega.ai and automatic region routing
+QA_USE_REGION=us
+
+# Optional: Custom API endpoint (default: https://api.desplega.ai)
+QA_USE_API_URL=https://api.desplega.ai
+
+# Optional: Custom app URL (default: https://app.desplega.ai)
+QA_USE_APP_URL=https://app.desplega.ai
+
+# Optional: Custom tunnel host (overrides QA_USE_REGION setting)
+TUNNEL_HOST=https://lt.desplega.ai
 ```
+
+#### Regional Configuration
+
+The `QA_USE_REGION` variable allows you to route your tunnel and API requests to specific regions:
+
+- **Not set** (default): Uses automatic region selection (`lt.desplega.ai`)
+- **`QA_USE_REGION=us`**: Uses US-based tunnel host (`lt.us.desplega.ai`) and routes sessions to the US region. Recommended for users primarily testing from North America.
+- **`QA_USE_REGION=auto`**: Explicitly sets automatic region selection (same as not setting it)
+
+Example configuration for US region:
+```bash
+export QA_USE_API_KEY=your-api-key
+export QA_USE_REGION=us
+npx @desplega.ai/qa-use-mcp
+```
+
+> **Note:** If `QA_USE_REGION` is not set, the system automatically defaults to `"auto"` behavior.
 
 
 ## Usage Examples

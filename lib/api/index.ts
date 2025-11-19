@@ -34,6 +34,7 @@ export interface CreateSessionOptions {
   wsUrl?: string;
   dependencyId?: string;
   devMode?: boolean;
+  region?: string;
 }
 
 export interface CreateSessionResponse {
@@ -312,6 +313,9 @@ export class ApiClient {
 
   async createSession(options: CreateSessionOptions): Promise<CreateSessionResponse> {
     try {
+      // Determine region from options or environment variable
+      const region = options.region || process.env.QA_USE_REGION || 'auto';
+
       const sessionData = {
         url: options.url,
         task: options.task,
@@ -321,6 +325,7 @@ export class ApiClient {
         autopilot: true,
         use_storage_path: false,
         persist: true,
+        region: region,
       };
 
       if (options.devMode) {
@@ -660,6 +665,45 @@ export class ApiClient {
       throw new Error(
         error instanceof Error ? error.message : 'Unknown error fetching app configs'
       );
+    }
+  }
+
+  async setWsUrl(wsUrl: string): Promise<{ success: boolean; message?: string; data?: any }> {
+    try {
+      if (!this.apiKey) {
+        return {
+          success: false,
+          message: 'API key not configured. Please set an API key first.',
+        };
+      }
+
+      const response: AxiosResponse = await this.client.post('/vibe-qa/ws-url', {
+        ws_url: wsUrl,
+      });
+
+      return {
+        success: true,
+        message: response.data.message || 'WebSocket URL set successfully',
+        data: response.data.data,
+      };
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const statusCode = error.response?.status;
+        const errorData = error.response?.data;
+
+        return {
+          success: false,
+          message:
+            errorData?.message ||
+            errorData?.detail ||
+            `HTTP ${statusCode}: Failed to set WebSocket URL`,
+        };
+      }
+
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Unknown error setting WebSocket URL',
+      };
     }
   }
 }

@@ -180,13 +180,17 @@ class BrowserSession {
   ttl: number;
   deadline: number;
   session_type: SessionType;
+  apiKey?: string;
+  sessionIndex?: number;
 
   constructor(
     sessionId: string,
     browser: BrowserManager,
     tunnel: TunnelManager,
     sessionType: SessionType,
-    ttl: number = 30 * 60 * 1000 // 30 minutes default
+    ttl: number = 30 * 60 * 1000, // 30 minutes default
+    apiKey?: string,
+    sessionIndex?: number
   ) {
     this.session_id = sessionId;
     this.created_at = Date.now();
@@ -195,6 +199,8 @@ class BrowserSession {
     this.ttl = ttl;
     this.deadline = this.created_at + ttl;
     this.session_type = sessionType;
+    this.apiKey = apiKey;
+    this.sessionIndex = sessionIndex;
   }
 
   refreshDeadline(): void {
@@ -224,8 +230,12 @@ class QAUseMcpServer {
   private globalApiClient: ApiClient;
 
   private browserSessions: BrowserSession[] = [];
-  private readonly MAX_SESSIONS = 10;
   private readonly DEFAULT_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+  // Global browser session (single browser shared across all sessions)
+  private globalBrowser: BrowserManager | null = null;
+  private globalTunnel: TunnelManager | null = null;
+  private globalSessionIndex: number = 0; // Always use index 0 for single browser
 
   private cleanupInterval: NodeJS.Timeout | null = null;
 
@@ -240,6 +250,7 @@ class QAUseMcpServer {
           tools: {},
           resources: {},
           prompts: {},
+          logging: {},
         },
       }
     );
@@ -486,10 +497,9 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
   }
 
   private startCleanupTask(): void {
-    // Check for expired sessions every minute
     this.cleanupInterval = setInterval(() => {
       this.cleanupExpiredSessions();
-    }, 60 * 1000);
+    }, 10000); // Changed from 1000ms (1s) to 10000ms (10s) for better performance
   }
 
   private async cleanupExpiredSessions(): Promise<void> {
@@ -510,10 +520,8 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
           }
         }
 
-        // Always cleanup browser and tunnel
-        await session.cleanup();
-
-        // Remove from array
+        // NOTE: Do NOT cleanup browser/tunnel here since they are shared globally
+        // Only remove the session from tracking
         this.browserSessions = this.browserSessions.filter(
           (s) => s.session_id !== session.session_id
         );
@@ -527,69 +535,177 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
     return this.browserSessions.find((s) => s.session_id === sessionId) || null;
   }
 
-  private async createBrowserAndTunnel(
-    headless: boolean = false
-  ): Promise<{ browser: BrowserManager; tunnel: TunnelManager; wsUrl: string }> {
-    // Check session limit
-    if (this.browserSessions.length >= this.MAX_SESSIONS) {
-      throw new Error(
-        `Maximum number of browser sessions (${this.MAX_SESSIONS}) reached. Please use reset_browser_sessions tool to clean up old sessions before creating new ones.`
-      );
+  /**
+   * Get or create the global browser session (singleton pattern)
+   * All sessions share this single browser instance
+   */
+  private async getOrCreateGlobalBrowser(headless: boolean = false): Promise<{
+    browser: BrowserManager;
+    tunnel: TunnelManager;
+    wsUrl: string;
+    sessionIndex: number;
+  }> {
+    // Return existing global browser if already created
+    if (this.globalBrowser && this.globalTunnel) {
+      const localWsUrl = this.globalBrowser.getWebSocketEndpoint();
+      if (localWsUrl) {
+        const tunneledWsUrl = this.globalTunnel.getWebSocketUrl(localWsUrl);
+        if (tunneledWsUrl) {
+          await this.server.notification({
+            method: 'notifications/message',
+            params: {
+              level: 'info',
+              logger: 'global_browser',
+              data: {
+                action: 'reuse',
+                sessionIndex: this.globalSessionIndex,
+                wsUrl: tunneledWsUrl,
+                message: `Reusing existing browser session (index: ${this.globalSessionIndex})`,
+              },
+            },
+          });
+          return {
+            browser: this.globalBrowser,
+            tunnel: this.globalTunnel,
+            wsUrl: tunneledWsUrl,
+            sessionIndex: this.globalSessionIndex,
+          };
+        }
+      }
     }
 
-    // Create new browser and tunnel
-    const browser = new BrowserManager();
-    const browserResult = await browser.startBrowser({ headless });
+    // Create single global browser session
+    const apiKey = this.globalApiClient.getApiKey();
+    const sessionIndex = 0; // Always use index 0 for single session
+
+    await this.server.notification({
+      method: 'notifications/message',
+      params: {
+        level: 'info',
+        logger: 'global_browser',
+        data: {
+          action: 'create',
+          sessionIndex,
+          message: `Creating new global browser session (index: ${sessionIndex})`,
+        },
+      },
+    });
+
+    this.globalBrowser = new BrowserManager();
+    const browserResult = await this.globalBrowser.startBrowser({ headless });
     const wsEndpoint = browserResult.wsEndpoint;
 
-    const tunnel = new TunnelManager();
+    this.globalTunnel = new TunnelManager();
+    await this.server.notification({
+      method: 'notifications/message',
+      params: {
+        level: 'info',
+        logger: 'global_browser',
+        data: {
+          action: 'tunnel_start',
+          wsEndpoint,
+          message: `Starting global tunnel for browser WebSocket URL: ${wsEndpoint}`,
+        },
+      },
+    });
+
     const wsUrl = new URL(wsEndpoint);
     const browserPort = parseInt(wsUrl.port);
-    await tunnel.startTunnel(browserPort);
 
-    const localWsUrl = browser.getWebSocketEndpoint();
+    // Pass API key and session index 0 to tunnel for deterministic subdomain
+    await this.globalTunnel.startTunnel(browserPort, {
+      apiKey: apiKey || undefined,
+      sessionIndex,
+    });
+
+    const localWsUrl = this.globalBrowser.getWebSocketEndpoint();
+
     if (!localWsUrl) {
-      await tunnel.stopTunnel();
-      await browser.stopBrowser();
+      await this.globalTunnel.stopTunnel();
+      await this.globalBrowser.stopBrowser();
+      this.globalBrowser = null;
+      this.globalTunnel = null;
       throw new Error('Failed to get browser WebSocket endpoint');
     }
 
-    const tunneledWsUrl = tunnel.getWebSocketUrl(localWsUrl);
+    const tunneledWsUrl = this.globalTunnel.getWebSocketUrl(localWsUrl);
+
     if (!tunneledWsUrl) {
-      await tunnel.stopTunnel();
-      await browser.stopBrowser();
+      await this.globalTunnel.stopTunnel();
+      await this.globalBrowser.stopBrowser();
+      this.globalBrowser = null;
+      this.globalTunnel = null;
       throw new Error('Failed to create tunneled WebSocket URL');
     }
 
-    return { browser, tunnel, wsUrl: tunneledWsUrl };
+    await this.server.notification({
+      method: 'notifications/message',
+      params: {
+        level: 'info',
+        logger: 'global_browser',
+        data: {
+          action: 'tunnel_established',
+          publicWsUrl: tunneledWsUrl,
+          localWsUrl: localWsUrl,
+          sessionIndex,
+          message: `Tunnel established - Public: ${tunneledWsUrl}, Local: ${localWsUrl}`,
+        },
+      },
+    });
+
+    this.globalSessionIndex = sessionIndex;
+
+    return {
+      browser: this.globalBrowser,
+      tunnel: this.globalTunnel,
+      wsUrl: tunneledWsUrl,
+      sessionIndex,
+    };
   }
 
   private addBrowserSession(
     sessionId: string,
     browser: BrowserManager,
     tunnel: TunnelManager,
-    sessionType: SessionType
+    sessionType: SessionType,
+    apiKey?: string,
+    sessionIndex?: number
   ): BrowserSession {
     const session = new BrowserSession(
       sessionId,
       browser,
       tunnel,
       sessionType,
-      this.DEFAULT_TTL_MS
+      this.DEFAULT_TTL_MS,
+      apiKey,
+      sessionIndex
     );
     this.browserSessions.push(session);
     return session;
   }
 
   private async resetAllBrowserSessions(): Promise<void> {
-    for (const session of this.browserSessions) {
+    // Clear all session tracking
+    this.browserSessions = [];
+
+    // Cleanup global browser and tunnel
+    if (this.globalTunnel) {
       try {
-        await session.cleanup();
+        await this.globalTunnel.stopTunnel();
       } catch (error) {
         // Silent cleanup
       }
+      this.globalTunnel = null;
     }
-    this.browserSessions = [];
+
+    if (this.globalBrowser) {
+      try {
+        await this.globalBrowser.stopBrowser();
+      } catch (error) {
+        // Silent cleanup
+      }
+      this.globalBrowser = null;
+    }
   }
 
   private setupTools(): void {
@@ -1215,8 +1331,12 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
       }
 
       try {
-        // Create browser and tunnel first
-        const { browser, tunnel, wsUrl } = await this.createBrowserAndTunnel(headless);
+        // Get API key for deterministic subdomain
+        const apiKey = this.globalApiClient.getApiKey();
+
+        // Use global browser session (single browser shared across all sessions)
+        const { browser, tunnel, wsUrl, sessionIndex } =
+          await this.getOrCreateGlobalBrowser(headless);
 
         // Create session via API with the actual wsUrl
         const { sessionId, appConfigId } = await this.globalApiClient.createSession({
@@ -1228,7 +1348,14 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
         });
 
         // Wrap browser and tunnel in a BrowserSession
-        this.addBrowserSession(sessionId, browser, tunnel, 'automated');
+        this.addBrowserSession(
+          sessionId,
+          browser,
+          tunnel,
+          'automated',
+          apiKey || undefined,
+          sessionIndex
+        );
 
         const result = {
           success: true,
@@ -1249,22 +1376,6 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
           ],
         };
       } catch (error) {
-        // Check if it's the session limit error
-        if (
-          error instanceof Error &&
-          error.message.includes('Maximum number of browser sessions')
-        ) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: error.message,
-              },
-            ],
-            isError: true,
-          };
-        }
-
         return {
           content: [
             {
@@ -1300,8 +1411,12 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
       }
 
       try {
-        // Create browser and tunnel first
-        const { browser, tunnel, wsUrl } = await this.createBrowserAndTunnel(headless);
+        // Get API key for deterministic subdomain
+        const apiKey = this.globalApiClient.getApiKey();
+
+        // Use global browser session (single browser shared across all sessions)
+        const { browser, tunnel, wsUrl, sessionIndex } =
+          await this.getOrCreateGlobalBrowser(headless);
 
         // Create session via API with the actual wsUrl
         const { sessionId, appConfigId } = await this.globalApiClient.createSession({
@@ -1312,7 +1427,14 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
         });
 
         // Wrap browser and tunnel in a BrowserSession
-        this.addBrowserSession(sessionId, browser, tunnel, 'dev');
+        this.addBrowserSession(
+          sessionId,
+          browser,
+          tunnel,
+          'dev',
+          apiKey || undefined,
+          sessionIndex
+        );
 
         const result = {
           success: true,
@@ -1331,22 +1453,6 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
           ],
         };
       } catch (error) {
-        // Check if it's the session limit error
-        if (
-          error instanceof Error &&
-          error.message.includes('Maximum number of browser sessions')
-        ) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: error.message,
-              },
-            ],
-            isError: true,
-          };
-        }
-
         return {
           content: [
             {
@@ -1402,12 +1508,8 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
             browserSession.refreshDeadline();
           }
         } else {
-          // Session is closed, clean it up
-          const browserSession = this.getBrowserSession(sessionId);
-          if (browserSession) {
-            await browserSession.cleanup();
-            this.browserSessions = this.browserSessions.filter((s) => s.session_id !== sessionId);
-          }
+          // Session is closed, remove from tracking (but don't cleanup global browser/tunnel)
+          this.browserSessions = this.browserSessions.filter((s) => s.session_id !== sessionId);
         }
 
         const result = {
@@ -1829,8 +1931,11 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
       }
 
       try {
-        // Create browser and tunnel for test runs
-        const { browser, tunnel, wsUrl } = await this.createBrowserAndTunnel(true); // headless for test runs
+        // Get API key for deterministic subdomain
+        const apiKey = this.globalApiClient.getApiKey();
+
+        // Use global browser session (single browser shared across all sessions)
+        const { browser, tunnel, wsUrl, sessionIndex } = await this.getOrCreateGlobalBrowser(true); // headless for test runs
 
         // Run tests with the wsUrl
         const result = await this.globalApiClient.runTests({
@@ -1842,7 +1947,14 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
         // For test runs, we store the browser/tunnel with a generic test_run session type
         // We'll use the test_run_id as the session identifier
         if (result.success && result.test_run_id) {
-          this.addBrowserSession(result.test_run_id, browser, tunnel, 'test_run');
+          this.addBrowserSession(
+            result.test_run_id,
+            browser,
+            tunnel,
+            'test_run',
+            apiKey || undefined,
+            sessionIndex
+          );
         }
 
         if (result.success) {
@@ -1867,9 +1979,7 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
             ],
           };
         } else {
-          // Cleanup browser/tunnel if test run failed
-          await tunnel.stopTunnel();
-          await browser.stopBrowser();
+          // NOTE: Do NOT cleanup browser/tunnel on failure since they are shared globally
 
           return {
             content: [
@@ -1890,22 +2000,6 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
           };
         }
       } catch (error) {
-        // Check if it's the session limit error
-        if (
-          error instanceof Error &&
-          error.message.includes('Maximum number of browser sessions')
-        ) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: error.message,
-              },
-            ],
-            isError: true,
-          };
-        }
-
         return {
           content: [
             {
@@ -2666,7 +2760,7 @@ For more detailed examples, see the Getting Started and Workflows guides.
       this.cleanupInterval = null;
     }
 
-    // Cleanup all browser sessions
+    // Cleanup all browser sessions (includes global browser/tunnel)
     await this.resetAllBrowserSessions();
   }
 }

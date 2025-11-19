@@ -21,10 +21,14 @@
   "include": [
     "src/**/*",
     "lib/**/*",
+    "types/**/*",
     "package.json"
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "**/*.test.ts",
+    "**/*.integration.test.ts",
+    "test-setup.ts"
   ]
 }
