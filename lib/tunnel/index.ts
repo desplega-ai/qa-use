@@ -159,18 +159,10 @@ export class TunnelManager {
 
     try {
       const localWsUrl = new URL(originalWsEndpoint);
-      const hostUrl = new URL(this.session.host);
-
       const wsPath = localWsUrl.pathname;
 
-      // Check if the session host is https:// or http:// and replace accordingly
-      if (hostUrl.protocol.startsWith('http')) {
-        return (
-          this.session.publicUrl.replace('https://', 'wss://').replace('http://', 'ws://') + wsPath
-        );
-      }
-
-      return this.session.publicUrl + wsPath;
+      // Convert HTTP/HTTPS URLs to WebSocket URLs (ws/wss)
+      return this.session.publicUrl.replace('https://', 'wss://').replace('http://', 'ws://') + wsPath;
     } catch (error) {
       return null;
     }
