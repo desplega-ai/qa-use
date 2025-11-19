@@ -499,7 +499,7 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
   private startCleanupTask(): void {
     this.cleanupInterval = setInterval(() => {
       this.cleanupExpiredSessions();
-    }, 1000);
+    }, 10000); // Changed from 1000ms (1s) to 10000ms (10s) for better performance
   }
 
   private async cleanupExpiredSessions(): Promise<void> {
