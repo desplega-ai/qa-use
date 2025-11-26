@@ -536,6 +536,28 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
   }
 
   /**
+   * Cleanup global browser and tunnel resources
+   */
+  private async cleanupGlobalResources(): Promise<void> {
+    if (this.globalTunnel) {
+      try {
+        await this.globalTunnel.stopTunnel();
+      } catch {
+        // Silent cleanup
+      }
+      this.globalTunnel = null;
+    }
+    if (this.globalBrowser) {
+      try {
+        await this.globalBrowser.stopBrowser();
+      } catch {
+        // Silent cleanup
+      }
+      this.globalBrowser = null;
+    }
+  }
+
+  /**
    * Get or create the global browser session (singleton pattern)
    * All sessions share this single browser instance
    */
@@ -545,33 +567,61 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
     wsUrl: string;
     sessionIndex: number;
   }> {
-    // Return existing global browser if already created
+    // Check if existing resources are healthy before reusing
     if (this.globalBrowser && this.globalTunnel) {
-      const localWsUrl = this.globalBrowser.getWebSocketEndpoint();
-      if (localWsUrl) {
-        const tunneledWsUrl = this.globalTunnel.getWebSocketUrl(localWsUrl);
-        if (tunneledWsUrl) {
-          await this.server.notification({
-            method: 'notifications/message',
-            params: {
-              level: 'info',
-              logger: 'global_browser',
-              data: {
-                action: 'reuse',
-                sessionIndex: this.globalSessionIndex,
-                wsUrl: tunneledWsUrl,
-                message: `Reusing existing browser session (index: ${this.globalSessionIndex})`,
+      const [browserResult, tunnelResult] = await Promise.allSettled([
+        this.globalBrowser.checkHealth(),
+        this.globalTunnel.checkHealth(),
+      ]);
+
+      const browserHealthy = browserResult.status === 'fulfilled' && browserResult.value;
+      const tunnelHealthy = tunnelResult.status === 'fulfilled' && tunnelResult.value;
+
+      if (browserHealthy && tunnelHealthy) {
+        // Resources are healthy, reuse them
+        const localWsUrl = this.globalBrowser.getWebSocketEndpoint();
+        if (localWsUrl) {
+          const tunneledWsUrl = this.globalTunnel.getWebSocketUrl(localWsUrl);
+          if (tunneledWsUrl) {
+            await this.server.notification({
+              method: 'notifications/message',
+              params: {
+                level: 'info',
+                logger: 'global_browser',
+                data: {
+                  action: 'reuse',
+                  sessionIndex: this.globalSessionIndex,
+                  wsUrl: tunneledWsUrl,
+                  message: `Reusing existing browser session (index: ${this.globalSessionIndex})`,
+                },
               },
-            },
-          });
-          return {
-            browser: this.globalBrowser,
-            tunnel: this.globalTunnel,
-            wsUrl: tunneledWsUrl,
-            sessionIndex: this.globalSessionIndex,
-          };
+            });
+            return {
+              browser: this.globalBrowser,
+              tunnel: this.globalTunnel,
+              wsUrl: tunneledWsUrl,
+              sessionIndex: this.globalSessionIndex,
+            };
+          }
         }
       }
+
+      // Health check failed - log and cleanup stale resources
+      await this.server.notification({
+        method: 'notifications/message',
+        params: {
+          level: 'warning',
+          logger: 'global_browser',
+          data: {
+            action: 'health_check_failed',
+            browserHealthy,
+            tunnelHealthy,
+            message: 'Resources unhealthy, recreating browser and tunnel',
+          },
+        },
+      });
+
+      await this.cleanupGlobalResources();
     }
 
     // Create single global browser session

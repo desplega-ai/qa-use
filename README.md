@@ -769,7 +769,6 @@ Execute multiple automated tests simultaneously.
 **Parameters:**
 - `test_ids` (array, required): Array of test IDs to execute
 - `app_config_id` (string, optional): Optional app config ID to run tests against (uses API key default config if not provided)
-- `ws_url` (string, optional): Optional WebSocket URL override (uses global tunnel URL by default)
 
 #### `search_automated_test_runs`
 Search automated test runs with optional filtering by test ID or run ID.

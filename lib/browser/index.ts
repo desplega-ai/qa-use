@@ -108,6 +108,24 @@ export class BrowserManager {
     return this.session?.isActive ?? false;
   }
 
+  /**
+   * Check if browser is actually alive by attempting to connect
+   */
+  async checkHealth(): Promise<boolean> {
+    if (!this.session) return false;
+
+    try {
+      const browser = await chromium.connect(this.session.wsEndpoint, {
+        timeout: 5000, // 5 second timeout
+      });
+      await browser.close();
+      return true;
+    } catch (error) {
+      this.session.isActive = false;
+      return false;
+    }
+  }
+
   getWebSocketEndpoint(): string | null {
     return this.session?.wsEndpoint ?? null;
   }

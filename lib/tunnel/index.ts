@@ -136,6 +136,30 @@ export class TunnelManager {
     return this.session?.isActive ?? false;
   }
 
+  /**
+   * Check if tunnel is actually alive by pinging the public URL
+   */
+  async checkHealth(): Promise<boolean> {
+    if (!this.session) return false;
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+
+      const response = await fetch(this.session.publicUrl, {
+        method: 'HEAD',
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+      // 426 = Upgrade Required (expected for WebSocket endpoint)
+      return response.ok || response.status === 426;
+    } catch (error) {
+      this.session.isActive = false;
+      return false;
+    }
+  }
+
   getPublicUrl(): string | null {
     return this.session?.publicUrl ?? null;
   }
@@ -162,7 +186,9 @@ export class TunnelManager {
       const wsPath = localWsUrl.pathname;
 
       // Convert HTTP/HTTPS URLs to WebSocket URLs (ws/wss)
-      return this.session.publicUrl.replace('https://', 'wss://').replace('http://', 'ws://') + wsPath;
+      return (
+        this.session.publicUrl.replace('https://', 'wss://').replace('http://', 'ws://') + wsPath
+      );
     } catch (error) {
       return null;
     }
