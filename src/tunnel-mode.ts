@@ -11,10 +11,11 @@ import { ApiClient } from '../lib/api/index.js';
 interface TunnelModeOptions {
   headless?: boolean;
   heartbeatInterval?: number; // in milliseconds
+  subdomain?: string; // optional custom subdomain (overrides deterministic subdomain)
 }
 
 export async function startTunnelMode(options: TunnelModeOptions = {}): Promise<void> {
-  const { headless = true, heartbeatInterval = 5000 } = options;
+  const { headless = true, heartbeatInterval = 5000, subdomain } = options;
 
   console.log('');
   console.log('🔧 QA-Use Tunnel Mode');
@@ -66,13 +67,17 @@ export async function startTunnelMode(options: TunnelModeOptions = {}): Promise<
   const wsEndpoint = browserResult.wsEndpoint;
   console.log('✅ Browser started');
 
-  // Step 4: Start tunnel
+  // Step 4: Start tunnel with deterministic subdomain (or custom if provided)
   const tunnel = new TunnelManager();
   const wsUrl = new URL(wsEndpoint);
   const browserPort = parseInt(wsUrl.port);
 
   try {
-    await tunnel.startTunnel(browserPort);
+    await tunnel.startTunnel(browserPort, {
+      subdomain, // custom subdomain overrides deterministic
+      apiKey: apiKey || undefined, // for deterministic subdomain generation
+      sessionIndex: 0, // always use index 0 for tunnel mode
+    });
   } catch (error) {
     console.error(
       `❌ Failed to start tunnel: ${error instanceof Error ? error.message : 'Unknown error'}`

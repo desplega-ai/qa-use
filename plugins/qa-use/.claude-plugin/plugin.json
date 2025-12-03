@@ -1,0 +1,16 @@
+{
+  "name": "qa-use",
+  "version": "0.1.0",
+  "description": "...",
+  "author": {
+    "name": "desplega.ai",
+    "email": "contact@desplega.ai",
+    "url": "https://desplega.ai"
+  },
+  "homepage": "https://github.com/desplega-ai/qa-use-todo",
+  "repository": "https://github.com/desplega-ai/qa-use",
+  "license": "MIT",
+  "keywords": [
+    
+    ]
+}

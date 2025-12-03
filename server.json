@@ -8,7 +8,8 @@
   "env": {
     "QA_USE_API_KEY": "",
     "QA_USE_API_URL": "",
-    "QA_USE_APP_URL": ""
+    "QA_USE_APP_URL": "",
+    "QA_USE_REGION": ""
   },
   "homepage": "https://github.com/your-username/qa-use-mcp",
   "license": "ISC"

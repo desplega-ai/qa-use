@@ -577,6 +577,8 @@ export QA_USE_REGION=us
 npx @desplega.ai/qa-use-mcp tunnel
 ```
 
+Alternatively, you can use a config file instead of environment variables. See [Configuration File](#configuration-file) for details.
+
 ### Options
 
 - **`--visible`**: Show browser window instead of headless mode (useful for debugging)
@@ -703,11 +705,6 @@ Get the current application configuration details including base URL, login sett
 
 **Parameters:** None
 
-#### `reset_browser_sessions`
-Reset and cleanup all active browser sessions. This will kill all browsers and tunnels. Use this when you hit the maximum session limit or need to free up resources.
-
-**Parameters:** None
-
 ### Session Management
 
 #### `search_sessions`
@@ -769,6 +766,7 @@ Execute multiple automated tests simultaneously.
 **Parameters:**
 - `test_ids` (array, required): Array of test IDs to execute
 - `app_config_id` (string, optional): Optional app config ID to run tests against (uses API key default config if not provided)
+- `ws_url` (string, optional): Optional WebSocket URL override (uses global tunnel URL by default)
 
 #### `search_automated_test_runs`
 Search automated test runs with optional filtering by test ID or run ID.
@@ -837,6 +835,29 @@ npx @desplega.ai/qa-use-mcp
 
 > **Note:** If `QA_USE_REGION` is not set, the system automatically defaults to `"auto"` behavior.
 
+### Configuration File
+
+As an alternative to environment variables, you can store your configuration in `~/.qa-use.json`:
+
+```json
+{
+  "env": {
+    "QA_USE_API_KEY": "your-api-key-here",
+    "QA_USE_API_URL": "https://api.desplega.ai",
+    "QA_USE_APP_URL": "https://app.desplega.ai",
+    "QA_USE_REGION": "us"
+  }
+}
+```
+
+**Priority order:**
+1. Environment variables (highest priority)
+2. Config file (`~/.qa-use.json`)
+3. Default values
+
+This is useful when you don't want to set environment variables or when using MCP clients that don't support environment configuration.
+
+An example config file is available at [`.qa-use.example.json`](.qa-use.example.json) in this repository.
 
 ## Usage Examples
 

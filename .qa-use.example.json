@@ -1,0 +1,8 @@
+{
+  "env": {
+    "QA_USE_API_KEY": "your-api-key-here",
+    "QA_USE_API_URL": "https://api.desplega.ai",
+    "QA_USE_APP_URL": "https://app.desplega.ai",
+    "QA_USE_REGION": "auto"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "qa-use",
+  "owner": {
+    "name": "desplega.ai",
+    "email": "contact@desplega.ai"
+  },
+  "plugins": [
+    {
+      "name": "qa-use",
+      "source": "./plugins/qa-use",
+      "description": "qa-use Claude Code plugin",
+      "version": "0.1.0",
+      "author": {
+        "name": "desplega.ai",
+        "email": "contact@desplega.ai"
+      }
+    }
+  ]
+}

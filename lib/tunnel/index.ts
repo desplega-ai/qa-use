@@ -2,6 +2,7 @@ import localtunnel from '@desplega.ai/localtunnel';
 import { URL } from 'url';
 import https from 'https';
 import crypto from 'crypto';
+import { getEnv } from '../env/index.js';
 
 export interface TunnelSession {
   tunnel: localtunnel.Tunnel;
@@ -47,8 +48,8 @@ export class TunnelManager {
       throw new Error('Tunnel session already active');
     }
 
-    const region = process.env.QA_USE_REGION || this.defaultRegion;
-    let host = process.env.TUNNEL_HOST;
+    const region = getEnv('QA_USE_REGION') || this.defaultRegion;
+    let host = getEnv('TUNNEL_HOST');
 
     if (!host) {
       // If no manual override, determine host based on region

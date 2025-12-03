@@ -1,6 +1,7 @@
 import axios from 'axios';
 import type { AxiosInstance, AxiosResponse } from 'axios';
 import 'dotenv/config';
+import { getEnv } from '../env/index.js';
 import type {
   TestAgentV2Session,
   IssueType,
@@ -226,7 +227,7 @@ export class ApiClient {
 
   constructor(baseUrl?: string) {
     // Use environment variable if available, otherwise use provided baseUrl, finally fall back to production
-    const apiUrl = process.env.QA_USE_API_URL || baseUrl || 'https://api.desplega.ai';
+    const apiUrl = getEnv('QA_USE_API_URL') || baseUrl || 'https://api.desplega.ai';
 
     this.client = axios.create({
       baseURL: apiUrl,
@@ -236,8 +237,8 @@ export class ApiClient {
       },
     });
 
-    // Auto-load API key from environment if available
-    const envApiKey = process.env.QA_USE_API_KEY;
+    // Auto-load API key from environment or config file if available
+    const envApiKey = getEnv('QA_USE_API_KEY');
     if (envApiKey) {
       this.setApiKey(envApiKey);
     }
@@ -261,7 +262,7 @@ export class ApiClient {
   }
 
   static getAppUrl(): string {
-    return process.env.QA_USE_APP_URL || 'https://app.desplega.ai';
+    return getEnv('QA_USE_APP_URL') || 'https://app.desplega.ai';
   }
 
   getApiUrl(): string {
@@ -313,8 +314,8 @@ export class ApiClient {
 
   async createSession(options: CreateSessionOptions): Promise<CreateSessionResponse> {
     try {
-      // Determine region from options or environment variable
-      const region = options.region || process.env.QA_USE_REGION || 'auto';
+      // Determine region from options or environment variable or config file
+      const region = options.region || getEnv('QA_USE_REGION') || 'auto';
 
       const sessionData = {
         url: options.url,
