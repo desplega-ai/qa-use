@@ -1,5 +1,8 @@
 {
   "name": "desplega.ai",
+  "metadata": {
+    "description": "desplega.ai Marketplace - Plugins for `qa-use` and other Vibe QA testing tools"
+  },
   "owner": {
     "name": "desplega.ai",
     "email": "contact@desplega.ai"

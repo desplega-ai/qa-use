@@ -35,7 +35,8 @@
     "test:integration": "node scripts/test-integration.js",
     "test:coverage": "bun test --coverage --preload ./test-setup.ts",
     "generate:readme": "node scripts/generate-readme-tools.js",
-    "prepublishOnly": "pnpm build && pnpm lint && pnpm typecheck"
+    "prepublishOnly": "pnpm build && pnpm lint && pnpm typecheck",
+    "cc:validate": "claude plugin validate ."
   },
   "keywords": [
     "mcp",
