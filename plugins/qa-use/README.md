@@ -1,4 +1,4 @@
-# qa-use for Claude Code
+# desplega.ai's `qa-use` plugin for Claude Code
 
 ...
 
@@ -15,7 +15,7 @@ Install the marketplace for this repo:
 Install the `qa-use plugin by:
 
 ```bash
-/plugin install qa-use@qa-use
+/plugin install qa-use@desplega.ai
 ```
 
 ## What's Included
