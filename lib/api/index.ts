@@ -485,7 +485,7 @@ export class ApiClient {
       }
 
       const response: AxiosResponse = await this.client.get(`/vibe-qa/tests?${params.toString()}`);
-      return response.data as AutomatedTest[];
+      return response.data.items as AutomatedTest[];
     } catch (error) {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;
