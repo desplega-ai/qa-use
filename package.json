@@ -1,6 +1,6 @@
 {
   "name": "@desplega.ai/qa-use-mcp",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "packageManager": "pnpm@10.23.0",
   "description": "MCP server for browser automation and QA testing",
   "type": "module",
