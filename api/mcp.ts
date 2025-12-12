@@ -1,5 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
@@ -15,14 +14,13 @@ interface AuthRequest extends IncomingMessage {
 const transports = new Map<string, StreamableHTTPServerTransport>();
 
 // Create MCP server instance
-let mcpServer: Server | null = null;
+let qaServerInstance: QAUseMcpServer | null = null;
 
-function getMcpServer(): Server {
-  if (!mcpServer) {
-    const qaServer = new QAUseMcpServer();
-    mcpServer = qaServer.getServer();
+function getQAServer(): QAUseMcpServer {
+  if (!qaServerInstance) {
+    qaServerInstance = new QAUseMcpServer();
   }
-  return mcpServer;
+  return qaServerInstance;
 }
 
 async function authenticateRequest(req: AuthRequest): Promise<boolean> {
@@ -83,6 +81,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // Get QA server and set API key from Bearer token
+    const qaServer = getQAServer();
+    if (authReq.apiKey) {
+      qaServer.setApiKey(authReq.apiKey);
+    }
+
     // Get or create transport
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
     let transport: StreamableHTTPServerTransport;
@@ -100,8 +104,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       });
 
-      const server = getMcpServer();
-      await server.connect(transport);
+      await qaServer.getServer().connect(transport);
     }
 
     // Handle the request
