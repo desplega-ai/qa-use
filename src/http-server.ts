@@ -6,6 +6,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { ApiClient } from '../lib/api/index.js';
 import { getName, getVersion } from './utils/package.js';
+import type { QAUseMcpServer } from './server.js';
 
 interface AuthRequest extends IncomingMessage {
   apiKey?: string;
@@ -15,12 +16,14 @@ interface AuthRequest extends IncomingMessage {
 export class HttpMcpServer {
   private app: express.Application;
   private server: Server;
+  private mcpServer: QAUseMcpServer;
   private port: number;
   private transports: Map<string, StreamableHTTPServerTransport>;
 
-  constructor(server: Server, port: number = 3000) {
+  constructor(mcpServer: QAUseMcpServer, port: number = 3000) {
     this.app = express();
-    this.server = server;
+    this.server = mcpServer.getServer();
+    this.mcpServer = mcpServer;
     this.port = port;
     this.transports = new Map();
     this.setupMiddleware();
@@ -91,6 +94,11 @@ export class HttpMcpServer {
           error: 'Unauthorized',
           message: 'Missing or invalid Authorization header. Expected: Bearer <api-key>',
         });
+      }
+
+      // Set API key on MCP server so tools can use it
+      if (authReq.apiKey) {
+        this.mcpServer.setApiKey(authReq.apiKey);
       }
 
       // Create or get transport for this request

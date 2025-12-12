@@ -2786,6 +2786,10 @@ For more detailed examples, see the Getting Started and Workflows guides.
     return this.server;
   }
 
+  setApiKey(apiKey: string): void {
+    this.globalApiClient.setApiKey(apiKey);
+  }
+
   async start(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);

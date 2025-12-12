@@ -95,7 +95,7 @@ if (tunnelFlag) {
   const { HttpMcpServer } = await import('./http-server.js');
 
   const mcpServer = new QAUseMcpServer();
-  const httpServer = new HttpMcpServer(mcpServer.getServer(), port);
+  const httpServer = new HttpMcpServer(mcpServer, port);
 
   await httpServer.start();
 } else {
