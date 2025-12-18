@@ -1,7 +1,7 @@
 {
   "name": "qa-use",
-  "version": "0.1.0",
-  "description": "...",
+  "version": "0.1.1",
+  "description": "A plugin to use qa-use in Claude Code",
   "author": {
     "name": "desplega.ai",
     "email": "contact@desplega.ai",
@@ -11,6 +11,10 @@
   "repository": "https://github.com/desplega-ai/qa-use",
   "license": "MIT",
   "keywords": [
-    
-    ]
+    "qa",
+    "vibe-qa",
+    "testing",
+    "desplega.ai",
+    "e2e"
+  ]
 }
