@@ -24,6 +24,10 @@ npx @desplega.ai/qa-use-mcp --http --port 3000
 npx @desplega.ai/qa-use-mcp tunnel
 ```
 
+> **For AI Assistants:** See [CLAUDE.md](./CLAUDE.md) for a concise onboarding guide with quick commands, architecture overview, and key concepts.
+
+> **Package Managers:** This project uses **pnpm** as the primary package manager (per `packageManager` field in package.json). **Bun** is used only for test execution and CI speed. Both lock files are maintained for compatibility.
+
 ## Table of Contents
 
 - [MCP Client Configuration (stdio mode)](#mcp-client-configuration-stdio-mode)
