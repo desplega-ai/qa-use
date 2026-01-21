@@ -93,19 +93,33 @@ Add TypeScript types for test definitions and implement ApiClient methods for th
 
 ### Changes Required
 
-#### 1. TestDefinition Types
-**File**: `src/types/test-definition.ts` (new file)
-**Changes**: Add comprehensive types for TestDefinition, Step variants, SSE events
+#### 1. TestDefinition Types (Auto-Generated)
+**File**: `src/types/test-definition.ts` (new file, auto-generated)
+**Changes**: Generate TypeScript types from the `/cli/schema` endpoint to keep them in sync
 
-```typescript
-// Key types to add:
-// - StepAction enum (goto, fill, click, etc.)
-// - SimpleStep, ExtendedStep, Step union
-// - TestDefinition interface
-// - SSE event types (SSEStartEvent, SSEStepCompleteEvent, etc.)
-// - RunCliTestOptions, RunCliTestResult
-// - ValidationResult, ImportResult
+**Approach:**
+1. Create a type generation script `scripts/generate-types.ts`
+2. Fetch JSON Schema from `GET /vibe-qa/cli/schema`
+3. Use `json-schema-to-typescript` to generate types
+4. Output to `src/types/test-definition.ts`
+
+```bash
+# Add dev dependency
+pnpm add -D json-schema-to-typescript
+
+# Add npm script
+# "generate:types": "bun scripts/generate-types.ts"
 ```
+
+**Generated types will include:**
+- StepAction enum (goto, fill, click, etc.)
+- SimpleStep, ExtendedStep, Step union
+- TestDefinition interface
+- SSE event types (SSEStartEvent, SSEStepCompleteEvent, etc.)
+- RunCliTestOptions, RunCliTestResult
+- ValidationResult, ImportResult
+
+**CI Integration:** Run type generation as part of build to catch schema drift.
 
 Reference: Research document Section 6 (lines 1112-1222)
 
@@ -257,7 +271,7 @@ import '../dist/cli/index.js';
 ## Phase 3: MCP Tools (Optional Enhancement)
 
 ### Overview
-Add MCP tools that wrap CLI functionality, enabling AI assistants to use the test definition features directly.
+Add MCP tools that wrap CLI functionality, enabling AI assistants to use local test definitions directly.
 
 ### Changes Required
 
@@ -267,11 +281,11 @@ Add MCP tools that wrap CLI functionality, enabling AI assistants to use the tes
 
 | Tool | Purpose |
 |------|---------|
-| `run_test_definitions` | Run inline TestDefinitions via SSE |
-| `export_test` | Export DB test to YAML/JSON |
-| `validate_test_definition` | Validate without running |
-| `import_test_definition` | Create test from definition |
-| `get_test_schema` | Get JSON Schema |
+| `run_local_tests` | Run local TestDefinitions via SSE |
+| `export_to_local_test` | Export DB test to local YAML/JSON file |
+| `validate_local_test` | Validate local test without running |
+| `import_local_test` | Create/update cloud test from local file |
+| `get_local_test_schema` | Get JSON Schema for local tests |
 | `list_local_tests` | Discover local test files |
 
 Reference: Research document Section 3.3 (lines 832-854) and Appendix B (lines 1422-1485)
