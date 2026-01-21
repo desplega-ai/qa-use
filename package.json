@@ -39,6 +39,7 @@
     "test:coverage": "bun test --coverage --preload ./test-setup.ts",
     "generate:readme": "node scripts/generate-readme-tools.js",
     "generate:types": "tsx scripts/generate-types.ts",
+    "release": "bun scripts/release.ts",
     "prepublishOnly": "bun run build && bun lint && bun typecheck",
     "cc:validate": "claude plugin validate ."
   },

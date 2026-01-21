@@ -221,13 +221,44 @@ bun typecheck
 
 ### Publishing to npm
 
-1. Update version in `package.json`
-2. Build and test
-3. Publish:
+We have an automated release script that handles the entire process:
 
 ```bash
-bun build
-npm publish
+# Interactive mode - prompts for version type
+bun release
+
+# Or specify version directly
+bun release 1.6.0
+
+# Or use semantic versioning shortcuts
+bun release patch   # 1.5.3 → 1.5.4
+bun release minor   # 1.5.3 → 1.6.0
+bun release major   # 1.5.3 → 2.0.0
+```
+
+The script will:
+1. Check you're on main branch (or warn if not)
+2. Verify working directory is clean
+3. Prompt for version number (if not provided)
+4. Update package.json
+5. Run build, lint, and typecheck
+6. Commit the version bump
+7. Create and push a git tag
+8. Publish to npm with `bun publish`
+
+### Manual Publishing (if needed)
+
+If you need to publish manually:
+
+```bash
+# Update version in package.json
+bun run build
+bun lint
+bun typecheck
+git commit -am "Release vX.Y.Z"
+git tag vX.Y.Z
+git push origin main --tags
+bun publish --access public
 ```
 
 ### Testing the Published Package
