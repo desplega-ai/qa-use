@@ -19,7 +19,7 @@ type BumpType = 'major' | 'minor' | 'patch';
 
 async function exec(command: string): Promise<void> {
   try {
-    await $`${command}`.quiet();
+    await $`sh -c ${command}`.quiet();
   } catch (error) {
     console.error(`❌ Command failed: ${command}`);
     process.exit(1);
@@ -28,7 +28,7 @@ async function exec(command: string): Promise<void> {
 
 async function execVisible(command: string): Promise<void> {
   try {
-    await $`${command}`;
+    await $`sh -c ${command}`;
   } catch (error) {
     console.error(`❌ Command failed: ${command}`);
     process.exit(1);
