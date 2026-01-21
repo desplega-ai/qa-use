@@ -9,7 +9,7 @@ echo "🚀 Testing init_qa_server MCP tool..."
 
 # Build the project first
 echo "📦 Building project..."
-pnpm build
+bun run build
 
 # Create temporary file for MCP communication
 TEMP_FILE=$(mktemp)

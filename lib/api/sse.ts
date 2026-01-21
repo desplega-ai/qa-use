@@ -52,9 +52,7 @@ export function parseSSE(chunk: string): SSEEvent[] {
  * @param response - Fetch Response with SSE stream
  * @yields SSE events as they arrive
  */
-export async function* streamSSE(
-  response: Response
-): AsyncGenerator<SSEEvent, void, unknown> {
+export async function* streamSSE(response: Response): AsyncGenerator<SSEEvent, void, unknown> {
   if (!response.body) {
     throw new Error('Response body is null');
   }

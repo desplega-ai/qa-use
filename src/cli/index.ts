@@ -14,10 +14,7 @@ const version = '1.5.3'; // TODO: Import from package.json
 
 const program = new Command();
 
-program
-  .name('qa-use')
-  .description('QA automation tool for desplega.ai')
-  .version(version);
+program.name('qa-use').description('QA automation tool for desplega.ai').version(version);
 
 // Register commands
 program.addCommand(setupCommand);

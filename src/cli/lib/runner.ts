@@ -2,7 +2,11 @@
  * Test execution runner with SSE progress output
  */
 
-import { ApiClient, type RunCliTestOptions, type RunCliTestResult } from '../../../lib/api/index.js';
+import {
+  ApiClient,
+  type RunCliTestOptions,
+  type RunCliTestResult,
+} from '../../../lib/api/index.js';
 import type { SSEEvent } from '../../../lib/api/sse.js';
 import { printSSEProgress } from './output.js';
 

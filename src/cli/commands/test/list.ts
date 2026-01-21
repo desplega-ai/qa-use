@@ -54,7 +54,9 @@ export const listCommand = new Command('list')
         for (const file of files) {
           try {
             const def = await loadTestDefinition(file);
-            const relativePath = path.relative(resolvedTestDir, file).replace(/\.(yaml|yml|json)$/, '');
+            const relativePath = path
+              .relative(resolvedTestDir, file)
+              .replace(/\.(yaml|yml|json)$/, '');
             tests.push({
               name: relativePath,
               steps: def.steps?.length,

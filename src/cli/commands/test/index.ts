@@ -8,8 +8,7 @@ import { listCommand } from './list.js';
 import { validateCommand } from './validate.js';
 import { initCommand } from './init.js';
 
-export const testCommand = new Command('test')
-  .description('Manage and run test definitions');
+export const testCommand = new Command('test').description('Manage and run test definitions');
 
 // Register subcommands
 testCommand.addCommand(runCommand);

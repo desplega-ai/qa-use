@@ -8,7 +8,7 @@ echo "🔑 Testing init_qa_server with environment variable..."
 
 # Build first
 echo "📦 Building project..."
-pnpm build
+bun run build
 
 echo "🧪 Testing init without providing API key (should use env var)..."
 

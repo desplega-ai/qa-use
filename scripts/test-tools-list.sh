@@ -8,7 +8,7 @@ echo "🔧 Testing tools/list MCP endpoint..."
 
 # Build the project first
 echo "📦 Building project..."
-pnpm build
+bun run build
 
 echo "🧪 Listing available tools..."
 

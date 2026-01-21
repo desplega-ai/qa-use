@@ -2,7 +2,7 @@
  * Auto-generated TypeScript types for Test CLI definitions
  *
  * DO NOT EDIT MANUALLY - Generated from API schema
- * Run 'pnpm generate:types' to regenerate
+ * Run 'bun generate:types' to regenerate
  *
  * Source: https://api.desplega.ai/vibe-qa/cli/schema
  * Generated: 2026-01-21T11:56:17.826Z

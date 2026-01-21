@@ -800,10 +800,7 @@ export class ApiClient {
    * @param onEvent - Optional callback for SSE events
    * @returns Promise resolving to test result
    */
-  async runCliTest(
-    options: RunCliTestOptions,
-    onEvent?: SSECallback
-  ): Promise<RunCliTestResult> {
+  async runCliTest(options: RunCliTestOptions, onEvent?: SSECallback): Promise<RunCliTestResult> {
     try {
       const response = await fetch(`${this.getApiUrl()}/vibe-qa/cli/run`, {
         method: 'POST',

@@ -26,7 +26,7 @@ npx @desplega.ai/qa-use-mcp tunnel
 
 > **For AI Assistants:** See [CLAUDE.md](./CLAUDE.md) for a concise onboarding guide with quick commands, architecture overview, and key concepts.
 
-> **Package Managers:** This project uses **pnpm** as the primary package manager (per `packageManager` field in package.json). **Bun** is used only for test execution and CI speed. Both lock files are maintained for compatibility.
+> **Package Manager:** This project uses **bun** as the package manager. Bun provides fast installs, a built-in test runner, and native TypeScript support.
 
 ## Table of Contents
 
@@ -476,9 +476,9 @@ vercel --prod
 ```
 
 **Vercel Build Settings:**
-- **Build Command**: `pnpm build`
+- **Build Command**: `bun build`
 - **Output Directory**: `dist`
-- **Install Command**: `pnpm install`
+- **Install Command**: `bun install`
 
 **Environment Variables** (set in Vercel dashboard):
 - `QA_USE_API_KEY` - Your desplega.ai API key
@@ -660,19 +660,19 @@ Clone the repository and install dependencies:
 ```bash
 git clone <repository-url>
 cd qa-use-mcp
-pnpm install
+bun install
 ```
 
 Build the project:
 
 ```bash
-pnpm build
+bun build
 ```
 
 Start the development server:
 
 ```bash
-pnpm dev
+bun dev
 ```
 
 <!-- AUTO-GENERATED-TOOLS-START -->

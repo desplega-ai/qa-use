@@ -125,9 +125,7 @@ export function printSSEProgress(event: SSEEvent): void {
 /**
  * Print test list table
  */
-export function printTestList(
-  tests: Array<{ name: string; steps?: number; deps?: string }>
-): void {
+export function printTestList(tests: Array<{ name: string; steps?: number; deps?: string }>): void {
   if (tests.length === 0) {
     console.log(warning('No tests found'));
     return;

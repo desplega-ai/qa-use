@@ -8,7 +8,7 @@ echo "🎬 Testing start_qa_session MCP tool..."
 
 # Build the project first
 echo "📦 Building project..."
-pnpm build
+bun run build
 
 echo "🧪 Testing start_qa_session..."
 

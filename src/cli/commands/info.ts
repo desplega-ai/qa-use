@@ -22,7 +22,9 @@ export const infoCommand = new Command('info')
 
     console.log('Configuration:');
     console.log(`  API Key: ${config.api_key ? config.api_key.slice(0, 8) + '...' : '(not set)'}`);
-    console.log(`  API URL: ${config.api_url || process.env.QA_USE_API_URL || 'https://api.desplega.ai'}`);
+    console.log(
+      `  API URL: ${config.api_url || process.env.QA_USE_API_URL || 'https://api.desplega.ai'}`
+    );
     console.log(`  Test Directory: ${config.test_directory || './qa-tests'}`);
     console.log(`  Default App Config: ${config.default_app_config_id || '(not set)'}`);
 
