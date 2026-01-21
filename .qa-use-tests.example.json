@@ -1,0 +1,11 @@
+{
+  "test_directory": "./qa-tests",
+  "defaults": {
+    "headless": true,
+    "persist": false,
+    "timeout": 300,
+    "allow_fix": false
+  },
+  "api_key": "<api_key_here>",
+  "api_url": "https://api.desplega.ai"
+}
