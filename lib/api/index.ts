@@ -16,6 +16,8 @@ import {
   categorizeIssues,
 } from '../../src/utils/summary.js';
 import type { EnhancedTestSummary, BlockSummary } from '../../src/utils/summary.js';
+import { streamSSE, type SSEEvent } from './sse.js';
+import type { TestDefinition } from '../../src/types/test-definition.js';
 
 // Re-export new types for external consumers
 export type { IssueType, Severity, IssueReport, TestCreatorDoneIntent };
@@ -219,6 +221,86 @@ export interface ListAppConfigsOptions {
   source?: APIKeySource;
   cfg_type?: AppConfigType;
 }
+
+// ==========================================
+// CLI Test Definition Types
+// ==========================================
+
+export interface RunCliTestOptions {
+  test_definitions?: TestDefinition[];
+  test_id?: string;
+  persist?: boolean;
+  headless?: boolean;
+  allow_fix?: boolean;
+  capture_screenshots?: boolean;
+  store_recording?: boolean;
+  store_har?: boolean;
+  ws_url?: string;
+}
+
+export type SSECallback = (event: SSEEvent) => void;
+
+export interface StepResult {
+  step_index: number;
+  name: string;
+  status: 'passed' | 'failed';
+  duration: number;
+  screenshot_url?: string;
+  error?: string;
+}
+
+export interface RunCliTestResult {
+  run_id: string;
+  test_id?: string;
+  status: 'passed' | 'failed' | 'error' | 'cancelled' | 'timeout';
+  duration_seconds: number;
+  steps: StepResult[];
+  assets?: {
+    recording_url?: string;
+    har_url?: string;
+  };
+  error?: string;
+}
+
+export interface ValidationError {
+  path: string;
+  message: string;
+  severity: 'error' | 'warning' | 'info';
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationError[];
+  resolved?: {
+    app_config_id?: string;
+    total_steps?: number;
+    dependencies?: string[];
+  };
+}
+
+export interface ImportOptions {
+  upsert?: boolean;
+  dry_run?: boolean;
+}
+
+export interface ImportedTest {
+  name: string;
+  id: string;
+  action: 'created' | 'updated' | 'skipped';
+}
+
+export interface ImportResult {
+  success: boolean;
+  imported: ImportedTest[];
+  errors: Array<{
+    name: string;
+    error: string;
+  }>;
+}
+
+// Re-export TestDefinition for convenience
+export type { TestDefinition };
 
 export class ApiClient {
   private readonly client: AxiosInstance;
@@ -705,6 +787,191 @@ export class ApiClient {
         success: false,
         message: error instanceof Error ? error.message : 'Unknown error setting WebSocket URL',
       };
+    }
+  }
+
+  // ==========================================
+  // CLI Test Definition Methods
+  // ==========================================
+
+  /**
+   * Run test definitions with SSE streaming progress
+   * @param options - Test execution options
+   * @param onEvent - Optional callback for SSE events
+   * @returns Promise resolving to test result
+   */
+  async runCliTest(options: RunCliTestOptions, onEvent?: SSECallback): Promise<RunCliTestResult> {
+    try {
+      const response = await fetch(`${this.getApiUrl()}/vibe-qa/cli/run`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        },
+        body: JSON.stringify(options),
+      });
+
+      if (!response.ok) {
+        const errorData = (await response.json().catch(() => ({}))) as {
+          message?: string;
+          detail?: string;
+        };
+        throw new Error(
+          errorData?.message || errorData?.detail || `HTTP ${response.status}: Failed to run test`
+        );
+      }
+
+      let result: RunCliTestResult | null = null;
+
+      // Stream SSE events
+      for await (const event of streamSSE(response)) {
+        if (onEvent) onEvent(event);
+
+        // Capture final result
+        if (event.event === 'complete' || event.event === 'error') {
+          result = event.data;
+        }
+      }
+
+      if (!result) {
+        throw new Error('No result received from test execution');
+      }
+
+      return result;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Unknown error running test');
+    }
+  }
+
+  /**
+   * Export a database test to YAML or JSON format
+   * @param testId - UUID of the test to export
+   * @param format - Output format ('yaml' or 'json')
+   * @param includeDeps - Whether to include dependencies
+   * @returns Promise resolving to YAML/JSON string
+   */
+  async exportTest(
+    testId: string,
+    format: 'yaml' | 'json' = 'yaml',
+    includeDeps: boolean = true
+  ): Promise<string> {
+    try {
+      const params = new URLSearchParams();
+      params.append('format', format);
+      if (!includeDeps) params.append('no_deps', 'true');
+
+      const response: AxiosResponse = await this.client.get(
+        `/vibe-qa/cli/export/${testId}?${params.toString()}`
+      );
+
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const statusCode = error.response?.status;
+        const errorData = error.response?.data;
+
+        if (statusCode === 404) {
+          throw new Error(`Test not found: ${testId}`);
+        }
+
+        throw new Error(
+          errorData?.message || errorData?.detail || `HTTP ${statusCode}: Failed to export test`
+        );
+      }
+      throw new Error(error instanceof Error ? error.message : 'Unknown error exporting test');
+    }
+  }
+
+  /**
+   * Validate test definitions without running them
+   * @param definitions - Array of TestDefinitions to validate
+   * @returns Promise resolving to validation result
+   */
+  async validateTestDefinition(definitions: TestDefinition[]): Promise<ValidationResult> {
+    try {
+      const response: AxiosResponse = await this.client.post('/vibe-qa/cli/validate', {
+        test_definitions: definitions,
+      });
+
+      return response.data as ValidationResult;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const statusCode = error.response?.status;
+        const errorData = error.response?.data;
+
+        throw new Error(
+          errorData?.message ||
+            errorData?.detail ||
+            `HTTP ${statusCode}: Failed to validate test definition`
+        );
+      }
+      throw new Error(
+        error instanceof Error ? error.message : 'Unknown error validating test definition'
+      );
+    }
+  }
+
+  /**
+   * Import (create/update) tests from definitions
+   * @param definitions - Array of TestDefinitions to import
+   * @param options - Import options (upsert, dry_run)
+   * @returns Promise resolving to import result
+   */
+  async importTestDefinition(
+    definitions: TestDefinition[],
+    options: ImportOptions = {}
+  ): Promise<ImportResult> {
+    try {
+      const response: AxiosResponse = await this.client.post('/vibe-qa/cli/import', {
+        test_definitions: definitions,
+        upsert: options.upsert ?? true,
+        dry_run: options.dry_run ?? false,
+      });
+
+      return response.data as ImportResult;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const statusCode = error.response?.status;
+        const errorData = error.response?.data;
+
+        throw new Error(
+          errorData?.message ||
+            errorData?.detail ||
+            `HTTP ${statusCode}: Failed to import test definition`
+        );
+      }
+      throw new Error(
+        error instanceof Error ? error.message : 'Unknown error importing test definition'
+      );
+    }
+  }
+
+  /**
+   * Get JSON Schema for TestDefinition format
+   * @returns Promise resolving to JSON Schema object
+   */
+  async getTestDefinitionSchema(): Promise<any> {
+    try {
+      const response: AxiosResponse = await this.client.get('/vibe-qa/cli/schema');
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const statusCode = error.response?.status;
+        const errorData = error.response?.data;
+
+        throw new Error(
+          errorData?.message ||
+            errorData?.detail ||
+            `HTTP ${statusCode}: Failed to fetch test definition schema`
+        );
+      }
+      throw new Error(
+        error instanceof Error ? error.message : 'Unknown error fetching test definition schema'
+      );
     }
   }
 }

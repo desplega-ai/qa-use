@@ -8,6 +8,6 @@ node_modules
 coverage
 *.test.ts
 *.spec.ts
-test-*
+test-setup.ts
 scripts/test-*
 .github

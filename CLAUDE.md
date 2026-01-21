@@ -5,18 +5,18 @@ MCP server for browser automation and QA testing using Playwright, integrating w
 ## Quick Reference
 
 ```bash
-pnpm install           # Install dependencies
-pnpm build             # Build TypeScript
-pnpm dev               # Development with hot reload
-pnpm test              # Run tests with bun
-pnpm lint:fix          # Fix linting issues
-pnpm format            # Format code
-pnpm typecheck         # Type check
+bun install           # Install dependencies
+bun build             # Build TypeScript
+bun dev               # Development with hot reload
+bun test              # Run tests with bun
+bun lint:fix          # Fix linting issues
+bun format            # Format code
+bun typecheck         # Type check
 ```
 
 ## Tech Stack
 
-- **Runtime**: Node.js 20+, TypeScript, pnpm
+- **Runtime**: Node.js 20+, TypeScript, bun
 - **MCP**: @modelcontextprotocol/sdk (stdio & HTTP/SSE transports)
 - **Browser**: Playwright (Chromium)
 - **Tunneling**: @desplega.ai/localtunnel

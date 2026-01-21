@@ -6,27 +6,27 @@ all: format lint build
 # Format code using prettier
 format:
 	@echo "🎨 Formatting code..."
-	pnpm run format
+	bun run format
 
 # Check formatting without making changes
 format-check:
 	@echo "🔍 Checking code formatting..."
-	pnpm run format:check
+	bun run format:check
 
 # Lint code using eslint
 lint:
 	@echo "🔍 Linting code..."
-	pnpm run lint
+	bun run lint
 
 # Fix linting issues automatically
 lint-fix:
 	@echo "🔧 Fixing lint issues..."
-	pnpm run lint:fix
+	bun run lint:fix
 
 # Build the project
 build:
 	@echo "🔨 Building project..."
-	pnpm run build
+	bun run build
 
 # Clean build artifacts
 clean:
@@ -36,12 +36,12 @@ clean:
 # Install dependencies
 install:
 	@echo "📦 Installing dependencies..."
-	pnpm install
+	bun install
 
 # Development mode
 dev:
 	@echo "🚀 Starting development server..."
-	pnpm run dev
+	bun run dev
 
 # Help
 help:

@@ -14,7 +14,7 @@ fi
 echo "🚀 Testing with real API key..."
 
 # Build first
-pnpm build
+bun run build
 
 # Create a temporary test script
 cat > /tmp/mcp-real-test.js << EOF

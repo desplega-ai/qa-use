@@ -5,7 +5,7 @@ Welcome! This guide will help you get the project running locally for developmen
 ## Prerequisites
 
 - **Node.js 18+** - Make sure you have Node.js installed
-- **pnpm** - Fast, disk space efficient package manager
+- **bun** - Fast all-in-one JavaScript runtime and package manager
 - **Git** - For version control
 
 ## Quick Start (For Taras 😊)
@@ -16,13 +16,13 @@ git clone <your-repo-url>
 cd qa-use-mcp
 
 # Install dependencies
-pnpm install
+bun install
 
 # Build the project
-pnpm build
+bun build
 
 # Start development server
-pnpm dev
+bun dev
 ```
 
 ## Development Workflow
@@ -46,15 +46,15 @@ qa-use-mcp/
 
 ```bash
 # Development
-pnpm dev                  # Start with tsx (hot reload)
-pnpm build               # Build TypeScript to JavaScript
-pnpm start               # Build and run production version
+bun dev                  # Start with tsx (hot reload)
+bun build               # Build TypeScript to JavaScript
+bun start               # Build and run production version
 
 # Code Quality
-pnpm lint                # Run ESLint
-pnpm lint:fix            # Fix linting issues
-pnpm typecheck           # Type check without building
-pnpm format              # Format code with Prettier
+bun lint                # Run ESLint
+bun lint:fix            # Fix linting issues
+bun typecheck           # Type check without building
+bun format              # Format code with Prettier
 
 # Testing
 ./scripts/test-tools-list.sh      # List available MCP tools
@@ -83,7 +83,7 @@ You can also test manually by sending JSON-RPC messages:
 
 ```bash
 # Build first
-pnpm build
+bun build
 
 # Test tools list
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | node dist/src/index.js
@@ -158,7 +158,7 @@ npx playwright install chromium
 #### Hot Reload Development
 ```bash
 # Start with hot reload (recommended for development)
-pnpm dev
+bun dev
 
 # In another terminal, test the server
 ./scripts/test-tools-list.sh
@@ -176,7 +176,7 @@ console.error('Debug message'); // Use stderr for MCP servers
 
 1. **Build Errors**: Make sure TypeScript compiles without errors
    ```bash
-   pnpm typecheck
+   bun typecheck
    ```
 
 2. **Module Import Issues**: Ensure all imports use proper file extensions
@@ -195,9 +195,9 @@ The project uses:
 
 Run before committing:
 ```bash
-pnpm lint:fix
-pnpm format
-pnpm typecheck
+bun lint:fix
+bun format
+bun typecheck
 ```
 
 ### 8. Architecture Notes
@@ -221,13 +221,44 @@ pnpm typecheck
 
 ### Publishing to npm
 
-1. Update version in `package.json`
-2. Build and test
-3. Publish:
+We have an automated release script that handles the entire process:
 
 ```bash
-pnpm build
-npm publish
+# Interactive mode - prompts for version type
+bun release
+
+# Or specify version directly
+bun release 1.6.0
+
+# Or use semantic versioning shortcuts
+bun release patch   # 1.5.3 → 1.5.4
+bun release minor   # 1.5.3 → 1.6.0
+bun release major   # 1.5.3 → 2.0.0
+```
+
+The script will:
+1. Check you're on main branch (or warn if not)
+2. Verify working directory is clean
+3. Prompt for version number (if not provided)
+4. Update package.json
+5. Run build, lint, and typecheck
+6. Commit the version bump
+7. Create and push a git tag
+8. Publish to npm with `bun publish`
+
+### Manual Publishing (if needed)
+
+If you need to publish manually:
+
+```bash
+# Update version in package.json
+bun run build
+bun lint
+bun typecheck
+git commit -am "Release vX.Y.Z"
+git tag vX.Y.Z
+git push origin main --tags
+bun publish --access public
 ```
 
 ### Testing the Published Package

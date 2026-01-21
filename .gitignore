@@ -14,3 +14,6 @@ yarn-error.log*
 coverage/
 .nyc_output/
 .vercel
+
+.qa-use.json
+.qa-use-tests.json

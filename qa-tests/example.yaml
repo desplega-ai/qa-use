@@ -1,0 +1,19 @@
+# Example test definition
+name: Example Test
+app_config: your-app-config-id-here
+variables:
+  email: test@example.com
+  password: secret123
+steps:
+  - action: goto
+    url: /
+  - action: fill
+    target: email input
+    value: $email
+  - action: fill
+    target: password input
+    value: $password
+  - action: click
+    target: login button
+  - action: to_be_visible
+    target: dashboard
