@@ -46,10 +46,16 @@ async function execOutput(command: string): Promise<string | null> {
 
 async function question(prompt: string): Promise<string> {
   process.stdout.write(prompt);
-  for await (const line of console) {
-    return line.trim();
-  }
-  return '';
+  const reader = process.stdin;
+  reader.resume();
+  reader.setEncoding('utf8');
+
+  return new Promise((resolve) => {
+    reader.once('data', (data) => {
+      reader.pause();
+      resolve(data.toString().trim());
+    });
+  });
 }
 
 function getCurrentVersion(): string {
