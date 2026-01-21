@@ -5,7 +5,7 @@
  * Run 'bun generate:types' to regenerate
  *
  * Source: https://api.desplega.ai/vibe-qa/cli/schema
- * Generated: 2026-01-21T11:56:17.826Z
+ * Generated: 2026-01-21T14:07:51.069Z
  */
 
 export type Name = string;
