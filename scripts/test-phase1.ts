@@ -56,12 +56,12 @@ async function main() {
     variables: {},
     steps: [
       {
-        action: 'goto',
-        url: '/',
+        action: 'click',
+        target: 'customers',
       },
       {
         action: 'to_be_visible',
-        target: 'dashboard',
+        target: 'John Doe',
       },
     ],
   };
