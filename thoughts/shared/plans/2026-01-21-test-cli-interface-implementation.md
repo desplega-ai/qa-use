@@ -152,9 +152,9 @@ Reference: Research document Section 3.1 (lines 335-434)
 ### Success Criteria
 
 #### Automated Verification
-- [ ] TypeScript compiles: `bun run build`
-- [ ] Existing tests pass: `bun test`
-- [ ] New types export correctly from package
+- [x] TypeScript compiles: `bun run build`
+- [ ] Existing tests pass: `bun test` (integration tests require API key)
+- [x] New types export correctly from package
 
 #### Manual Verification
 - [ ] ApiClient methods callable (unit test or script)
