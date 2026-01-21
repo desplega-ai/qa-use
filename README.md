@@ -15,14 +15,19 @@ An MCP (Model Context Protocol) server that provides comprehensive browser autom
 
 ```bash
 # Run with stdio transport (for MCP clients)
-npx @desplega.ai/qa-use-mcp
+npx @desplega.ai/qa-use mcp
 
 # Run with HTTP transport (for web/remote access)
-npx @desplega.ai/qa-use-mcp --http --port 3000
+npx @desplega.ai/qa-use mcp --http --port 3000
 
 # Run persistent tunnel (for backend-initiated tasks)
-npx @desplega.ai/qa-use-mcp tunnel
+npx @desplega.ai/qa-use mcp tunnel
+
+# Run automated tests (new in v2.0!)
+npx @desplega.ai/qa-use test run
 ```
+
+> **Migrating from v1.x?** The package has been renamed from `@desplega.ai/qa-use-mcp` to `@desplega.ai/qa-use`. MCP server commands now use the `mcp` subcommand (e.g., `qa-use mcp` instead of `qa-use-mcp`). Update your MCP client configurations to add `"mcp"` to the args array.
 
 > **For AI Assistants:** See [CLAUDE.md](./CLAUDE.md) for a concise onboarding guide with quick commands, architecture overview, and key concepts.
 
@@ -49,7 +54,7 @@ The server requires a desplega.ai API key - you can get one by using the `regist
   "mcpServers": {
     "desplega-qa": {
       "command": "npx",
-      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
+      "args": ["-y", "@desplega.ai/qa-use@latest", "mcp"],
       "env": {
         "QA_USE_API_KEY": "your-desplega-ai-api-key"
       }
@@ -65,18 +70,18 @@ The server requires a desplega.ai API key - you can get one by using the `regist
     Use the Claude Code CLI to add the QA-Use MCP server (<a href="https://docs.anthropic.com/en/docs/claude-code/mcp">guide</a>):
 
 ```bash
-claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest --env QA_USE_API_KEY=your-desplega-ai-api-key
+claude mcp add desplega-qa -- npx @desplega.ai/qa-use@latest mcp --env QA_USE_API_KEY=your-desplega-ai-api-key
 ```
 
 For US region (optional):
 ```bash
-claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest --env QA_USE_API_KEY=your-desplega-ai-api-key --env QA_USE_REGION=us
+claude mcp add desplega-qa -- npx @desplega.ai/qa-use@latest mcp --env QA_USE_API_KEY=your-desplega-ai-api-key --env QA_USE_REGION=us
 ```
 
 Or add without environment variables and configure them later through the interactive setup:
 
 ```bash
-claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest
+claude mcp add desplega-qa -- npx @desplega.ai/qa-use@latest mcp
 ```
 
 </details>
@@ -90,7 +95,7 @@ claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest
   "mcpServers": {
     "desplega-qa": {
       "command": "npx",
-      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
+      "args": ["-y", "@desplega.ai/qa-use@latest", "mcp"],
       "env": {
         "QA_USE_API_KEY": "your-desplega-ai-api-key"
       }
@@ -112,7 +117,7 @@ claude mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest
   using the standard config from above. You can also install the QA-Use MCP server using the Codex CLI:
 
 ```bash
-codex mcp add desplega-qa -- npx @desplega.ai/qa-use-mcp@latest
+codex mcp add desplega-qa -- npx @desplega.ai/qa-use@latest mcp
 ```
 
 </details>
@@ -123,7 +128,7 @@ codex mcp add desplega-qa -- npx @desplega.ai/qa-use-mcp@latest
   with the standard config from above. You can also install the QA-Use MCP server using the VS Code CLI:
 
   ```bash
-  code --add-mcp '{"name":"desplega-qa","command":"npx","args":["-y","@desplega.ai/qa-use-mcp@latest"],"env":{"QA_USE_API_KEY":"your-desplega-ai-api-key"}}'
+  code --add-mcp '{"name":"desplega-qa","command":"npx","args":["-y","@desplega.ai/qa-use@latest","mcp"],"env":{"QA_USE_API_KEY":"your-desplega-ai-api-key"}}'
   ```
 </details>
 
@@ -145,7 +150,7 @@ Go to `Cursor Settings` -> `MCP` -> `New MCP Server`. Use the config provided ab
   "mcpServers": {
     "desplega-qa": {
       "command": "npx",
-      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
+      "args": ["-y", "@desplega.ai/qa-use@latest", "mcp"],
       "env": {
         "QA_USE_API_KEY": "your-desplega-ai-api-key"
       }
@@ -163,13 +168,13 @@ Install the QA-Use MCP server using the Gemini CLI.
 **Project wide:**
 
 ```bash
-gemini mcp add desplega-qa npx @desplega.ai/qa-use-mcp@latest
+gemini mcp add desplega-qa npx @desplega.ai/qa-use@latest mcp
 ```
 
 **Globally:**
 
 ```bash
-gemini mcp add -s user desplega-qa npx @desplega.ai/qa-use-mcp@latest
+gemini mcp add -s user desplega-qa npx @desplega.ai/qa-use@latest mcp
 ```
 
 Alternatively, follow the <a href="https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md#how-to-set-up-your-mcp-server">MCP guide</a> and use the standard config from above.
@@ -186,7 +191,7 @@ Alternatively, follow the <a href="https://github.com/google-gemini/gemini-cli/b
   <summary>JetBrains AI Assistant & Junie</summary>
 
 Go to `Settings | Tools | AI Assistant | Model Context Protocol (MCP)` -> `Add`. Use the config provided above.
-The same way @desplega.ai/qa-use-mcp can be configured for JetBrains Junie in `Settings | Tools | Junie | MCP Settings` -> `Add`. Use the config provided above.
+The same way @desplega.ai/qa-use can be configured for JetBrains Junie in `Settings | Tools | Junie | MCP Settings` -> `Add`. Use the config provided above.
 
 </details>
 
@@ -199,7 +204,7 @@ The same way @desplega.ai/qa-use-mcp can be configured for JetBrains Junie in `S
   "mcpServers": {
     "desplega-qa": {
       "command": "npx",
-      "args": ["-y", "@desplega.ai/qa-use-mcp@latest"],
+      "args": ["-y", "@desplega.ai/qa-use@latest", "mcp"],
       "env": {
         "QA_USE_API_KEY": "your-desplega-ai-api-key"
       }
@@ -260,17 +265,17 @@ In addition to the standard MCP stdio transport, QA-Use can run with StreamableH
 
 ### Starting the HTTP Server
 
-Run the server with the `--http` or `--api` flag:
+Run the server with the `mcp --http` or `mcp --api` flags:
 
 ```bash
 # Default port (3000)
-npx @desplega.ai/qa-use-mcp --http
+npx @desplega.ai/qa-use mcp --http
 
 # Custom port
-npx @desplega.ai/qa-use-mcp --http --port 8080
+npx @desplega.ai/qa-use mcp --http --port 8080
 
 # Show help
-npx @desplega.ai/qa-use-mcp --help
+npx @desplega.ai/qa-use mcp --help
 ```
 
 ### Authentication
@@ -437,8 +442,8 @@ RUN apt-get update && apt-get install -y \
     libgbm1 libasound2 libxshmfence1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install qa-use-mcp
-RUN npm install -g @desplega.ai/qa-use-mcp
+# Install qa-use
+RUN npm install -g @desplega.ai/qa-use
 
 # Expose port
 EXPOSE 3000
@@ -447,16 +452,16 @@ EXPOSE 3000
 ENV QA_USE_API_KEY=your-api-key-here
 
 # Start in HTTP mode
-CMD ["qa-use-mcp", "--http", "--port", "3000"]
+CMD ["qa-use", "mcp", "--http", "--port", "3000"]
 ```
 
 Run the container:
 
 ```bash
-docker build -t qa-use-mcp .
+docker build -t qa-use .
 docker run -d -p 3000:3000 \
   -e QA_USE_API_KEY=your-api-key \
-  qa-use-mcp
+  qa-use
 ```
 
 ### Vercel Deployment
@@ -491,19 +496,19 @@ vercel --prod
 
 See [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md) for detailed deployment guide and limitations.
 
-### Backward Compatibility
+### Unified CLI
 
-All modes are fully backward compatible. Running without flags uses the standard MCP stdio transport:
+All MCP modes are accessed via the `mcp` subcommand:
 
 ```bash
 # Standard MCP mode (stdio) - default
-npx @desplega.ai/qa-use-mcp
+npx @desplega.ai/qa-use mcp
 
 # HTTP transport mode (SSE)
-npx @desplega.ai/qa-use-mcp --http
+npx @desplega.ai/qa-use mcp --http
 
 # Tunnel mode (persistent WebSocket)
-npx @desplega.ai/qa-use-mcp tunnel
+npx @desplega.ai/qa-use mcp tunnel
 ```
 
 All modes support the complete MCP tools and functionality. The HTTP mode follows the official MCP Streamable HTTP specification.
@@ -533,10 +538,10 @@ The tunnel mode creates a persistent WebSocket tunnel that allows the desplega.a
 
 ```bash
 # Start tunnel with headless browser (default)
-npx @desplega.ai/qa-use-mcp tunnel
+npx @desplega.ai/qa-use mcp tunnel
 
 # Start tunnel with visible browser
-npx @desplega.ai/qa-use-mcp tunnel --visible
+npx @desplega.ai/qa-use mcp tunnel --visible
 ```
 
 ### Example Output
@@ -570,7 +575,7 @@ Set your API key before starting tunnel mode:
 
 ```bash
 export QA_USE_API_KEY=your-desplega-ai-api-key
-npx @desplega.ai/qa-use-mcp tunnel
+npx @desplega.ai/qa-use mcp tunnel
 ```
 
 Optionally configure the US region for better tunnel performance from North America:
@@ -578,7 +583,7 @@ Optionally configure the US region for better tunnel performance from North Amer
 ```bash
 export QA_USE_API_KEY=your-desplega-ai-api-key
 export QA_USE_REGION=us
-npx @desplega.ai/qa-use-mcp tunnel
+npx @desplega.ai/qa-use mcp tunnel
 ```
 
 Alternatively, you can use a config file instead of environment variables. See [Configuration File](#configuration-file) for details.
@@ -597,7 +602,7 @@ Run tunnel mode in your CI/CD pipeline to allow backend-initiated tests:
 - name: Start QA Tunnel
   run: |
     export QA_USE_API_KEY=${{ secrets.QA_USE_API_KEY }}
-    npx @desplega.ai/qa-use-mcp tunnel &
+    npx @desplega.ai/qa-use mcp tunnel &
     sleep 10  # Wait for tunnel to establish
 ```
 
@@ -606,7 +611,7 @@ Keep a tunnel running while developing to allow ad-hoc tests from the backend:
 
 ```bash
 # Terminal 1: Keep tunnel running
-npx @desplega.ai/qa-use-mcp tunnel
+npx @desplega.ai/qa-use mcp tunnel
 
 # Terminal 2: Trigger tests from backend via API/dashboard
 # The backend will use your local browser through the tunnel
@@ -616,7 +621,7 @@ npx @desplega.ai/qa-use-mcp tunnel
 When you need to see what's happening:
 
 ```bash
-npx @desplega.ai/qa-use-mcp tunnel --visible
+npx @desplega.ai/qa-use mcp tunnel --visible
 ```
 
 ### Graceful Shutdown
@@ -643,14 +648,20 @@ Press `Ctrl+C` to stop the tunnel. The server will:
 Install and run directly with npx:
 
 ```bash
-npx @desplega.ai/qa-use-mcp
+# Run MCP server (stdio mode)
+npx @desplega.ai/qa-use mcp
+
+# Run automated tests
+npx @desplega.ai/qa-use test run
 ```
 
 Or install globally:
 
 ```bash
-npm install -g @desplega.ai/qa-use-mcp
-qa-use-mcp  # or: desplega-qa
+npm install -g @desplega.ai/qa-use
+qa-use mcp        # Start MCP server
+qa-use test run   # Run automated tests
+qa-use --help     # Show all commands
 ```
 
 ## Development
@@ -659,7 +670,7 @@ Clone the repository and install dependencies:
 
 ```bash
 git clone <repository-url>
-cd qa-use-mcp
+cd qa-use
 bun install
 ```
 
@@ -834,7 +845,7 @@ Example configuration for US region:
 ```bash
 export QA_USE_API_KEY=your-api-key
 export QA_USE_REGION=us
-npx @desplega.ai/qa-use-mcp
+npx @desplega.ai/qa-use mcp
 ```
 
 > **Note:** If `QA_USE_REGION` is not set, the system automatically defaults to `"auto"` behavior.

@@ -26,7 +26,10 @@ bun typecheck         # Type check
 
 ```
 src/
-├── index.ts           # Entry point & CLI flags (--http, tunnel)
+├── cli/               # Unified CLI (qa-use command)
+│   ├── index.ts       # CLI entry point
+│   └── commands/      # CLI subcommands (setup, info, test, mcp)
+├── index.ts           # MCP stdio entry point (direct invocation)
 ├── server.ts          # Main MCP server, tools & session management
 ├── http-server.ts     # HTTP/SSE transport implementation
 ├── tunnel-mode.ts     # Persistent WebSocket tunnel mode

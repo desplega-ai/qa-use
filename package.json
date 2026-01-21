@@ -1,14 +1,12 @@
 {
-  "name": "@desplega.ai/qa-use-mcp",
-  "version": "1.6.0",
+  "name": "@desplega.ai/qa-use",
+  "version": "2.0.0",
   "packageManager": "bun@^1.3.4",
-  "description": "MCP server for browser automation and QA testing",
+  "description": "QA automation tool for browser testing with MCP server support",
   "type": "module",
   "main": "dist/src/index.js",
   "bin": {
-    "qa-use": "./bin/qa-use.js",
-    "qa-use-mcp": "dist/src/index.js",
-    "desplega-qa": "dist/src/index.js"
+    "qa-use": "./bin/qa-use.js"
   },
   "files": [
     "dist",
