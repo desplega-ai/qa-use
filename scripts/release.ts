@@ -37,7 +37,7 @@ async function execVisible(command: string): Promise<void> {
 
 async function execOutput(command: string): Promise<string | null> {
   try {
-    const result = await $`${command}`.quiet();
+    const result = await $`sh -c ${command}`.quiet();
     return result.stdout.toString().trim();
   } catch {
     return null;
