@@ -7,6 +7,7 @@ import * as path from 'path';
 import { homedir } from 'os';
 
 export interface CliConfig {
+  env?: Record<string, string>;
   api_key?: string;
   api_url?: string;
   default_app_config_id?: string;
@@ -80,6 +81,16 @@ export async function loadConfig(): Promise<CliConfig> {
     } catch (error) {
       console.error(`Warning: Failed to parse config file at ${configPath}`);
       console.error(error);
+    }
+  }
+
+  // Apply env block from config (after file merge, before env override)
+  if (config.env) {
+    for (const [key, value] of Object.entries(config.env)) {
+      if (!process.env[key]) {
+        // Don't override existing shell env vars
+        process.env[key] = value;
+      }
     }
   }
 
