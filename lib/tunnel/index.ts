@@ -123,7 +123,7 @@ export class TunnelManager {
     this.session = null;
 
     try {
-      session.tunnel.close();
+      await session.tunnel.close();
     } catch (error) {
       // Silently handle cleanup errors
     }

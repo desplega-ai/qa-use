@@ -5,15 +5,24 @@
 import * as fs from 'fs';
 import * as yaml from 'yaml';
 import type { SSEEvent } from '../../../lib/api/sse.js';
+import { downloadFile, buildDownloadPath, getExtensionFromUrl } from './download.js';
 
 /**
- * Context for SSE progress output, used for features like --update-local
+ * Context for SSE progress output, used for features like --update-local and --download
  */
 export interface SSEProgressContext {
   /** Whether to update local file on test_fixed event */
   updateLocal?: boolean;
   /** Path to the source test definition file */
   sourceFile?: string;
+  /** Whether to download assets locally */
+  download?: boolean;
+  /** Base directory for downloads (default: /tmp/qa-use/downloads) */
+  downloadBaseDir?: string;
+  /** Test ID for organizing downloads */
+  testId?: string;
+  /** Run ID for organizing downloads */
+  runId?: string;
 }
 
 // ANSI color codes
@@ -30,11 +39,38 @@ const colors = {
 // Track printed logs per step to avoid duplicates when logs are sent incrementally
 const printedLogs = new Map<number, Set<string>>();
 
+// Track screenshots per step to display at end
+const stepScreenshots = new Map<
+  number,
+  {
+    name: string;
+    preUrl?: string;
+    postUrl?: string;
+  }
+>();
+
+// Track downloaded files to display at end
+const downloadedFiles: Array<{ type: string; path: string }> = [];
+
 /**
  * Reset printed logs tracker (call on new test run)
  */
 function resetPrintedLogs(): void {
   printedLogs.clear();
+}
+
+/**
+ * Reset screenshot tracker (call on new test run)
+ */
+function resetScreenshots(): void {
+  stepScreenshots.clear();
+}
+
+/**
+ * Reset downloaded files tracker (call on new test run)
+ */
+function resetDownloadedFiles(): void {
+  downloadedFiles.length = 0;
 }
 
 /**
@@ -179,6 +215,12 @@ export function printSSEProgress(
   switch (event.event) {
     case 'start':
       resetPrintedLogs();
+      resetScreenshots();
+      resetDownloadedFiles();
+      // Store runId in context for downloads
+      if (context) {
+        context.runId = event.data.run_id;
+      }
       console.log(success(`Test started (run_id: ${event.data.run_id})`));
       console.log(`Total steps: ${event.data.total_steps}\n`);
       break;
@@ -216,6 +258,65 @@ export function printSSEProgress(
         break;
       }
 
+      // Capture screenshot URLs if present (both pre and post)
+      if (event.data.pre_screenshot_url || event.data.post_screenshot_url) {
+        stepScreenshots.set(event.data.step_index, {
+          name: event.data.name,
+          preUrl: event.data.pre_screenshot_url,
+          postUrl: event.data.post_screenshot_url,
+        });
+
+        // Download screenshots if download option is enabled
+        if (context?.download && context?.runId) {
+          const baseDir = context.downloadBaseDir || '/tmp/qa-use/downloads';
+          const stepIndex = event.data.step_index;
+
+          // Download pre-screenshot
+          if (event.data.pre_screenshot_url) {
+            const ext = getExtensionFromUrl(event.data.pre_screenshot_url);
+            const fileName = `step_${stepIndex}_pre${ext}`;
+            const destPath = buildDownloadPath(
+              baseDir,
+              context.testId,
+              context.runId,
+              'screenshot',
+              fileName
+            );
+            downloadFile(event.data.pre_screenshot_url, destPath)
+              .then(() => {
+                downloadedFiles.push({ type: 'Screenshot (pre)', path: destPath });
+              })
+              .catch((err) => {
+                console.error(
+                  `${colors.gray}Failed to download pre-screenshot: ${err.message}${colors.reset}`
+                );
+              });
+          }
+
+          // Download post-screenshot
+          if (event.data.post_screenshot_url) {
+            const ext = getExtensionFromUrl(event.data.post_screenshot_url);
+            const fileName = `step_${stepIndex}_post${ext}`;
+            const destPath = buildDownloadPath(
+              baseDir,
+              context.testId,
+              context.runId,
+              'screenshot',
+              fileName
+            );
+            downloadFile(event.data.post_screenshot_url, destPath)
+              .then(() => {
+                downloadedFiles.push({ type: 'Screenshot (post)', path: destPath });
+              })
+              .catch((err) => {
+                console.error(
+                  `${colors.gray}Failed to download post-screenshot: ${err.message}${colors.reset}`
+                );
+              });
+          }
+        }
+      }
+
       let status: string;
       let timeStr: string;
       if (event.data.status === 'passed') {
@@ -232,7 +333,9 @@ export function printSSEProgress(
         status = colors.red + '✗';
         timeStr = ` ${colors.gray}${duration(event.data.duration)}${colors.reset}`;
       }
-      console.log(`${status}${colors.reset}${timeStr}`);
+      const hasScreenshots = event.data.pre_screenshot_url || event.data.post_screenshot_url;
+      const screenshotIndicator = hasScreenshots ? ` ${colors.gray}📸${colors.reset}` : '';
+      console.log(`${status}${colors.reset}${timeStr}${screenshotIndicator}`);
       // Print any remaining logs not yet printed
       printLogsIncremental(event.data.step_index, event.data.logs);
       break;
@@ -322,5 +425,80 @@ export function printValidationErrors(
           ? colors.yellow + '⚠'
           : colors.blue + 'ℹ';
     console.log(`  ${icon}${colors.reset} ${err.path}: ${err.message}`);
+  }
+}
+
+/**
+ * Get screenshot URLs collected during execution
+ */
+export function getStepScreenshots(): Map<
+  number,
+  { name: string; preUrl?: string; postUrl?: string }
+> {
+  return new Map(stepScreenshots);
+}
+
+/**
+ * Clear screenshot collection (for cleanup between test runs)
+ */
+export function clearStepScreenshots(): void {
+  stepScreenshots.clear();
+}
+
+/**
+ * Print screenshots summary table
+ */
+export function printScreenshotsSummary(): void {
+  if (stepScreenshots.size === 0) {
+    return;
+  }
+
+  console.log('\nScreenshots:');
+  const sortedSteps = Array.from(stepScreenshots.entries()).sort((a, b) => a[0] - b[0]);
+  for (const [stepIndex, { name, preUrl, postUrl }] of sortedSteps) {
+    console.log(`  [${stepIndex + 1}] ${name}`);
+    if (preUrl) {
+      console.log(`      Pre:  ${preUrl}`);
+    }
+    if (postUrl) {
+      console.log(`      Post: ${postUrl}`);
+    }
+  }
+}
+
+/**
+ * Add downloaded file to tracking list
+ */
+export function addDownloadedFile(type: string, path: string): void {
+  downloadedFiles.push({ type, path });
+}
+
+/**
+ * Get list of downloaded files
+ */
+export function getDownloadedFiles(): Array<{ type: string; path: string }> {
+  return [...downloadedFiles];
+}
+
+/**
+ * Clear downloaded files list
+ */
+export function clearDownloadedFiles(): void {
+  downloadedFiles.length = 0;
+}
+
+/**
+ * Print downloaded files summary
+ */
+export function printDownloadedFilesSummary(): void {
+  if (downloadedFiles.length === 0) {
+    return;
+  }
+
+  console.log(
+    `\nDownloaded ${downloadedFiles.length} file${downloadedFiles.length === 1 ? '' : 's'}:`
+  );
+  for (const { type, path } of downloadedFiles) {
+    console.log(`  ${type}: ${path}`);
   }
 }

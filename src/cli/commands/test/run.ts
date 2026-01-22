@@ -11,8 +11,23 @@ import {
   resolveTestPath,
 } from '../../lib/loader.js';
 import { runTest } from '../../lib/runner.js';
-import { error, success } from '../../lib/output.js';
+import {
+  error,
+  success,
+  printScreenshotsSummary,
+  clearStepScreenshots,
+  printDownloadedFilesSummary,
+  clearDownloadedFiles,
+  addDownloadedFile,
+} from '../../lib/output.js';
 import { ApiClient } from '../../../../lib/api/index.js';
+import { downloadAssets } from '../../lib/download.js';
+import {
+  startBrowserWithTunnel,
+  stopBrowserWithTunnel,
+  getEffectiveWsUrl,
+  type BrowserTunnelSession,
+} from '../../lib/browser.js';
 
 function collectVars(value: string, previous: Record<string, string>) {
   const [key, val] = value.split('=');
@@ -28,6 +43,10 @@ export const runCommand = new Command('run')
   .option('--headful', 'Show browser window (default: headless)')
   .option('--autofix', 'Enable AI self-healing (default: off)')
   .option('--screenshots', 'Capture screenshots at each step')
+  .option(
+    '--download',
+    'Download all assets (screenshots, recordings, HAR) to /tmp/qa-use/downloads/'
+  )
   .option('--var <key=value...>', 'Variable overrides', collectVars, {})
   .option('--app-config-id <uuid>', 'App config ID to use')
   .option('--timeout <seconds>', 'Timeout in seconds', '300')
@@ -81,38 +100,90 @@ export const runCommand = new Command('run')
         console.log(success(`Applied ${Object.keys(options.var).length} variable overrides\n`));
       }
 
-      // Run the test with SSE streaming
-      const result = await runTest(
-        client,
-        {
-          test_definitions: testDefinitions,
-          test_id: options.id,
-          persist: options.persist || config.defaults?.persist || false,
-          headless: !options.headful && (config.defaults?.headless ?? true),
-          allow_fix: options.autofix || config.defaults?.allow_fix || false,
-          capture_screenshots: options.screenshots || false,
-        },
-        {
-          verbose: options.verbose || false,
-          updateLocal: options.updateLocal || false,
-          sourceFile,
-        }
-      );
+      // If headful, start local browser with tunnel for remote execution
+      let browserSession: BrowserTunnelSession | null = null;
 
-      // Print result summary
-      if (result.assets) {
-        console.log('\nAssets:');
-        if (result.assets.recording_url) {
-          console.log(`  Recording: ${result.assets.recording_url}`);
+      try {
+        if (options.headful) {
+          console.log('Starting local browser with tunnel for headful mode...');
+          console.log('⏳ First run may take a moment while the tunnel establishes connection');
+          browserSession = await startBrowserWithTunnel(undefined, {
+            headless: false,
+            apiKey: config.api_key,
+            sessionIndex: 0,
+          });
+          console.log(success('Browser ready, running test...'));
         }
-        if (result.assets.har_url) {
-          console.log(`  HAR: ${result.assets.har_url}`);
-        }
-      }
 
-      // Exit with appropriate code
-      if (result.status !== 'passed') {
-        process.exit(1);
+        // Clear any previous screenshots and downloads
+        clearStepScreenshots();
+        clearDownloadedFiles();
+
+        // Run the test with SSE streaming
+        const result = await runTest(
+          client,
+          {
+            test_definitions: testDefinitions,
+            test_id: options.id,
+            persist: options.persist || config.defaults?.persist || false,
+            // When using ws_url, headless flag is irrelevant (backend uses our browser)
+            headless: browserSession ? true : (config.defaults?.headless ?? true),
+            allow_fix: options.autofix || config.defaults?.allow_fix || false,
+            capture_screenshots: options.screenshots || options.download || false,
+            ws_url: browserSession ? getEffectiveWsUrl(browserSession) : undefined,
+          },
+          {
+            verbose: options.verbose || false,
+            updateLocal: options.updateLocal || false,
+            sourceFile,
+            download: options.download || false,
+            downloadBaseDir: '/tmp/qa-use/downloads',
+            testId: testDefinitions?.[0]?.id || undefined,
+          }
+        );
+
+        // Download assets if --download option is enabled
+        if (options.download && result.assets && result.run_id) {
+          const downloadedAssets = await downloadAssets(
+            result.assets,
+            '/tmp/qa-use/downloads',
+            testDefinitions?.[0]?.id || undefined,
+            result.run_id
+          );
+          // Add downloaded assets to the tracking list
+          for (const asset of downloadedAssets) {
+            addDownloadedFile(asset.type, asset.path);
+          }
+        }
+
+        // Print result summary
+        printScreenshotsSummary();
+
+        // Print downloaded files summary if any
+        if (options.download) {
+          printDownloadedFilesSummary();
+        }
+
+        if (result.assets) {
+          console.log('\nAssets:');
+          if (result.assets.recording_url) {
+            console.log(`  Recording: ${result.assets.recording_url}`);
+          }
+          if (result.assets.har_url) {
+            console.log(`  HAR: ${result.assets.har_url}`);
+          }
+        }
+
+        // Exit with appropriate code
+        if (result.status !== 'passed') {
+          process.exit(1);
+        }
+      } finally {
+        // Cleanup browser and tunnel
+        if (browserSession) {
+          console.log('Cleaning up browser and tunnel...');
+          await stopBrowserWithTunnel(browserSession);
+        }
       }
     } catch (err) {
       console.log(error(`Test execution failed: ${err}`));

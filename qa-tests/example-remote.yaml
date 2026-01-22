@@ -1,0 +1,5 @@
+name: Example Remote
+app_config: cde59b5b-a6b1-483e-89f1-c30c504f8591
+steps:
+  - action: to_be_visible
+    target: evals

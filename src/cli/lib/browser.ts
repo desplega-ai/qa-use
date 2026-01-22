@@ -96,7 +96,7 @@ export async function startBrowserWithTunnel(
 
     publicWsUrl = tunnel.getWebSocketUrl(wsUrl);
     console.error(`Tunnel established: ${tunnelSession.publicUrl}`);
-    console.error(`Public WebSocket URL: ${publicWsUrl}`);
+    console.error(`Public WebSocket URL: ${publicWsUrl}\n`);
   }
 
   return {

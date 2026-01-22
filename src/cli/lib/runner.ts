@@ -16,6 +16,14 @@ export interface RunTestOptions {
   updateLocal?: boolean;
   /** Path to the source test definition file */
   sourceFile?: string;
+  /** Whether to download assets locally */
+  download?: boolean;
+  /** Base directory for downloads */
+  downloadBaseDir?: string;
+  /** Test ID for organizing downloads */
+  testId?: string;
+  /** Run ID for organizing downloads (set automatically) */
+  runId?: string;
 }
 
 /**
@@ -33,11 +41,21 @@ export async function runTest(
   runOptions: RunTestOptions = {},
   onEvent?: (event: SSEEvent) => void
 ): Promise<RunCliTestResult> {
-  const { verbose = false, updateLocal, sourceFile } = runOptions;
+  const {
+    verbose = false,
+    updateLocal,
+    sourceFile,
+    download,
+    downloadBaseDir,
+    testId,
+    runId,
+  } = runOptions;
 
   // Build context for SSE progress handler
   const context: SSEProgressContext | undefined =
-    updateLocal || sourceFile ? { updateLocal, sourceFile } : undefined;
+    updateLocal || sourceFile || download
+      ? { updateLocal, sourceFile, download, downloadBaseDir, testId, runId }
+      : undefined;
 
   return await client.runCliTest(options, (event) => {
     // Print progress to console
