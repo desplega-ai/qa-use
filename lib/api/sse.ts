@@ -11,6 +11,26 @@ export interface SSEEvent {
 }
 
 /**
+ * Find the boundary between SSE events
+ * Handles both LF (\n\n) and CRLF (\r\n\r\n) line endings
+ */
+function findEventBoundary(buffer: string): { index: number; length: number } | -1 {
+  // Check for CRLF first (more specific)
+  const crlfPos = buffer.indexOf('\r\n\r\n');
+  const lfPos = buffer.indexOf('\n\n');
+
+  if (crlfPos === -1 && lfPos === -1) {
+    return -1;
+  }
+
+  if (crlfPos !== -1 && (lfPos === -1 || crlfPos < lfPos)) {
+    return { index: crlfPos, length: 4 };
+  }
+
+  return { index: lfPos, length: 2 };
+}
+
+/**
  * Parse SSE data from a chunk of text
  *
  * @param chunk - Raw SSE text chunk (may contain multiple events)
@@ -18,7 +38,8 @@ export interface SSEEvent {
  */
 export function parseSSE(chunk: string): SSEEvent[] {
   const events: SSEEvent[] = [];
-  const lines = chunk.split('\n');
+  // Split on \n and trim \r from each line to handle both LF and CRLF
+  const lines = chunk.split('\n').map((line) => line.replace(/\r$/, ''));
 
   let currentEvent: Partial<SSEEvent> = {};
 
@@ -34,13 +55,19 @@ export function parseSSE(chunk: string): SSEEvent[] {
       }
     } else if (line.startsWith('id: ')) {
       currentEvent.id = line.slice(4).trim();
-    } else if (line === '') {
+    } else if (line === '' || line === '\r') {
       // Empty line signals end of event
       if (currentEvent.event && currentEvent.data !== undefined) {
         events.push(currentEvent as SSEEvent);
       }
       currentEvent = {};
     }
+    // Lines starting with ':' are comments (e.g., pings) - ignore them
+  }
+
+  // Push any pending event (in case chunk doesn't end with empty line)
+  if (currentEvent.event && currentEvent.data !== undefined) {
+    events.push(currentEvent as SSEEvent);
   }
 
   return events;
@@ -69,17 +96,19 @@ export async function* streamSSE(response: Response): AsyncGenerator<SSEEvent, v
       buffer += decoder.decode(value, { stream: true });
 
       // Find complete events (separated by double newlines)
-      let pos = buffer.indexOf('\n\n');
+      // Handle both LF (\n\n) and CRLF (\r\n\r\n) line endings
+      let pos = findEventBoundary(buffer);
       while (pos !== -1) {
-        const chunk = buffer.slice(0, pos + 2);
-        buffer = buffer.slice(pos + 2);
+        const { index, length } = pos;
+        const eventChunk = buffer.slice(0, index);
+        buffer = buffer.slice(index + length);
 
-        const events = parseSSE(chunk);
+        const events = parseSSE(eventChunk);
         for (const event of events) {
           yield event;
         }
 
-        pos = buffer.indexOf('\n\n');
+        pos = findEventBoundary(buffer);
       }
     }
 

@@ -4,7 +4,12 @@
 
 import { Command } from 'commander';
 import { loadConfig } from '../../lib/config.js';
-import { loadTestWithDeps, loadAllTests, applyVariableOverrides } from '../../lib/loader.js';
+import {
+  loadTestWithDeps,
+  loadAllTests,
+  applyVariableOverrides,
+  resolveTestPath,
+} from '../../lib/loader.js';
 import { runTest } from '../../lib/runner.js';
 import { error, success } from '../../lib/output.js';
 import { ApiClient } from '../../../../lib/api/index.js';
@@ -20,12 +25,14 @@ export const runCommand = new Command('run')
   .option('--id <uuid>', 'Run cloud test by ID instead of local file')
   .option('--all', 'Run all tests in test directory')
   .option('--persist', 'Save test to cloud after run')
-  .option('--no-headless', 'Show browser window')
-  .option('--no-autofix', 'Disable AI self-healing')
+  .option('--headful', 'Show browser window (default: headless)')
+  .option('--autofix', 'Enable AI self-healing (default: off)')
   .option('--screenshots', 'Capture screenshots at each step')
   .option('--var <key=value...>', 'Variable overrides', collectVars, {})
   .option('--app-config-id <uuid>', 'App config ID to use')
   .option('--timeout <seconds>', 'Timeout in seconds', '300')
+  .option('--verbose', 'Output raw SSE event data for debugging')
+  .option('--update-local', 'Update local test file when AI auto-fixes the test')
   .action(async (test, options) => {
     try {
       const config = await loadConfig();
@@ -42,6 +49,7 @@ export const runCommand = new Command('run')
       client.setApiKey(config.api_key);
 
       let testDefinitions;
+      let sourceFile: string | undefined;
 
       if (options.id) {
         // Run by cloud ID - no local definition needed
@@ -51,10 +59,14 @@ export const runCommand = new Command('run')
         console.log('Loading all tests...');
         testDefinitions = await loadAllTests(config.test_directory || './qa-tests');
         console.log(success(`Loaded ${testDefinitions.length} tests\n`));
+        // Note: --update-local only works for single test runs
       } else if (test) {
         // Load specific test and its dependencies
         console.log(`Loading test: ${test}...`);
-        testDefinitions = await loadTestWithDeps(test, config.test_directory || './qa-tests');
+        const testDir = config.test_directory || './qa-tests';
+        testDefinitions = await loadTestWithDeps(test, testDir);
+        // Track source file for --update-local support
+        sourceFile = resolveTestPath(test, testDir);
         console.log(success(`Loaded ${testDefinitions.length} test(s)\n`));
       } else {
         console.log(error('Usage: qa-use test run <test-name>'));
@@ -70,14 +82,22 @@ export const runCommand = new Command('run')
       }
 
       // Run the test with SSE streaming
-      const result = await runTest(client, {
-        test_definitions: testDefinitions,
-        test_id: options.id,
-        persist: options.persist || config.defaults?.persist || false,
-        headless: options.headless !== false && (config.defaults?.headless ?? true),
-        allow_fix: options.autofix !== false && (config.defaults?.allow_fix ?? true),
-        capture_screenshots: options.screenshots || false,
-      });
+      const result = await runTest(
+        client,
+        {
+          test_definitions: testDefinitions,
+          test_id: options.id,
+          persist: options.persist || config.defaults?.persist || false,
+          headless: !options.headful && (config.defaults?.headless ?? true),
+          allow_fix: options.autofix || config.defaults?.allow_fix || false,
+          capture_screenshots: options.screenshots || false,
+        },
+        {
+          verbose: options.verbose || false,
+          updateLocal: options.updateLocal || false,
+          sourceFile,
+        }
+      );
 
       // Print result summary
       if (result.assets) {

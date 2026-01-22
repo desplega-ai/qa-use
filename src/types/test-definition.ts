@@ -2,10 +2,10 @@
  * Auto-generated TypeScript types for Test CLI definitions
  *
  * DO NOT EDIT MANUALLY - Generated from API schema
- * Run 'bun generate:types' to regenerate
+ * Run 'pnpm generate:types' to regenerate
  *
- * Source: https://api.desplega.ai/vibe-qa/cli/schema
- * Generated: 2026-01-21T14:07:51.069Z
+ * Source: http://localhost:5005/vibe-qa/cli/schema
+ * Generated: 2026-01-22T01:14:59.542Z
  */
 
 export type Name = string;
@@ -296,6 +296,7 @@ export type SelectorStrategy =
 export type Name2 = string | null;
 export type Description = string | null;
 export type AaaPhase1 = ('arrange' | 'act' | 'assert') | null;
+export type ShouldSkip = boolean;
 export type Steps = (SimpleStep | ExtendedStep)[];
 
 /**
@@ -346,6 +347,7 @@ export interface ExtendedStep {
   name?: Name2;
   description?: Description;
   aaa_phase?: AaaPhase1;
+  should_skip?: ShouldSkip;
   [k: string]: unknown;
 }
 /**

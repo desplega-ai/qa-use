@@ -1,0 +1,78 @@
+name: Deals Page Verification
+id: 469d535b-ebdd-4faf-ab61-bd590dc923aa
+app_config: 600dc916-16b9-4cb8-a7d1-09658f146e45
+variables: {}
+depends_on: null
+steps:
+  - type: extended
+    action:
+      action: click
+      value: "{}"
+      value_can_be_variable: false
+      timeout: null
+      allowed_ai_actions: null
+      max_steps: null
+      max_mode: false
+      ultra_mode: false
+      value_strategy: null
+      value_semantic_text: null
+      value_variable_name: null
+    locator:
+      chain:
+        - method: get_by_role
+          args:
+            - link
+          args_can_be_variable: false
+          kwargs:
+            name: Deals
+          kwargs_can_be_variable: false
+          attribute: null
+          human_name: null
+      text: null
+      strategy_used: null
+    name: Click Deals Link
+    description: Click on the Deals link in the navigation sidebar.
+    aaa_phase: act
+    should_skip: false
+  - type: extended
+    action:
+      action: ai_assertion
+      value: The URL contains '/deals' and the 'Deals' heading is visible.
+      value_can_be_variable: false
+      timeout: null
+      allowed_ai_actions: null
+      max_steps: null
+      max_mode: false
+      ultra_mode: false
+      value_strategy: null
+      value_semantic_text: null
+      value_variable_name: null
+    locator:
+      chain: []
+      text: null
+      strategy_used: null
+    name: The URL contains '/deals' and the 'Deals' heading is visible.
+    description: null
+    aaa_phase: assert
+    should_skip: false
+  - type: extended
+    action:
+      action: ai_action
+      value: Do nothing
+      value_can_be_variable: false
+      timeout: null
+      allowed_ai_actions: null
+      max_steps: null
+      max_mode: false
+      ultra_mode: false
+      value_strategy: null
+      value_semantic_text: null
+      value_variable_name: null
+    locator:
+      chain: []
+      text: null
+      strategy_used: null
+    name: <some name>
+    description: <some description>
+    aaa_phase: null
+    should_skip: false
