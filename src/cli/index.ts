@@ -5,13 +5,15 @@
  */
 
 import { Command } from 'commander';
+import { createRequire } from 'module';
 import { setupCommand } from './commands/setup.js';
 import { infoCommand } from './commands/info.js';
 import { testCommand } from './commands/test/index.js';
 import { mcpCommand } from './commands/mcp.js';
 
 // Get version from package.json
-const version = '2.0.0';
+const require = createRequire(import.meta.url);
+const { version } = require('../../package.json');
 
 const program = new Command();
 
