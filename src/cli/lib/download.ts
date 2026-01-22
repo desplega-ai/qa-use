@@ -6,6 +6,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
+import * as crypto from 'crypto';
+
+/**
+ * Generate short hash from file path for deterministic directory naming
+ */
+function hashFilePath(filePath: string): string {
+  return crypto.createHash('sha256').update(filePath).digest('hex').slice(0, 8);
+}
 
 /**
  * Download a file from URL to local path
@@ -69,9 +77,17 @@ export function buildDownloadPath(
   testId: string | undefined,
   runId: string,
   assetType: 'screenshot' | 'recording' | 'har',
-  fileName: string
+  fileName: string,
+  sourceFile?: string
 ): string {
-  const testDir = testId || 'unknown-test';
+  let testDir: string;
+  if (testId) {
+    testDir = testId;
+  } else if (sourceFile) {
+    testDir = `local-${hashFilePath(sourceFile)}`;
+  } else {
+    testDir = 'unknown-test';
+  }
   return path.join(baseDir, testDir, runId, assetType + 's', fileName);
 }
 
@@ -82,7 +98,8 @@ export async function downloadAssets(
   assets: { recording_url?: string; har_url?: string },
   baseDir: string,
   testId: string | undefined,
-  runId: string
+  runId: string,
+  sourceFile?: string
 ): Promise<Array<{ type: string; path: string }>> {
   const downloaded: Array<{ type: string; path: string }> = [];
 
@@ -90,7 +107,7 @@ export async function downloadAssets(
     try {
       const ext = getExtensionFromUrl(assets.recording_url);
       const fileName = `recording${ext}`;
-      const destPath = buildDownloadPath(baseDir, testId, runId, 'recording', fileName);
+      const destPath = buildDownloadPath(baseDir, testId, runId, 'recording', fileName, sourceFile);
       await downloadFile(assets.recording_url, destPath);
       downloaded.push({ type: 'Recording', path: destPath });
     } catch (err: any) {
@@ -102,7 +119,7 @@ export async function downloadAssets(
     try {
       const ext = getExtensionFromUrl(assets.har_url);
       const fileName = `network${ext}`;
-      const destPath = buildDownloadPath(baseDir, testId, runId, 'har', fileName);
+      const destPath = buildDownloadPath(baseDir, testId, runId, 'har', fileName, sourceFile);
       await downloadFile(assets.har_url, destPath);
       downloaded.push({ type: 'HAR', path: destPath });
     } catch (err: any) {

@@ -24,7 +24,7 @@ This skill orchestrates the execution of E2E tests using the `qa-use` CLI (`npx 
 
 2. **Construct CLI Command**
    - Base: `npx @desplega.ai/qa-use test run <name>`
-   - Add user-specified flags: `--headful`, `--autofix`, `--screenshots`, etc.
+   - Add user-specified flags: `--headful`, `--autofix`, `--screenshots`, `--download`, etc.
    - Add variable overrides via `--var key=value`
 
 3. **Execute Test**
@@ -56,4 +56,27 @@ npx @desplega.ai/qa-use test run --all
 
 # With variable overrides
 npx @desplega.ai/qa-use test run <name> --var email=test@example.com --var password=secret
+
+# Download assets locally
+npx @desplega.ai/qa-use test run <name> --download
 ```
+
+### Download Directory Structure
+
+When using `--download`, assets are saved to `/tmp/qa-use/downloads/`:
+
+```
+/tmp/qa-use/downloads/
+└── <test-id or local-hash>/    # UUID for cloud tests, local-<hash> for local tests
+    └── <run-id>/
+        ├── screenshots/
+        │   ├── step_0_pre.jpeg
+        │   ├── step_0_post.jpeg
+        │   └── ...
+        ├── recordings/
+        │   └── recording.webm
+        └── hars/
+            └── network.har
+```
+
+Local tests without cloud IDs use a deterministic hash of the source file path (e.g., `local-a1b2c3d4`).

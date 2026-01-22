@@ -53,6 +53,7 @@ Install the qa-use plugin:
 - `--autofix` - Enable AI self-healing
 - `--update-local` - Persist AI fixes to local file
 - `--screenshots` - Capture screenshots
+- `--download` - Download assets (screenshots, recordings, HAR) to `/tmp/qa-use/downloads/`
 - `--var key=value` - Override variables
 
 ## Skills
@@ -72,13 +73,21 @@ Two specialized agents are available:
 
 ## Configuration
 
+### Option 1: Environment Variables (recommended for CI/secrets)
+
+```bash
+export QA_USE_API_KEY="your-api-key"
+export QA_USE_API_URL="https://api.desplega.ai"  # optional
+```
+
+### Option 2: Config File
+
 Create `.qa-use-tests.json` in your project root:
 
 ```json
 {
-  "env": {
-    "QA_USE_API_KEY": "your-api-key"
-  },
+  "api_key": "your-api-key",
+  "api_url": "https://api.desplega.ai",
   "test_directory": "./qa-tests",
   "default_app_config_id": "your-app-config-id",
   "defaults": {
@@ -89,6 +98,19 @@ Create `.qa-use-tests.json` in your project root:
   }
 }
 ```
+
+You can also use an `env` block to set arbitrary environment variables:
+
+```json
+{
+  "api_key": "your-api-key",
+  "env": {
+    "MY_CUSTOM_VAR": "value"
+  }
+}
+```
+
+**Note:** Shell environment variables override config file values. Use `qa-use setup` for interactive configuration.
 
 ## Test Definition Format
 

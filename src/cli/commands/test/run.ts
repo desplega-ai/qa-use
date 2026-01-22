@@ -148,7 +148,8 @@ export const runCommand = new Command('run')
             result.assets,
             '/tmp/qa-use/downloads',
             testDefinitions?.[0]?.id || undefined,
-            result.run_id
+            result.run_id,
+            sourceFile
           );
           // Add downloaded assets to the tracking list
           for (const asset of downloadedAssets) {

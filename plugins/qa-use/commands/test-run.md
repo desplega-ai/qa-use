@@ -1,6 +1,6 @@
 ---
 description: Run E2E tests with qa-use CLI
-argument-hint: [test-name] [--headful] [--autofix] [--update-local] [--screenshots] [--var key=value]
+argument-hint: [test-name] [--headful] [--autofix] [--update-local] [--screenshots] [--download] [--var key=value]
 ---
 
 # /qa-use:test-run
@@ -16,6 +16,7 @@ Execute E2E tests using the qa-use CLI with real-time progress monitoring.
 | `--autofix` | Enable AI self-healing for failed steps |
 | `--update-local` | Update local test file after AI fixes |
 | `--screenshots` | Capture screenshots at each step |
+| `--download` | Download all assets (screenshots, recordings, HAR) to `/tmp/qa-use/downloads/` |
 | `--all` | Run all tests in the test directory |
 | `--var key=value` | Override a variable (can be used multiple times) |
 
@@ -42,4 +43,26 @@ Execute E2E tests using the qa-use CLI with real-time progress monitoring.
 /qa-use:test-run checkout --autofix --update-local
 /qa-use:test-run --all
 /qa-use:test-run login --var email=admin@test.com --var password=admin123
+/qa-use:test-run checkout --download
 ```
+
+## Download Directory Structure
+
+When using `--download`, assets are saved to `/tmp/qa-use/downloads/` with the following structure:
+
+```
+/tmp/qa-use/downloads/
+└── <test-id or local-hash>/
+    └── <run-id>/
+        ├── screenshots/
+        │   ├── step_0_pre.jpeg
+        │   ├── step_0_post.jpeg
+        │   └── ...
+        ├── recordings/
+        │   └── recording.webm
+        └── hars/
+            └── network.har
+```
+
+- **Cloud tests**: Use the test UUID as directory name
+- **Local tests**: Use `local-<8-char-hash>` derived from the source file path (deterministic)

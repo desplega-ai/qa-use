@@ -271,6 +271,8 @@ export function printSSEProgress(
           const baseDir = context.downloadBaseDir || '/tmp/qa-use/downloads';
           const stepIndex = event.data.step_index;
 
+          const stepName = event.data.name;
+
           // Download pre-screenshot
           if (event.data.pre_screenshot_url) {
             const ext = getExtensionFromUrl(event.data.pre_screenshot_url);
@@ -280,11 +282,15 @@ export function printSSEProgress(
               context.testId,
               context.runId,
               'screenshot',
-              fileName
+              fileName,
+              context.sourceFile
             );
             downloadFile(event.data.pre_screenshot_url, destPath)
               .then(() => {
-                downloadedFiles.push({ type: 'Screenshot (pre)', path: destPath });
+                downloadedFiles.push({
+                  type: `[${stepIndex}] ${stepName} (pre)`,
+                  path: destPath,
+                });
               })
               .catch((err) => {
                 console.error(
@@ -302,11 +308,15 @@ export function printSSEProgress(
               context.testId,
               context.runId,
               'screenshot',
-              fileName
+              fileName,
+              context.sourceFile
             );
             downloadFile(event.data.post_screenshot_url, destPath)
               .then(() => {
-                downloadedFiles.push({ type: 'Screenshot (post)', path: destPath });
+                downloadedFiles.push({
+                  type: `[${stepIndex}] ${stepName} (post)`,
+                  path: destPath,
+                });
               })
               .catch((err) => {
                 console.error(
