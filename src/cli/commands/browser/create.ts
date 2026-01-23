@@ -13,6 +13,7 @@ interface CreateOptions {
   headless?: boolean;
   viewport?: ViewportType;
   timeout?: number;
+  wsUrl?: string;
 }
 
 export const createCommand = new Command('create')
@@ -25,6 +26,7 @@ export const createCommand = new Command('create')
     'desktop'
   )
   .option('--timeout <seconds>', 'Session timeout in seconds (default: 300)', '300')
+  .option('--ws-url <url>', 'WebSocket URL for remote/tunneled browser')
   .action(async (options: CreateOptions) => {
     try {
       // Load configuration
@@ -62,6 +64,7 @@ export const createCommand = new Command('create')
         headless: options.headless !== false,
         viewport,
         timeout,
+        ws_url: options.wsUrl,
       });
 
       console.log(info(`Session created: ${session.id}`));
@@ -86,6 +89,9 @@ export const createCommand = new Command('create')
       console.log(`Viewport: ${viewport}`);
       console.log(`Headless: ${options.headless !== false}`);
       console.log(`Timeout: ${timeout}s`);
+      if (options.wsUrl) {
+        console.log(`WebSocket URL: ${options.wsUrl}`);
+      }
     } catch (err) {
       console.log(error(err instanceof Error ? err.message : 'Failed to create session'));
       process.exit(1);

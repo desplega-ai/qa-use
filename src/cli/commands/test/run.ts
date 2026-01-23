@@ -40,7 +40,8 @@ export const runCommand = new Command('run')
   .option('--id <uuid>', 'Run cloud test by ID instead of local file')
   .option('--all', 'Run all tests in test directory')
   .option('--persist', 'Save test to cloud after run')
-  .option('--headful', 'Show browser window (default: headless)')
+  .option('--headful', 'Show browser window (starts local browser with tunnel)')
+  .option('--ws-url <url>', 'Use existing tunneled browser (from `browser tunnel` command)')
   .option('--autofix', 'Enable AI self-healing (default: off)')
   .option('--screenshots', 'Capture screenshots at each step')
   .option(
@@ -100,10 +101,16 @@ export const runCommand = new Command('run')
         console.log(success(`Applied ${Object.keys(options.var).length} variable overrides\n`));
       }
 
-      // If headful, start local browser with tunnel for remote execution
+      // Determine ws_url: from --ws-url flag, --headful (starts new browser), or none (backend browser)
       let browserSession: BrowserTunnelSession | null = null;
+      let wsUrl: string | undefined = options.wsUrl;
 
       try {
+        if (options.wsUrl && options.headful) {
+          console.log(error('Cannot use both --ws-url and --headful'));
+          process.exit(1);
+        }
+
         if (options.headful) {
           console.log('Starting local browser with tunnel for headful mode...');
           console.log('⏳ First run may take a moment while the tunnel establishes connection');
@@ -112,7 +119,10 @@ export const runCommand = new Command('run')
             apiKey: config.api_key,
             sessionIndex: 0,
           });
+          wsUrl = getEffectiveWsUrl(browserSession);
           console.log(success('Browser ready, running test...'));
+        } else if (options.wsUrl) {
+          console.log(`Using existing tunneled browser: ${options.wsUrl}`);
         }
 
         // Clear any previous screenshots and downloads
@@ -127,10 +137,10 @@ export const runCommand = new Command('run')
             test_id: options.id,
             persist: options.persist || config.defaults?.persist || false,
             // When using ws_url, headless flag is irrelevant (backend uses our browser)
-            headless: browserSession ? true : (config.defaults?.headless ?? true),
+            headless: wsUrl ? true : (config.defaults?.headless ?? true),
             allow_fix: options.autofix || config.defaults?.allow_fix || false,
             capture_screenshots: options.screenshots || options.download || false,
-            ws_url: browserSession ? getEffectiveWsUrl(browserSession) : undefined,
+            ws_url: wsUrl,
           },
           {
             verbose: options.verbose || false,

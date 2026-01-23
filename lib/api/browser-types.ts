@@ -14,6 +14,7 @@ export interface CreateBrowserSessionOptions {
   headless?: boolean;
   viewport?: ViewportType;
   timeout?: number; // Session timeout in seconds (60-3600)
+  ws_url?: string; // WebSocket URL for remote/tunneled browser
 }
 
 export interface BrowserSession {

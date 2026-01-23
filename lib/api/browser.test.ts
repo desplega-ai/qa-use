@@ -102,6 +102,47 @@ describe('BrowserApiClient', () => {
       });
       expect(session.id).toBe('session-456');
     });
+
+    it('should create session with ws_url for remote browser', async () => {
+      const mockSession = {
+        id: 'session-789',
+        status: 'starting',
+        created_at: '2026-01-23T10:00:00Z',
+      };
+      mockAxiosInstance.post.mockResolvedValueOnce({ data: mockSession });
+
+      const session = await client.createSession({
+        headless: true,
+        viewport: 'desktop',
+        timeout: 300,
+        ws_url: 'wss://tunnel.example.com/devtools/browser/abc123',
+      });
+
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/sessions', {
+        headless: true,
+        viewport: 'desktop',
+        timeout: 300,
+        ws_url: 'wss://tunnel.example.com/devtools/browser/abc123',
+      });
+      expect(session.id).toBe('session-789');
+    });
+
+    it('should not include ws_url when not provided', async () => {
+      const mockSession = {
+        id: 'session-abc',
+        status: 'starting',
+        created_at: '2026-01-23T10:00:00Z',
+      };
+      mockAxiosInstance.post.mockResolvedValueOnce({ data: mockSession });
+
+      await client.createSession({
+        headless: true,
+        viewport: 'desktop',
+      });
+
+      const callArgs = mockAxiosInstance.post.mock.calls[0];
+      expect(callArgs[1]).not.toHaveProperty('ws_url');
+    });
   });
 
   describe('listSessions', () => {

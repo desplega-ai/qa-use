@@ -66,6 +66,7 @@ export class BrowserApiClient {
         headless: options.headless ?? true,
         viewport: options.viewport ?? 'desktop',
         timeout: options.timeout ?? 300,
+        ...(options.ws_url && { ws_url: options.ws_url }),
       });
 
       return response.data as BrowserSession;
