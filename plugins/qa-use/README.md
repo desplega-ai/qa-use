@@ -81,12 +81,16 @@ This positions qa-use as **infrastructure for AI-driven development workflows** 
 
 ### Common Flags for test-run
 
-- `--headful` - Show browser window
+- `--tunnel` - Start local browser with tunnel (required for localhost URLs!)
+- `--headful` - Show browser window (use with `--tunnel`)
+- `--ws-url <url>` - Use existing tunneled browser (from `browser create --tunnel`)
 - `--autofix` - Enable AI self-healing
 - `--update-local` - Persist AI fixes to local file
 - `--screenshots` - Capture screenshots
 - `--download` - Download assets (screenshots, recordings, HAR) to `/tmp/qa-use/downloads/`
 - `--var key=value` - Override variables
+
+> **Important:** When testing localhost URLs (e.g., `http://localhost:3000`), you MUST use `--tunnel` or `--ws-url` with a tunneled browser. The cloud cannot access your local machine directly!
 
 ## Skills
 
@@ -117,7 +121,8 @@ The plugin wraps the `qa-use browser` CLI for AI-assisted browser automation:
 
 ```bash
 # Session management
-qa-use browser create --viewport desktop
+qa-use browser create --viewport desktop     # Remote browser (managed by API)
+qa-use browser create --tunnel               # Local browser with tunnel (for debugging)
 qa-use browser list
 qa-use browser close
 
@@ -134,6 +139,22 @@ qa-use browser click --text "Submit button"  # Semantic selection
 # Inspection
 qa-use browser url
 qa-use browser screenshot
+```
+
+### Local Browser with Tunnel
+
+For debugging, use `--tunnel` to run a visible browser on your machine:
+
+```bash
+# Start tunnel - browser stays open for interactive use
+qa-use browser create --tunnel
+
+# Use the session with other commands (in another terminal)
+qa-use browser goto https://example.com
+qa-use browser snapshot
+
+# Or run tests against it (copy WebSocket URL from tunnel output)
+qa-use test run my-test --ws-url <websocket-url>
 ```
 
 ## Command Cheat Sheet

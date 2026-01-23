@@ -36,21 +36,35 @@ npx @desplega.ai/qa-use browser <command>
 - NEVER guess element refs - always verify via snapshot
 - ALWAYS close sessions when done to free resources
 - If element not found, run `snapshot` to see available elements
+- **ALWAYS use `--tunnel` when testing localhost URLs** (e.g., `http://localhost:3000`) - the cloud cannot access your local machine without a tunnel!
 
 ## Workflow
 
 ### 1. Session Management
 
 ```bash
-# Create session (stores in ~/.qa-use.json)
+# Create session (remote browser managed by API)
 qa-use browser create --viewport desktop
+
+# Create session with local browser + tunnel (visible browser on your machine)
+qa-use browser create --tunnel
+
+# Create session with existing WebSocket URL (e.g., browserbase)
+qa-use browser create --ws-url wss://my-browser.example.com/ws
 
 # List active sessions
 qa-use browser list
 
-# Close session
+# Close session (also stops tunnel if running)
 qa-use browser close
 ```
+
+**Local Browser with Tunnel (`--tunnel`):**
+- Starts a real browser on your machine (visible by default, use `--headless` for headless)
+- Creates a tunnel so the API can control it
+- Useful for debugging - you see exactly what happens
+- Auto-cleans up when closed via `browser close` or Ctrl+C
+- Process stays running until you close it
 
 ### 2. Navigation
 

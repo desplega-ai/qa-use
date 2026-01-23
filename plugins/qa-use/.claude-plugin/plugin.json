@@ -1,6 +1,6 @@
 {
   "name": "qa-use",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "CLI-integrated plugin for E2E testing and browser automation with qa-use. Provides slash commands, skills, and specialized agents for test authoring, execution, debugging, and AI-first feature verification.",
   "author": {
     "name": "desplega.ai",

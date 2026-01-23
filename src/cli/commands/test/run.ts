@@ -40,8 +40,9 @@ export const runCommand = new Command('run')
   .option('--id <uuid>', 'Run cloud test by ID instead of local file')
   .option('--all', 'Run all tests in test directory')
   .option('--persist', 'Save test to cloud after run')
-  .option('--headful', 'Show browser window (starts local browser with tunnel)')
-  .option('--ws-url <url>', 'Use existing tunneled browser (from `browser tunnel` command)')
+  .option('--tunnel', 'Start local browser with tunnel (required for localhost URLs)')
+  .option('--headful', 'Show browser window (use with --tunnel)')
+  .option('--ws-url <url>', 'Use existing tunneled browser (from `browser create --tunnel`)')
   .option('--autofix', 'Enable AI self-healing (default: off)')
   .option('--screenshots', 'Capture screenshots at each step')
   .option(
@@ -101,21 +102,47 @@ export const runCommand = new Command('run')
         console.log(success(`Applied ${Object.keys(options.var).length} variable overrides\n`));
       }
 
-      // Determine ws_url: from --ws-url flag, --headful (starts new browser), or none (backend browser)
+      // Determine ws_url: from --ws-url flag, --tunnel (starts new browser), or none (backend browser)
       let browserSession: BrowserTunnelSession | null = null;
       let wsUrl: string | undefined = options.wsUrl;
 
       try {
-        if (options.wsUrl && options.headful) {
-          console.log(error('Cannot use both --ws-url and --headful'));
+        // Validate flag combinations
+        if (options.wsUrl && (options.tunnel || options.headful)) {
+          console.log(error('Cannot use --ws-url with --tunnel or --headful'));
           process.exit(1);
         }
 
-        if (options.headful) {
-          console.log('Starting local browser with tunnel for headful mode...');
+        // Check if running in development mode (localhost API)
+        const isDevelopment =
+          process.env.NODE_ENV === 'development' ||
+          config.api_url?.includes('localhost') ||
+          config.api_url?.includes('127.0.0.1');
+
+        // Handle --headful without --tunnel
+        if (options.headful && !options.tunnel) {
+          if (isDevelopment) {
+            // In development, allow --headful alone for backwards compatibility
+            console.log(
+              '⚠️  Note: --headful without --tunnel is deprecated. Use --tunnel --headful instead.'
+            );
+            options.tunnel = true; // Implicitly enable tunnel
+          } else {
+            console.log(error('--headful requires --tunnel flag'));
+            console.log('  Use: qa-use test run <name> --tunnel --headful');
+            console.log('  Or for headless local browser: qa-use test run <name> --tunnel');
+            process.exit(1);
+          }
+        }
+
+        if (options.tunnel) {
+          const headless = !options.headful;
+          console.log(
+            `Starting local browser with tunnel (${headless ? 'headless' : 'visible'})...`
+          );
           console.log('⏳ First run may take a moment while the tunnel establishes connection');
           browserSession = await startBrowserWithTunnel(undefined, {
-            headless: false,
+            headless,
             apiKey: config.api_key,
             sessionIndex: 0,
           });

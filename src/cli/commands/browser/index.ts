@@ -12,7 +12,6 @@ import { createCommand } from './create.js';
 import { listCommand } from './list.js';
 import { statusCommand } from './status.js';
 import { closeCommand } from './close.js';
-import { tunnelCommand } from './tunnel.js';
 
 // Navigation & action commands
 import { gotoCommand } from './goto.js';
@@ -50,7 +49,6 @@ browserCommand.addCommand(createCommand);
 browserCommand.addCommand(listCommand);
 browserCommand.addCommand(statusCommand);
 browserCommand.addCommand(closeCommand);
-browserCommand.addCommand(tunnelCommand);
 
 // Register navigation & action commands
 browserCommand.addCommand(gotoCommand);

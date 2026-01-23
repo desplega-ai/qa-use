@@ -14,6 +14,7 @@ This skill orchestrates the execution of E2E tests using the `qa-use` CLI (`npx 
 - NEVER assume tests exist - verify via `npx @desplega.ai/qa-use test list`
 - If test fails and `--autofix` was not used, explain the failure and suggest `--autofix`
 - If AI auto-fix succeeds, suggest `--update-local` to persist changes
+- **ALWAYS use `--tunnel` when testing localhost URLs** (e.g., `http://localhost:3000`) - the cloud cannot access your local machine without a tunnel!
 
 ## Workflow
 
@@ -45,11 +46,17 @@ This skill orchestrates the execution of E2E tests using the `qa-use` CLI (`npx 
 ## CLI Reference
 
 ```bash
-# Basic run
+# Basic run (uses cloud browser)
 npx @desplega.ai/qa-use test run <name>
 
-# With options
-npx @desplega.ai/qa-use test run <name> --headful --autofix --update-local
+# With local browser tunnel (required for localhost URLs!)
+npx @desplega.ai/qa-use test run <name> --tunnel
+
+# With visible local browser (for debugging)
+npx @desplega.ai/qa-use test run <name> --tunnel --headful
+
+# With self-healing and auto-update
+npx @desplega.ai/qa-use test run <name> --tunnel --autofix --update-local
 
 # Run all tests
 npx @desplega.ai/qa-use test run --all
@@ -59,7 +66,37 @@ npx @desplega.ai/qa-use test run <name> --var email=test@example.com --var passw
 
 # Download assets locally
 npx @desplega.ai/qa-use test run <name> --download
+
+# Use existing tunneled browser (from `qa-use browser create --tunnel`)
+npx @desplega.ai/qa-use test run <name> --ws-url <websocket-url>
 ```
+
+### Using a Local Tunneled Browser
+
+**Simple way** - use `--tunnel` directly:
+
+```bash
+# Headless local browser with tunnel
+qa-use test run <name> --tunnel
+
+# Visible local browser for debugging
+qa-use test run <name> --tunnel --headful
+```
+
+**Reusable session** - for running multiple tests against the same browser:
+
+```bash
+# Terminal 1: Start tunnel (keeps browser open between runs)
+qa-use browser create --tunnel
+
+# Terminal 2: Run tests against that browser
+qa-use test run <name> --ws-url <websocket-url-from-tunnel-output>
+```
+
+This is useful for:
+- Watching tests execute in real-time
+- Running multiple tests against the same browser session
+- Debugging test failures visually
 
 ### Download Directory Structure
 
