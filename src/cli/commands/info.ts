@@ -8,6 +8,7 @@ import { success, error, warning } from '../lib/output.js';
 import { ApiClient } from '../../../lib/api/index.js';
 import type { AppConfig } from '../../../lib/api/index.js';
 import { getEnvWithSource } from '../../../lib/env/index.js';
+import { BrowserManager } from '../../../lib/browser/index.js';
 
 /**
  * Mask a sensitive value (show first 10 chars or asterisks)
@@ -194,5 +195,14 @@ export const infoCommand = new Command('info')
       console.log(success('Local config file exists'));
     } else {
       console.log(warning('No local config file - run `qa-use setup`'));
+    }
+
+    // Playwright browser status
+    const browserManager = new BrowserManager();
+    const browserStatus = browserManager.checkBrowsersInstalled();
+    if (browserStatus.installed) {
+      console.log(success('Playwright browsers installed'));
+    } else {
+      console.log(error('Playwright browsers not installed - run `qa-use install-deps`'));
     }
   });

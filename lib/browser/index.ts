@@ -2,8 +2,15 @@ import { chromium } from 'playwright';
 import type { BrowserServer, Browser } from 'playwright';
 import { fork } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
+
+export interface BrowserInstallationStatus {
+  installed: boolean;
+  executablePath: string | null;
+  error?: string;
+}
 
 export interface BrowserSession {
   browserServer: BrowserServer;
@@ -177,5 +184,35 @@ export class BrowserManager {
         reject(new Error(`Failed to locate Playwright CLI: ${error.message}`));
       }
     });
+  }
+
+  /**
+   * Check if Playwright Chromium browser is installed without launching it.
+   * This is a fast, cheap check that verifies the executable file exists.
+   */
+  checkBrowsersInstalled(): BrowserInstallationStatus {
+    try {
+      const executablePath = chromium.executablePath();
+
+      // Check if the executable file actually exists
+      if (fs.existsSync(executablePath)) {
+        return {
+          installed: true,
+          executablePath,
+        };
+      }
+
+      return {
+        installed: false,
+        executablePath: null,
+        error: `Chromium executable not found at expected path: ${executablePath}`,
+      };
+    } catch (error: any) {
+      return {
+        installed: false,
+        executablePath: null,
+        error: error.message,
+      };
+    }
   }
 }

@@ -23,6 +23,18 @@ Install the qa-use plugin:
 - Node.js 20+
 - API key from [desplega.ai](https://desplega.ai)
 
+After installation, run `qa-use info` to verify your setup:
+
+```bash
+qa-use info
+```
+
+This shows your configuration status including API key, app config, and whether Playwright browsers are installed. If browsers are missing, run:
+
+```bash
+qa-use install-deps
+```
+
 ## Quick Start
 
 1. **Initialize test directory**:
@@ -60,6 +72,14 @@ The primary way to use this plugin is the **verify → explore → record → te
 This positions qa-use as **infrastructure for AI-driven development workflows** - where Claude Code develops a feature, verifies it through automated testing, and iterates until green.
 
 ## Commands
+
+### Setup
+
+| Command | Description |
+|---------|-------------|
+| `qa-use setup` | Interactive configuration wizard |
+| `qa-use info` | Show configuration and setup status |
+| `qa-use install-deps` | Install Playwright browser dependencies |
 
 ### Feature Verification
 
@@ -228,6 +248,32 @@ steps:
   - action: to_be_visible
     target: dashboard
 ```
+
+## Troubleshooting
+
+### "Playwright Chromium browser is not installed"
+
+Run `qa-use install-deps` to install the required browser:
+
+```bash
+qa-use install-deps
+```
+
+### Check your setup status
+
+Run `qa-use info` to see a complete checklist of your configuration:
+
+```bash
+qa-use info
+```
+
+This shows:
+- API Key status
+- App Config availability
+- Base URL configuration
+- Login credentials
+- Local config file
+- Playwright browser installation
 
 ## Resources
 

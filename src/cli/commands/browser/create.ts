@@ -14,6 +14,7 @@ import {
 } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
 import { success, error, info, warning } from '../../lib/output.js';
+import { ensureBrowsersInstalled } from '../../lib/browser.js';
 
 interface CreateOptions {
   headless?: boolean;
@@ -147,6 +148,9 @@ async function runTunnelMode(
   viewport: ViewportType,
   timeout: number
 ): Promise<void> {
+  // Check that browsers are installed before expensive operations
+  ensureBrowsersInstalled();
+
   // Track resources for cleanup
   let browser: BrowserManager | null = null;
   let tunnel: TunnelManager | null = null;

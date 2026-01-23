@@ -8,6 +8,7 @@
 import { TunnelManager } from '../../../lib/tunnel/index.js';
 import { BrowserManager } from '../../../lib/browser/index.js';
 import { URL } from 'url';
+import { error } from './output.js';
 
 export interface BrowserTunnelSession {
   browser: BrowserManager;
@@ -41,6 +42,24 @@ export function isLocalhostUrl(url: string): boolean {
 }
 
 /**
+ * Check if Playwright browsers are installed and exit with helpful message if not.
+ * This is a guard function to call before expensive tunnel/browser operations.
+ */
+export function ensureBrowsersInstalled(): void {
+  const browser = new BrowserManager();
+  const status = browser.checkBrowsersInstalled();
+
+  if (!status.installed) {
+    console.log(error('Playwright Chromium browser is not installed'));
+    console.log('');
+    console.log('  To install, run:');
+    console.log('    qa-use install-deps');
+    console.log('');
+    process.exit(1);
+  }
+}
+
+/**
  * Get the port from a URL
  */
 export function getPortFromUrl(url: string): number {
@@ -67,6 +86,9 @@ export async function startBrowserWithTunnel(
   testUrl: string | undefined,
   options: BrowserTunnelOptions = {}
 ): Promise<BrowserTunnelSession> {
+  // Check that browsers are installed before expensive operations
+  ensureBrowsersInstalled();
+
   const browser = new BrowserManager();
   let tunnel: TunnelManager | null = null;
   let publicWsUrl: string | null = null;
