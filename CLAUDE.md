@@ -4,14 +4,16 @@ MCP server for browser automation and QA testing using Playwright, integrating w
 
 ## Quick Reference
 
+**IMPORTANT: Always use `bun`, never `npm` or `yarn`.**
+
 ```bash
 bun install           # Install dependencies
-bun build             # Build TypeScript
-bun dev               # Development with hot reload
+bun run build         # Build TypeScript
+bun run dev           # Development with hot reload
 bun test              # Run tests with bun
-bun lint:fix          # Fix linting issues
-bun format            # Format code
-bun typecheck         # Type check
+bun run lint:fix      # Fix linting issues
+bun run format        # Format code
+bun run typecheck     # Type check
 ```
 
 ## Tech Stack

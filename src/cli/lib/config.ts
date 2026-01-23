@@ -103,6 +103,10 @@ export async function loadConfig(): Promise<CliConfig> {
     config.api_url = process.env.QA_USE_API_URL;
   }
 
+  if (process.env.QA_USE_DEFAULT_APP_CONFIG_ID) {
+    config.default_app_config_id = process.env.QA_USE_DEFAULT_APP_CONFIG_ID;
+  }
+
   return config;
 }
 

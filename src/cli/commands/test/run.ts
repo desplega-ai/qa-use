@@ -120,19 +120,11 @@ export const runCommand = new Command('run')
           config.api_url?.includes('127.0.0.1');
 
         // Handle --headful without --tunnel
-        if (options.headful && !options.tunnel) {
-          if (isDevelopment) {
-            // In development, allow --headful alone for backwards compatibility
-            console.log(
-              '⚠️  Note: --headful without --tunnel is deprecated. Use --tunnel --headful instead.'
-            );
-            options.tunnel = true; // Implicitly enable tunnel
-          } else {
-            console.log(error('--headful requires --tunnel flag'));
-            console.log('  Use: qa-use test run <name> --tunnel --headful');
-            console.log('  Or for headless local browser: qa-use test run <name> --tunnel');
-            process.exit(1);
-          }
+        if (options.headful && !options.tunnel && !isDevelopment) {
+          console.log(error('--headful requires --tunnel flag'));
+          console.log('  Use: qa-use test run <name> --tunnel --headful');
+          console.log('  Or for headless local browser: qa-use test run <name> --tunnel');
+          process.exit(1);
         }
 
         if (options.tunnel) {
@@ -164,7 +156,8 @@ export const runCommand = new Command('run')
             test_id: options.id,
             persist: options.persist || config.defaults?.persist || false,
             // When using ws_url, headless flag is irrelevant (backend uses our browser)
-            headless: wsUrl ? true : (config.defaults?.headless ?? true),
+            // When --headful without tunnel (dev mode), tell backend to run visible browser
+            headless: wsUrl ? true : options.headful ? false : (config.defaults?.headless ?? true),
             allow_fix: options.autofix || config.defaults?.allow_fix || false,
             capture_screenshots: options.screenshots || options.download || false,
             ws_url: wsUrl,
