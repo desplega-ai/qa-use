@@ -462,6 +462,139 @@ Session closed.
 
 ---
 
+## Phase 6: Additional Protocol Commands
+
+### Overview
+Implement remaining browser protocol commands not covered in earlier phases: navigation history (back, forward, reload), checkbox actions (check, uncheck), scroll-into-view, advanced waits, and get-blocks.
+
+### Changes Required:
+
+#### Navigation History Commands
+
+##### 1. Back Command
+**File**: `src/cli/commands/browser/back.ts` (new)
+**Changes**: Navigate back in browser history
+- Option: `-s/--session-id`
+
+##### 2. Forward Command
+**File**: `src/cli/commands/browser/forward.ts` (new)
+**Changes**: Navigate forward in browser history
+- Option: `-s/--session-id`
+
+##### 3. Reload Command
+**File**: `src/cli/commands/browser/reload.ts` (new)
+**Changes**: Reload current page
+- Option: `-s/--session-id`
+
+#### Checkbox Commands
+
+##### 4. Check Command
+**File**: `src/cli/commands/browser/check.ts` (new)
+**Changes**: Check a checkbox
+- Argument: `<ref>` (or use `--text` for semantic selection)
+- Option: `--text <description>` (AI-based element selection)
+- Option: `-s/--session-id`
+
+##### 5. Uncheck Command
+**File**: `src/cli/commands/browser/uncheck.ts` (new)
+**Changes**: Uncheck a checkbox
+- Argument: `<ref>` (or use `--text` for semantic selection)
+- Option: `--text <description>` (AI-based element selection)
+- Option: `-s/--session-id`
+
+#### Scroll Commands
+
+##### 6. Scroll Into View Command
+**File**: `src/cli/commands/browser/scroll-into-view.ts` (new)
+**Changes**: Scroll element into view
+- Argument: `<ref>` (or use `--text` for semantic selection)
+- Option: `--text <description>` (AI-based element selection)
+- Option: `-s/--session-id`
+
+#### Advanced Wait Commands
+
+##### 7. Wait For Selector Command
+**File**: `src/cli/commands/browser/wait-for-selector.ts` (new)
+**Changes**: Wait for CSS selector to reach a state
+- Argument: `<selector>` (CSS selector)
+- Option: `--state <state>` (attached/detached/visible/hidden, default: visible)
+- Option: `--timeout <ms>` (default: 30000)
+- Option: `-s/--session-id`
+
+##### 8. Wait For Load Command
+**File**: `src/cli/commands/browser/wait-for-load.ts` (new)
+**Changes**: Wait for page load state
+- Option: `--state <state>` (load/domcontentloaded/networkidle, default: load)
+- Option: `--timeout <ms>` (default: 30000)
+- Option: `-s/--session-id`
+
+#### Inspection Commands
+
+##### 9. Get Blocks Command
+**File**: `src/cli/commands/browser/get-blocks.ts` (new)
+**Changes**: Get recorded blocks (test steps) from the session
+- Option: `-s/--session-id`
+- Option: `--json` (output raw JSON, default)
+- Returns `ExtendedStep[]` (types in `src/types/test-definition.ts`)
+- Useful for debugging/inspecting recorded actions and test generation
+
+### Success Criteria:
+
+#### Automated Verification:
+- [x] TypeScript compiles: `bun typecheck`
+- [x] Linting passes: `bun lint`
+- [x] Build succeeds: `bun run build`
+
+#### Manual Verification:
+- [ ] Navigation: `back`, `forward`, `reload` work after navigating between pages
+- [ ] Checkbox: `check` and `uncheck` toggle checkbox state
+- [ ] Scroll: `scroll-into-view` scrolls element into viewport
+- [ ] Wait for selector: `wait-for-selector ".content"` waits for element
+- [ ] Wait for load: `wait-for-load --state networkidle` waits for network idle
+- [ ] Get blocks: `get-blocks` shows recorded actions as ExtendedStep[]
+
+**Implementation Note**: These commands can be implemented in any order. They are independent additions to the existing command set.
+
+---
+
+## Updated Command Summary
+
+| Command | Arguments | Key Options | Description |
+|---------|-----------|-------------|-------------|
+| create | - | --headless, --viewport, --timeout | Create new session |
+| list | - | - | List all sessions |
+| status | - | -s | Get session status |
+| close | - | -s | Close session |
+| goto | `<url>` | -s | Navigate to URL |
+| **back** | - | -s | Navigate back |
+| **forward** | - | -s | Navigate forward |
+| **reload** | - | -s | Reload page |
+| click | `<ref>` | -s, --text | Click element |
+| fill | `<ref> <value>` | -s, --text | Fill input |
+| type | `<ref> <text>` | -s | Type text |
+| press | `<key>` | -s, --ref | Press key |
+| hover | `<ref>` | -s, --text | Hover element |
+| select | `<ref> <value>` | -s, --text | Select option |
+| **check** | `<ref>` | -s, --text | Check checkbox |
+| **uncheck** | `<ref>` | -s, --text | Uncheck checkbox |
+| scroll | `<direction> [amount]` | -s, --ref | Scroll page/element |
+| **scroll-into-view** | `<ref>` | -s, --text | Scroll element into view |
+| wait | `<ms>` | -s | Wait fixed time |
+| **wait-for-selector** | `<selector>` | -s, --state, --timeout | Wait for selector |
+| **wait-for-load** | - | -s, --state, --timeout | Wait for load state |
+| snapshot | - | -s, --json | Get ARIA tree |
+| screenshot | `[file]` | -s, --base64, --stdout | Take screenshot |
+| url | - | -s | Get current URL |
+| **get-blocks** | - | -s, --json | Get recorded blocks |
+| stream | - | -s | WebSocket event stream |
+| run | - | -s, --headless | Interactive REPL |
+
+**Bold** = New commands added in Phase 6
+
+**Note**: Commands supporting `--text` use AI-based semantic element selection (slower but doesn't require refs from snapshot).
+
+---
+
 ## Testing Strategy
 
 ### Unit Tests
@@ -478,12 +611,19 @@ Session closed.
 2. Navigate to real website
 3. Get snapshot, identify refs
 4. Click/fill/type with refs
-5. Screenshot to file and stdout
-6. Stream events while performing actions
-7. REPL mode full workflow
-8. Session auto-resolution with single session
-9. Error when multiple sessions and no `-s` flag
-10. Stale session cleanup
+5. Check/uncheck checkboxes
+6. Select dropdown options
+7. Scroll page and scroll-into-view
+8. Wait for selectors and load states
+9. Screenshot to file and stdout
+10. Get blocks (ExtendedStep[])
+11. Navigate back/forward/reload
+12. Stream events while performing actions
+13. REPL mode full workflow
+14. Session auto-resolution with single session
+15. Error when multiple sessions and no `-s` flag
+16. Stale session cleanup
+17. Text-based semantic selection (--text option)
 
 ## References
 - Related research: `thoughts/taras/research/2026-01-23-browser-subcommand.md`

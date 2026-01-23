@@ -1,0 +1,60 @@
+/**
+ * qa-use browser wait-for-load - Wait for page load state
+ */
+
+import { Command } from 'commander';
+import { BrowserApiClient } from '../../../../lib/api/browser.js';
+import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
+import { loadConfig } from '../../lib/config.js';
+import { success, error } from '../../lib/output.js';
+
+interface WaitForLoadOptions {
+  sessionId?: string;
+  state?: 'load' | 'domcontentloaded' | 'networkidle';
+  timeout?: string;
+}
+
+export const waitForLoadCommand = new Command('wait-for-load')
+  .description('Wait for page load state')
+  .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
+  .option('--state <state>', 'Load state to wait for (load|domcontentloaded|networkidle)', 'load')
+  .option('--timeout <ms>', 'Timeout in milliseconds', '30000')
+  .action(async (options: WaitForLoadOptions) => {
+    try {
+      const config = await loadConfig();
+      if (!config.api_key) {
+        console.log(error('API key not configured. Run `qa-use setup` first.'));
+        process.exit(1);
+      }
+
+      const client = new BrowserApiClient(config.api_url);
+      client.setApiKey(config.api_key);
+
+      const resolved = await resolveSessionId({
+        explicitId: options.sessionId,
+        client,
+      });
+
+      const state = options.state as 'load' | 'domcontentloaded' | 'networkidle';
+      if (!['load', 'domcontentloaded', 'networkidle'].includes(state)) {
+        console.log(error('Invalid state. Must be: load, domcontentloaded, or networkidle'));
+        process.exit(1);
+      }
+
+      const result = await client.executeAction(resolved.id, {
+        type: 'wait_for_load',
+        state,
+      });
+
+      if (result.success) {
+        console.log(success(`Page reached ${state} state`));
+        await touchSession(resolved.id);
+      } else {
+        console.log(error(result.error || 'Wait for load failed'));
+        process.exit(1);
+      }
+    } catch (err) {
+      console.log(error(err instanceof Error ? err.message : 'Failed to wait for load'));
+      process.exit(1);
+    }
+  });

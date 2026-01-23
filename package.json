@@ -1,6 +1,6 @@
 {
   "name": "@desplega.ai/qa-use",
-  "version": "2.1.7",
+  "version": "2.2.0",
   "packageManager": "bun@^1.3.4",
   "description": "QA automation tool for browser testing with MCP server support",
   "type": "module",
@@ -95,6 +95,7 @@
     "express": "^4.21.2",
     "glob": "^13.0.0",
     "playwright": "1.55.0",
+    "ws": "^8.19.0",
     "yaml": "^2.8.2"
   }
 }
