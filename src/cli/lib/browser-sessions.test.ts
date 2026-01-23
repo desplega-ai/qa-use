@@ -53,8 +53,16 @@ describe('browser-sessions', () => {
     it('should load stored sessions', async () => {
       const config = {
         browser_sessions: [
-          { id: 'session-1', created_at: '2026-01-23T10:00:00Z', last_updated: '2026-01-23T10:00:00Z' },
-          { id: 'session-2', created_at: '2026-01-23T11:00:00Z', last_updated: '2026-01-23T11:00:00Z' },
+          {
+            id: 'session-1',
+            created_at: '2026-01-23T10:00:00Z',
+            last_updated: '2026-01-23T10:00:00Z',
+          },
+          {
+            id: 'session-2',
+            created_at: '2026-01-23T11:00:00Z',
+            last_updated: '2026-01-23T11:00:00Z',
+          },
         ],
       };
       fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify(config));
@@ -126,8 +134,16 @@ describe('browser-sessions', () => {
     it('should remove a session by ID', async () => {
       const config = {
         browser_sessions: [
-          { id: 'session-1', created_at: '2026-01-23T10:00:00Z', last_updated: '2026-01-23T10:00:00Z' },
-          { id: 'session-2', created_at: '2026-01-23T11:00:00Z', last_updated: '2026-01-23T11:00:00Z' },
+          {
+            id: 'session-1',
+            created_at: '2026-01-23T10:00:00Z',
+            last_updated: '2026-01-23T10:00:00Z',
+          },
+          {
+            id: 'session-2',
+            created_at: '2026-01-23T11:00:00Z',
+            last_updated: '2026-01-23T11:00:00Z',
+          },
         ],
       };
       fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify(config));
@@ -142,7 +158,11 @@ describe('browser-sessions', () => {
     it('should do nothing if session not found', async () => {
       const config = {
         browser_sessions: [
-          { id: 'session-1', created_at: '2026-01-23T10:00:00Z', last_updated: '2026-01-23T10:00:00Z' },
+          {
+            id: 'session-1',
+            created_at: '2026-01-23T10:00:00Z',
+            last_updated: '2026-01-23T10:00:00Z',
+          },
         ],
       };
       fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify(config));
@@ -158,7 +178,11 @@ describe('browser-sessions', () => {
     it('should update last_updated timestamp', async () => {
       const config = {
         browser_sessions: [
-          { id: 'session-1', created_at: '2026-01-23T10:00:00Z', last_updated: '2026-01-23T10:00:00Z' },
+          {
+            id: 'session-1',
+            created_at: '2026-01-23T10:00:00Z',
+            last_updated: '2026-01-23T10:00:00Z',
+          },
         ],
       };
       fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify(config));
@@ -175,7 +199,11 @@ describe('browser-sessions', () => {
     it('should do nothing if session not found', async () => {
       const config = {
         browser_sessions: [
-          { id: 'session-1', created_at: '2026-01-23T10:00:00Z', last_updated: '2026-01-23T10:00:00Z' },
+          {
+            id: 'session-1',
+            created_at: '2026-01-23T10:00:00Z',
+            last_updated: '2026-01-23T10:00:00Z',
+          },
         ],
       };
       fs.writeFileSync(TEST_CONFIG_PATH, JSON.stringify(config));

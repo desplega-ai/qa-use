@@ -37,7 +37,7 @@ export const listCommand = new Command('list')
           id: s.id,
           status: s.status,
           created_at: s.created_at,
-          url: s.url,
+          url: s.current_url,
           local: storedIds.has(s.id),
         }));
         console.log(JSON.stringify(output, null, 2));
@@ -65,7 +65,7 @@ export const listCommand = new Command('list')
         const createdStr = createdAt.toISOString().replace('T', ' ').slice(0, 19);
 
         // Format URL (truncate if too long)
-        const url = session.url || '-';
+        const url = session.current_url || '-';
         const truncatedUrl = url.length > 30 ? url.slice(0, 27) + '...' : url;
 
         // Status with color indicator
@@ -78,9 +78,7 @@ export const listCommand = new Command('list')
           statusStr = `\x1b[90m${statusStr}\x1b[0m`; // Gray
         }
 
-        console.log(
-          `${session.id}${localMarker}${statusStr}  ${createdStr}  ${truncatedUrl}`
-        );
+        console.log(`${session.id}${localMarker}${statusStr}  ${createdStr}  ${truncatedUrl}`);
       }
 
       console.log('');
@@ -91,7 +89,9 @@ export const listCommand = new Command('list')
       if (staleSessions.length > 0) {
         console.log('');
         console.log(
-          warning(`${staleSessions.length} stale local session(s) will be cleaned up automatically.`)
+          warning(
+            `${staleSessions.length} stale local session(s) will be cleaned up automatically.`
+          )
         );
       }
     } catch (err) {

@@ -1,5 +1,5 @@
 /**
- * qa-use browser click - Click element by ref or semantic text
+ * qa-use browser check - Check a checkbox by ref or semantic text
  */
 
 import { Command } from 'commander';
@@ -8,7 +8,7 @@ import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
 import { success, error } from '../../lib/output.js';
 
-interface ClickOptions {
+interface CheckOptions {
   sessionId?: string;
   text?: string;
 }
@@ -20,12 +20,12 @@ function normalizeRef(ref: string): string {
   return ref.startsWith('@') ? ref.slice(1) : ref;
 }
 
-export const clickCommand = new Command('click')
-  .description('Click an element by ref or semantic description')
+export const checkCommand = new Command('check')
+  .description('Check a checkbox by ref or semantic description')
   .argument('[ref]', 'Element ref from snapshot (e.g., "e3" or "@e3")')
   .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
   .option('-t, --text <description>', 'Semantic element description (AI-based, slower)')
-  .action(async (ref: string | undefined, options: ClickOptions) => {
+  .action(async (ref: string | undefined, options: CheckOptions) => {
     try {
       // Validate that either ref or --text is provided
       if (!ref && !options.text) {
@@ -48,7 +48,7 @@ export const clickCommand = new Command('click')
       });
 
       // Build action with either ref or text
-      const action: { type: 'click'; ref?: string; text?: string } = { type: 'click' };
+      const action: { type: 'check'; ref?: string; text?: string } = { type: 'check' };
       if (ref) {
         action.ref = normalizeRef(ref);
       } else if (options.text) {
@@ -58,16 +58,15 @@ export const clickCommand = new Command('click')
       const result = await client.executeAction(resolved.id, action);
 
       if (result.success) {
-        const target = ref ? `element ${normalizeRef(ref)}` : `"${options.text}"`;
-        console.log(success(`Clicked ${target}`));
+        const target = ref ? `checkbox ${normalizeRef(ref)}` : `"${options.text}"`;
+        console.log(success(`Checked ${target}`));
         await touchSession(resolved.id);
       } else {
-        const hint = result.error || 'Click failed';
-        console.log(error(`${hint}. Use 'qa-use browser snapshot' to see available elements.`));
+        console.log(error(result.error || 'Check failed'));
         process.exit(1);
       }
     } catch (err) {
-      console.log(error(err instanceof Error ? err.message : 'Failed to click element'));
+      console.log(error(err instanceof Error ? err.message : 'Failed to check checkbox'));
       process.exit(1);
     }
   });

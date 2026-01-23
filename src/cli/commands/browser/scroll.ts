@@ -32,7 +32,9 @@ export const scrollCommand = new Command('scroll')
       // Validate direction
       const normalizedDirection = direction.toLowerCase() as ScrollDirection;
       if (!VALID_DIRECTIONS.includes(normalizedDirection)) {
-        console.log(error(`Invalid direction: ${direction}. Must be one of: ${VALID_DIRECTIONS.join(', ')}`));
+        console.log(
+          error(`Invalid direction: ${direction}. Must be one of: ${VALID_DIRECTIONS.join(', ')}`)
+        );
         process.exit(1);
       }
 

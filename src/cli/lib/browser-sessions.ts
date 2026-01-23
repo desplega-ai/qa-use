@@ -183,7 +183,9 @@ export interface ResolvedSession {
  *
  * @throws Error if no session can be resolved or verification fails
  */
-export async function resolveSessionId(options: SessionResolutionOptions): Promise<ResolvedSession> {
+export async function resolveSessionId(
+  options: SessionResolutionOptions
+): Promise<ResolvedSession> {
   const { explicitId, client, verify = true } = options;
 
   let sessionId: string;

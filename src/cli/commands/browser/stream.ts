@@ -69,7 +69,9 @@ export const streamCommand = new Command('stream')
         try {
           // Handle binary data (screenshots)
           if (Buffer.isBuffer(data)) {
-            console.log(`${colors.gray}📷 Binary frame received (${data.length} bytes)${colors.reset}`);
+            console.log(
+              `${colors.gray}📷 Binary frame received (${data.length} bytes)${colors.reset}`
+            );
             return;
           }
 
@@ -141,13 +143,17 @@ function formatEvent(event: { type: string; data?: unknown; timestamp?: string }
 
     case 'error': {
       const data = event.data as { message?: string; code?: string };
-      console.log(`${timestampStr}${colors.red}✗${colors.reset} Error: ${data.message || 'unknown'}`);
+      console.log(
+        `${timestampStr}${colors.red}✗${colors.reset} Error: ${data.message || 'unknown'}`
+      );
       break;
     }
 
     case 'closed': {
       const data = event.data as { reason?: string };
-      console.log(`${timestampStr}${colors.yellow}●${colors.reset} Session closed${data?.reason ? `: ${data.reason}` : ''}`);
+      console.log(
+        `${timestampStr}${colors.yellow}●${colors.reset} Session closed${data?.reason ? `: ${data.reason}` : ''}`
+      );
       break;
     }
 
@@ -156,6 +162,8 @@ function formatEvent(event: { type: string; data?: unknown; timestamp?: string }
       break;
 
     default:
-      console.log(`${timestampStr}${colors.gray}[${event.type}]${colors.reset} ${JSON.stringify(event.data || {})}`);
+      console.log(
+        `${timestampStr}${colors.gray}[${event.type}]${colors.reset} ${JSON.stringify(event.data || {})}`
+      );
   }
 }

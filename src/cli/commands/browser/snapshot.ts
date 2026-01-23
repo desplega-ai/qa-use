@@ -47,7 +47,7 @@ export const snapshotCommand = new Command('snapshot')
         if (snapshot.url) {
           console.log(`URL: ${snapshot.url}\n`);
         }
-        console.log(formatAriaTree(snapshot.aria_tree));
+        console.log(formatAriaTree(snapshot.snapshot));
       }
 
       // Update session timestamp

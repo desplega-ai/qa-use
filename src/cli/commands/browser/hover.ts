@@ -1,5 +1,5 @@
 /**
- * qa-use browser hover - Hover over element
+ * qa-use browser hover - Hover over element by ref or semantic text
  */
 
 import { Command } from 'commander';
@@ -10,6 +10,7 @@ import { success, error } from '../../lib/output.js';
 
 interface HoverOptions {
   sessionId?: string;
+  text?: string;
 }
 
 /**
@@ -20,39 +21,45 @@ function normalizeRef(ref: string): string {
 }
 
 export const hoverCommand = new Command('hover')
-  .description('Hover over an element')
-  .argument('<ref>', 'Element ref (e.g., "e3" or "@e3")')
+  .description('Hover over an element by ref or semantic description')
+  .argument('[ref]', 'Element ref from snapshot (e.g., "e3" or "@e3")')
   .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
-  .action(async (ref: string, options: HoverOptions) => {
+  .option('-t, --text <description>', 'Semantic element description (AI-based, slower)')
+  .action(async (ref: string | undefined, options: HoverOptions) => {
     try {
-      // Load configuration
+      // Validate that either ref or --text is provided
+      if (!ref && !options.text) {
+        console.log(error('Either <ref> argument or --text option is required'));
+        process.exit(1);
+      }
+
       const config = await loadConfig();
       if (!config.api_key) {
         console.log(error('API key not configured. Run `qa-use setup` first.'));
         process.exit(1);
       }
 
-      // Create client and set API key
       const client = new BrowserApiClient(config.api_url);
       client.setApiKey(config.api_key);
 
-      // Resolve session ID
       const resolved = await resolveSessionId({
         explicitId: options.sessionId,
         client,
       });
 
-      // Normalize ref
-      const normalizedRef = normalizeRef(ref);
+      // Build action with either ref or text
+      const action: { type: 'hover'; ref?: string; text?: string } = { type: 'hover' };
+      if (ref) {
+        action.ref = normalizeRef(ref);
+      } else if (options.text) {
+        action.text = options.text;
+      }
 
-      // Execute hover action
-      const result = await client.executeAction(resolved.id, {
-        type: 'hover',
-        ref: normalizedRef,
-      });
+      const result = await client.executeAction(resolved.id, action);
 
       if (result.success) {
-        console.log(success(`Hovering over element ${normalizedRef}`));
+        const target = ref ? `element ${normalizeRef(ref)}` : `"${options.text}"`;
+        console.log(success(`Hovering over ${target}`));
         await touchSession(resolved.id);
       } else {
         const hint = result.error || 'Hover failed';

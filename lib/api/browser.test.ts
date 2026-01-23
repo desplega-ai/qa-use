@@ -234,7 +234,7 @@ describe('BrowserApiClient', () => {
   describe('getSnapshot', () => {
     it('should get ARIA snapshot', async () => {
       const mockSnapshot = {
-        aria_tree: '- heading "Example" [ref=e1]',
+        snapshot: '- heading "Example" [ref=e1]',
         url: 'https://example.com',
       };
       mockAxiosInstance.get.mockResolvedValueOnce({ data: mockSnapshot });
@@ -242,7 +242,7 @@ describe('BrowserApiClient', () => {
       const snapshot = await client.getSnapshot('session-123');
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/sessions/session-123/snapshot');
-      expect(snapshot.aria_tree).toContain('Example');
+      expect(snapshot.snapshot).toContain('Example');
       expect(snapshot.url).toBe('https://example.com');
     });
   });

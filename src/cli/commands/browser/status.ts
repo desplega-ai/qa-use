@@ -78,8 +78,8 @@ export const statusCommand = new Command('status')
       }
 
       // Current URL
-      if (session.url) {
-        console.log(`URL:          ${session.url}`);
+      if (session.current_url) {
+        console.log(`URL:          ${session.current_url}`);
       }
 
       // Viewport

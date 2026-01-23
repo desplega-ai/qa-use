@@ -11,9 +11,11 @@ import type {
   ActionResult,
   SnapshotResult,
   UrlResult,
+  BlocksResult,
   CreateBrowserSessionOptions,
   BrowserSessionStatus,
 } from './browser-types.js';
+import type { ExtendedStep } from '../../src/types/test-definition.js';
 
 export class BrowserApiClient {
   private readonly client: AxiosInstance;
@@ -199,6 +201,20 @@ export class BrowserApiClient {
       return result.url;
     } catch (error) {
       throw this.handleError(error, 'get URL');
+    }
+  }
+
+  /**
+   * Get recorded blocks (test steps) from the session
+   * @returns Array of ExtendedStep objects
+   */
+  async getBlocks(sessionId: string): Promise<ExtendedStep[]> {
+    try {
+      const response = await this.client.get(`/sessions/${sessionId}/blocks`);
+      const result = response.data as BlocksResult;
+      return (result.blocks || []) as ExtendedStep[];
+    } catch (error) {
+      throw this.handleError(error, 'get blocks');
     }
   }
 

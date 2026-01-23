@@ -21,7 +21,7 @@ export interface BrowserSession {
   status: BrowserSessionStatus;
   created_at: string;
   updated_at?: string;
-  url?: string;
+  current_url?: string;
   viewport?: ViewportType;
   headless?: boolean;
   timeout?: number;
@@ -33,13 +33,19 @@ export interface BrowserSession {
 
 export type BrowserActionType =
   | 'goto'
+  | 'back'
+  | 'forward'
+  | 'reload'
   | 'click'
   | 'fill'
   | 'type'
   | 'press'
   | 'hover'
   | 'scroll'
+  | 'scroll_into_view'
   | 'select'
+  | 'check'
+  | 'uncheck'
   | 'wait'
   | 'wait_for_selector'
   | 'wait_for_load'
@@ -53,14 +59,28 @@ export interface GotoAction {
   url: string;
 }
 
+export interface BackAction {
+  type: 'back';
+}
+
+export interface ForwardAction {
+  type: 'forward';
+}
+
+export interface ReloadAction {
+  type: 'reload';
+}
+
 export interface ClickAction {
   type: 'click';
-  ref: string;
+  ref?: string;
+  text?: string; // AI-based semantic element selection (alternative to ref)
 }
 
 export interface FillAction {
   type: 'fill';
-  ref: string;
+  ref?: string;
+  text?: string; // AI-based semantic element selection (alternative to ref)
   value: string;
 }
 
@@ -77,7 +97,8 @@ export interface PressAction {
 
 export interface HoverAction {
   type: 'hover';
-  ref: string;
+  ref?: string;
+  text?: string; // AI-based semantic element selection (alternative to ref)
 }
 
 export interface ScrollAction {
@@ -88,8 +109,27 @@ export interface ScrollAction {
 
 export interface SelectAction {
   type: 'select';
-  ref: string;
+  ref?: string;
+  text?: string; // AI-based semantic element selection (alternative to ref)
   value: string;
+}
+
+export interface CheckAction {
+  type: 'check';
+  ref?: string;
+  text?: string; // AI-based semantic element selection (alternative to ref)
+}
+
+export interface UncheckAction {
+  type: 'uncheck';
+  ref?: string;
+  text?: string; // AI-based semantic element selection (alternative to ref)
+}
+
+export interface ScrollIntoViewAction {
+  type: 'scroll_into_view';
+  ref?: string;
+  text?: string; // AI-based semantic element selection (alternative to ref)
 }
 
 export interface WaitAction {
@@ -118,13 +158,19 @@ export interface ScreenshotAction {
 
 export type BrowserAction =
   | GotoAction
+  | BackAction
+  | ForwardAction
+  | ReloadAction
   | ClickAction
   | FillAction
   | TypeAction
   | PressAction
   | HoverAction
   | ScrollAction
+  | ScrollIntoViewAction
   | SelectAction
+  | CheckAction
+  | UncheckAction
   | WaitAction
   | WaitForSelectorAction
   | WaitForLoadAction
@@ -142,12 +188,16 @@ export interface ActionResult {
 }
 
 export interface SnapshotResult {
-  aria_tree: string;
+  snapshot: string;
   url?: string;
 }
 
 export interface UrlResult {
   url: string;
+}
+
+export interface BlocksResult {
+  blocks: unknown[]; // ExtendedStep[] - typed in BrowserApiClient
 }
 
 // ==========================================

@@ -42,7 +42,9 @@ export const createCommand = new Command('create')
       const validViewports: ViewportType[] = ['desktop', 'mobile', 'tablet'];
       const viewport = (options.viewport || 'desktop') as ViewportType;
       if (!validViewports.includes(viewport)) {
-        console.log(error(`Invalid viewport: ${viewport}. Must be one of: ${validViewports.join(', ')}`));
+        console.log(
+          error(`Invalid viewport: ${viewport}. Must be one of: ${validViewports.join(', ')}`)
+        );
         process.exit(1);
       }
 
