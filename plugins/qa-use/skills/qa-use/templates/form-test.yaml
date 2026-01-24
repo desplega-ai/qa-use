@@ -1,0 +1,49 @@
+# Form Submission Template
+# Fill out a form and verify successful submission
+
+name: Form Submission
+description: Fill a contact form and verify submission success
+
+# Replace with your app config ID from desplega.ai
+app_config: $APP_CONFIG_ID
+
+# Variables for form data
+variables:
+  name: Test User
+  email: test@example.com
+  message: This is a test message from automated testing.
+
+steps:
+  # Navigate to the form page
+  - action: goto
+    url: /contact
+
+  # Fill form fields
+  - action: fill
+    target: name input
+    value: $name
+
+  - action: fill
+    target: email input
+    value: $email
+
+  - action: fill
+    target: message textarea
+    value: $message
+
+  # Optional: handle checkbox/consent
+  # - action: check
+  #   target: consent checkbox
+
+  # Submit the form
+  - action: click
+    target: submit button
+
+  # Verify success
+  - action: to_be_visible
+    target: success message
+
+  # Optional: verify specific success text
+  # - action: to_have_text
+  #   target: confirmation message
+  #   value: Thank you for your message

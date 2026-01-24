@@ -1,0 +1,23 @@
+# Basic Test Template
+# A simple navigation and assertion test
+
+name: Basic Test
+description: Navigate to a page and verify an element is visible
+
+# Replace with your app config ID from desplega.ai
+# Or set default_app_config_id in .qa-use-tests.json
+app_config: $APP_CONFIG_ID
+
+steps:
+  # Navigate to the starting page
+  - action: goto
+    url: /
+
+  # Verify the main content is visible
+  - action: to_be_visible
+    target: main content area
+
+  # Optional: verify page heading
+  # - action: to_have_text
+  #   target: page heading
+  #   value: Welcome

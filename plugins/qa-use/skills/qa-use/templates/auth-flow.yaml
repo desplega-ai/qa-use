@@ -1,0 +1,44 @@
+# Authentication Flow Template
+# Login with credentials and verify dashboard access
+
+name: Authentication Flow
+description: Login with credentials and verify successful authentication
+
+# Replace with your app config ID from desplega.ai
+app_config: $APP_CONFIG_ID
+
+# Variables for credentials
+# Override at runtime: qa-use test run auth-flow --var email=real@example.com
+variables:
+  email: test@example.com
+  password: "********"
+
+steps:
+  # Navigate to login page
+  - action: goto
+    url: /login
+
+  # Fill login form
+  - action: fill
+    target: email input
+    value: $email
+
+  - action: fill
+    target: password input
+    value: $password
+
+  # Submit the form
+  - action: click
+    target: sign in button
+
+  # Wait for successful redirect
+  - action: wait_for_url
+    url: /dashboard
+
+  # Verify dashboard is visible
+  - action: to_be_visible
+    target: dashboard content
+
+  # Optional: verify user greeting
+  # - action: to_be_visible
+  #   target: welcome message

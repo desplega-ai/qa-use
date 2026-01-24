@@ -7,32 +7,22 @@ argument-hint: [test-name]
 
 Edit an existing test definition with AI assistance.
 
+**Invokes skill:** qa-use
+
 ## Arguments
 
 | Argument | Description |
 |----------|-------------|
-| `test-name` | Name of the test to edit (without extension). Omit to list available tests. |
+| `test-name` | Test to edit (omit to list available tests) |
 
-## Workflow
+## What Happens
 
-1. **Parse Arguments**
-   - Extract test name from command arguments
-   - If no test name, list available tests and prompt for selection
+1. Loads current test definition
+2. Understands your desired changes
+3. Applies modifications
+4. Validates and saves with confirmation
 
-2. **Invoke test-authoring Skill** (editing mode)
-   - Load current test definition
-   - Understand user's desired changes
-   - Apply modifications
-
-3. **Validate Changes**
-   - Run validation on updated test
-   - Fix any issues
-
-4. **Confirm and Save**
-   - Show diff of changes
-   - Confirm before writing
-
-## Example Usage
+## Examples
 
 ```
 /qa-use:test-update login

@@ -4,18 +4,10 @@ A CLI-integrated plugin for E2E testing and browser automation with [qa-use](htt
 
 ## Installation
 
-### From GitHub
-
-Add the desplega marketplace:
-
-```bash
-/plugin marketplace add desplega-ai/qa-use
-```
-
 Install the qa-use plugin:
 
 ```bash
-/plugin install qa-use@desplega.ai
+claude /mcp add qa-use -- npx @desplega.ai/qa-use mcp
 ```
 
 ### Prerequisites
@@ -29,7 +21,7 @@ After installation, run `qa-use info` to verify your setup:
 qa-use info
 ```
 
-This shows your configuration status including API key, app config, and whether Playwright browsers are installed. If browsers are missing, run:
+If browsers are missing, run:
 
 ```bash
 qa-use install-deps
@@ -62,38 +54,16 @@ The primary way to use this plugin is the **verify → explore → record → te
 # 2. Generate a test YAML from exploration
 # 3. Execute the test
 # 4. Report results with specific recommendations
-
-# On failure, it classifies the issue:
-# - CODE BUG: Feature broken → points to relevant code
-# - TEST BUG: Selector changed → suggests fix or auto-fixes
-# - ENVIRONMENT: Network/auth issue → suggests retry
 ```
 
-This positions qa-use as **infrastructure for AI-driven development workflows** - where Claude Code develops a feature, verifies it through automated testing, and iterates until green.
-
 ## Commands
-
-### Setup
-
-| Command | Description |
-|---------|-------------|
-| `qa-use setup` | Interactive configuration wizard |
-| `qa-use info` | Show configuration and setup status |
-| `qa-use install-deps` | Install Playwright browser dependencies |
-
-### Feature Verification
 
 | Command | Description |
 |---------|-------------|
 | `/qa-use:verify <description>` | Verify a feature works (THE main command) |
 | `/qa-use:explore <url or goal>` | Explore a web page autonomously |
 | `/qa-use:record [start\|stop] [name]` | Record browser actions into test YAML |
-
-### Test Operations
-
-| Command | Description |
-|---------|-------------|
-| `/qa-use:test-init` | Initialize test directory with example test |
+| `/qa-use:test-init` | Initialize test directory |
 | `/qa-use:test-run [name] [flags]` | Run E2E tests |
 | `/qa-use:test-validate [name]` | Validate test syntax |
 | `/qa-use:test-sync [--pull\|--push]` | Sync with cloud |
@@ -103,26 +73,39 @@ This positions qa-use as **infrastructure for AI-driven development workflows** 
 
 - `--tunnel` - Start local browser with tunnel (required for localhost URLs!)
 - `--headful` - Show browser window (use with `--tunnel`)
-- `--ws-url <url>` - Use existing tunneled browser (from `browser create --tunnel`)
 - `--autofix` - Enable AI self-healing
 - `--update-local` - Persist AI fixes to local file
-- `--screenshots` - Capture screenshots
-- `--download` - Download assets (screenshots, recordings, HAR) to `/tmp/qa-use/downloads/`
+- `--download` - Download assets to `/tmp/qa-use/downloads/`
 - `--var key=value` - Override variables
 
-> **Important:** When testing localhost URLs (e.g., `http://localhost:3000`), you MUST use `--tunnel` or `--ws-url` with a tunneled browser. The cloud cannot access your local machine directly!
+> **Important:** When testing localhost URLs, you MUST use `--tunnel`. The cloud cannot access your local machine directly!
 
-## Skills
+## Skill
 
-The plugin includes five core skills:
+The plugin provides a single unified skill:
 
 | Skill | Description |
 |-------|-------------|
-| **feature-verify** | Orchestrates feature verification: explore → test → analyze |
-| **browser-control** | Low-level browser automation via `qa-use browser` CLI |
-| **test-running** | Orchestrates test execution with progress monitoring |
-| **test-authoring** | Creates and edits test definitions |
-| **test-debugging** | Analyzes failures (CODE BUG vs TEST BUG vs ENVIRONMENT) |
+| **qa-use** | E2E testing and browser automation |
+
+See [skills/qa-use/SKILL.md](skills/qa-use/SKILL.md) for complete documentation.
+
+### References
+
+| Document | Description |
+|----------|-------------|
+| [browser-commands.md](skills/qa-use/references/browser-commands.md) | Complete browser CLI reference |
+| [test-format.md](skills/qa-use/references/test-format.md) | Full test YAML specification |
+| [localhost-testing.md](skills/qa-use/references/localhost-testing.md) | Tunnel setup for local development |
+| [failure-debugging.md](skills/qa-use/references/failure-debugging.md) | Failure classification and diagnostics |
+
+### Templates
+
+| Template | Description |
+|----------|-------------|
+| [basic-test.yaml](skills/qa-use/templates/basic-test.yaml) | Simple navigation and assertion |
+| [auth-flow.yaml](skills/qa-use/templates/auth-flow.yaml) | Login flow with credentials |
+| [form-test.yaml](skills/qa-use/templates/form-test.yaml) | Form submission with validation |
 
 ## Agents
 
@@ -130,113 +113,66 @@ Four specialized agents are available:
 
 | Agent | Description |
 |-------|-------------|
-| **browser-navigator** | Autonomous page exploration (snapshot → analyze → act loop) |
+| **browser-navigator** | Autonomous page exploration |
 | **browser-recorder** | Records interactions and generates test YAML |
 | **test-analyzer** | Deep analysis of test failures |
 | **step-generator** | Generate steps from natural language |
 
 ## Browser Automation
 
-The plugin wraps the `qa-use browser` CLI for AI-assisted browser automation:
+The plugin wraps the `qa-use browser` CLI:
 
 ```bash
 # Session management
-qa-use browser create --viewport desktop     # Remote browser (managed by API)
-qa-use browser create --tunnel               # Local browser with tunnel (for debugging)
+qa-use browser create --viewport desktop
+qa-use browser create --tunnel          # For localhost
 qa-use browser list
 qa-use browser close
 
 # Navigation
 qa-use browser goto https://example.com
-qa-use browser back / forward / reload
 
-# Element targeting (always snapshot first!)
-qa-use browser snapshot           # Get refs
-qa-use browser click e3           # Click by ref
-qa-use browser fill e4 "value"    # Fill by ref
-qa-use browser click --text "Submit button"  # Semantic selection
+# Interaction (always snapshot first!)
+qa-use browser snapshot                 # Get element refs
+qa-use browser click e3                 # Click by ref
+qa-use browser fill e4 "value"          # Fill by ref
 
 # Inspection
 qa-use browser url
 qa-use browser screenshot
+qa-use browser logs console             # View console logs
+qa-use browser logs network             # View network logs
 ```
-
-### Local Browser with Tunnel
-
-For debugging, use `--tunnel` to run a visible browser on your machine:
-
-```bash
-# Start tunnel - browser stays open for interactive use
-qa-use browser create --tunnel
-
-# Use the session with other commands (in another terminal)
-qa-use browser goto https://example.com
-qa-use browser snapshot
-
-# Or run tests against it (copy WebSocket URL from tunnel output)
-qa-use test run my-test --ws-url <websocket-url>
-```
-
-## Command Cheat Sheet
-
-| I want to... | Command |
-|--------------|---------|
-| Verify a feature works | `/qa-use:verify "description"` |
-| Explore a page | `/qa-use:explore https://url` |
-| Record a test | `/qa-use:record start` then `/qa-use:record stop` |
-| Run existing test | `/qa-use:test-run <name>` |
-| Debug a failure | Use `test-analyzer` agent via `/qa-use:test-run <name>` |
-| Quick browser action | `qa-use browser <cmd>` (direct CLI) |
 
 ## Configuration
 
-### Option 1: Environment Variables (recommended for CI/secrets)
+### Environment Variables
 
 ```bash
 export QA_USE_API_KEY="your-api-key"
-export QA_USE_API_URL="https://api.desplega.ai"  # optional
 ```
 
-### Option 2: Config File
+### Config File
 
 Create `.qa-use-tests.json` in your project root:
 
 ```json
 {
   "api_key": "your-api-key",
-  "api_url": "https://api.desplega.ai",
   "test_directory": "./qa-tests",
-  "default_app_config_id": "your-app-config-id",
-  "defaults": {
-    "headless": true,
-    "persist": false,
-    "timeout": 300,
-    "allow_fix": true
-  }
+  "default_app_config_id": "your-app-config-id"
 }
 ```
 
-You can also use an `env` block to set arbitrary environment variables:
+Use `qa-use setup` for interactive configuration.
 
-```json
-{
-  "api_key": "your-api-key",
-  "env": {
-    "MY_CUSTOM_VAR": "value"
-  }
-}
-```
-
-**Note:** Shell environment variables override config file values. Use `qa-use setup` for interactive configuration.
-
-## Test Definition Format
+## Test Format
 
 ```yaml
 name: Login Test
 app_config: your-app-config-id
 variables:
   email: test@example.com
-  password: secret123
 steps:
   - action: goto
     url: /login
@@ -253,27 +189,15 @@ steps:
 
 ### "Playwright Chromium browser is not installed"
 
-Run `qa-use install-deps` to install the required browser:
-
 ```bash
 qa-use install-deps
 ```
 
-### Check your setup status
-
-Run `qa-use info` to see a complete checklist of your configuration:
+### Check your setup
 
 ```bash
 qa-use info
 ```
-
-This shows:
-- API Key status
-- App Config availability
-- Base URL configuration
-- Login credentials
-- Local config file
-- Playwright browser installation
 
 ## Resources
 
