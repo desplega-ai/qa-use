@@ -14,6 +14,12 @@ import type {
   BlocksResult,
   CreateBrowserSessionOptions,
   BrowserSessionStatus,
+  GenerateTestOptions,
+  GenerateTestResult,
+  ConsoleLogsOptions,
+  ConsoleLogsResult,
+  NetworkLogsOptions,
+  NetworkLogsResult,
 } from './browser-types.js';
 import type { ExtendedStep } from '../../src/types/test-definition.js';
 
@@ -67,6 +73,7 @@ export class BrowserApiClient {
         viewport: options.viewport ?? 'desktop',
         timeout: options.timeout ?? 300,
         ...(options.ws_url && { ws_url: options.ws_url }),
+        ...(options.record_blocks !== undefined && { record_blocks: options.record_blocks }),
       });
 
       return response.data as BrowserSession;
@@ -220,6 +227,80 @@ export class BrowserApiClient {
   }
 
   // ==========================================
+  // Test Generation
+  // ==========================================
+
+  /**
+   * Generate a test definition from recorded session blocks
+   * @param sessionId - The session ID
+   * @param options - Test generation options (name, app_config, variables)
+   * @returns Generated test YAML and metadata
+   */
+  async generateTest(sessionId: string, options: GenerateTestOptions): Promise<GenerateTestResult> {
+    try {
+      const response = await this.client.post(`/sessions/${sessionId}/generate-test`, options);
+      return response.data as GenerateTestResult;
+    } catch (error) {
+      throw this.handleError(error, 'generate test');
+    }
+  }
+
+  // ==========================================
+  // Logs
+  // ==========================================
+
+  /**
+   * Get console logs from a session
+   * @param sessionId - The session ID
+   * @param options - Filter options (level, limit)
+   * @returns Console log entries
+   */
+  async getConsoleLogs(
+    sessionId: string,
+    options: ConsoleLogsOptions = {}
+  ): Promise<ConsoleLogsResult> {
+    try {
+      const params = new URLSearchParams();
+      if (options.level) params.append('level', options.level);
+      if (options.limit !== undefined) params.append('limit', options.limit.toString());
+
+      const queryString = params.toString();
+      const url = `/sessions/${sessionId}/logs/console${queryString ? `?${queryString}` : ''}`;
+
+      const response = await this.client.get(url);
+      return response.data as ConsoleLogsResult;
+    } catch (error) {
+      throw this.handleError(error, 'get console logs');
+    }
+  }
+
+  /**
+   * Get network request logs from a session
+   * @param sessionId - The session ID
+   * @param options - Filter options (status, url_pattern, limit)
+   * @returns Network log entries
+   */
+  async getNetworkLogs(
+    sessionId: string,
+    options: NetworkLogsOptions = {}
+  ): Promise<NetworkLogsResult> {
+    try {
+      const params = new URLSearchParams();
+      if (options.status) params.append('status', options.status);
+      if (options.url_pattern) params.append('url_pattern', options.url_pattern);
+      if (options.limit !== undefined) params.append('limit', options.limit.toString());
+
+      const queryString = params.toString();
+      const url = `/sessions/${sessionId}/logs/network${queryString ? `?${queryString}` : ''}`;
+
+      const response = await this.client.get(url);
+      return response.data as NetworkLogsResult;
+    } catch (error) {
+      throw this.handleError(error, 'get network logs');
+    }
+  }
+
+  // ==========================================
   // WebSocket Streaming
   // ==========================================
 
@@ -276,4 +357,12 @@ export type {
   UrlResult,
   CreateBrowserSessionOptions,
   BrowserSessionStatus,
+  GenerateTestOptions,
+  GenerateTestResult,
+  ConsoleLogsOptions,
+  ConsoleLogsResult,
+  ConsoleLogEntry,
+  NetworkLogsOptions,
+  NetworkLogsResult,
+  NetworkLogEntry,
 } from './browser-types.js';

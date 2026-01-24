@@ -37,6 +37,8 @@ import { snapshotCommand } from './snapshot.js';
 import { screenshotCommand } from './screenshot.js';
 import { urlCommand } from './url.js';
 import { getBlocksCommand } from './get-blocks.js';
+import { logsCommand } from './logs.js';
+import { generateTestCommand } from './generate-test.js';
 
 // Advanced commands
 import { streamCommand } from './stream.js';
@@ -74,6 +76,8 @@ browserCommand.addCommand(snapshotCommand);
 browserCommand.addCommand(screenshotCommand);
 browserCommand.addCommand(urlCommand);
 browserCommand.addCommand(getBlocksCommand);
+browserCommand.addCommand(logsCommand);
+browserCommand.addCommand(generateTestCommand);
 
 // Register advanced commands
 browserCommand.addCommand(streamCommand);

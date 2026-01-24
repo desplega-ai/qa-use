@@ -375,4 +375,167 @@ describe('BrowserApiClient', () => {
       );
     });
   });
+
+  describe('generateTest', () => {
+    it('should generate test from session blocks', async () => {
+      const mockResult = {
+        yaml: 'name: Login Test\nsteps:\n  - goto: https://example.com',
+        test_definition: { name: 'Login Test' },
+        block_count: 3,
+      };
+      mockAxiosInstance.post.mockResolvedValueOnce({ data: mockResult });
+
+      const result = await client.generateTest('session-123', {
+        name: 'Login Test',
+      });
+
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/sessions/session-123/generate-test', {
+        name: 'Login Test',
+      });
+      expect(result.yaml).toContain('Login Test');
+      expect(result.block_count).toBe(3);
+    });
+
+    it('should generate test with app_config and variables', async () => {
+      const mockResult = {
+        yaml: 'name: Test with Config\nsteps: []',
+        test_definition: { name: 'Test with Config' },
+        block_count: 5,
+      };
+      mockAxiosInstance.post.mockResolvedValueOnce({ data: mockResult });
+
+      const result = await client.generateTest('session-123', {
+        name: 'Test with Config',
+        app_config: 'my-app-config',
+        variables: { base_url: 'https://staging.example.com' },
+      });
+
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/sessions/session-123/generate-test', {
+        name: 'Test with Config',
+        app_config: 'my-app-config',
+        variables: { base_url: 'https://staging.example.com' },
+      });
+      expect(result.block_count).toBe(5);
+    });
+  });
+
+  describe('getConsoleLogs', () => {
+    it('should get console logs', async () => {
+      const mockResult = {
+        logs: [{ level: 'error', text: 'Test error', timestamp: '2026-01-24T10:00:00Z' }],
+        total: 1,
+      };
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: mockResult });
+
+      const result = await client.getConsoleLogs('session-123');
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/sessions/session-123/logs/console');
+      expect(result.logs).toHaveLength(1);
+      expect(result.logs[0].level).toBe('error');
+    });
+
+    it('should get console logs with filters', async () => {
+      const mockResult = { logs: [], total: 0 };
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: mockResult });
+
+      await client.getConsoleLogs('session-123', { level: 'error', limit: 50 });
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+        '/sessions/session-123/logs/console?level=error&limit=50'
+      );
+    });
+
+    it('should get console logs with only level filter', async () => {
+      const mockResult = { logs: [], total: 0 };
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: mockResult });
+
+      await client.getConsoleLogs('session-123', { level: 'warn' });
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+        '/sessions/session-123/logs/console?level=warn'
+      );
+    });
+  });
+
+  describe('getNetworkLogs', () => {
+    it('should get network logs', async () => {
+      const mockResult = {
+        requests: [
+          {
+            method: 'GET',
+            url: 'https://api.example.com',
+            status: 200,
+            duration_ms: 150,
+            timestamp: '2026-01-24T10:00:00Z',
+          },
+        ],
+        total: 1,
+      };
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: mockResult });
+
+      const result = await client.getNetworkLogs('session-123');
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/sessions/session-123/logs/network');
+      expect(result.requests).toHaveLength(1);
+      expect(result.requests[0].status).toBe(200);
+    });
+
+    it('should get network logs with filters', async () => {
+      const mockResult = { requests: [], total: 0 };
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: mockResult });
+
+      await client.getNetworkLogs('session-123', { status: '4xx,5xx', url_pattern: '*api*' });
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+        '/sessions/session-123/logs/network?status=4xx%2C5xx&url_pattern=*api*'
+      );
+    });
+
+    it('should get network logs with limit only', async () => {
+      const mockResult = { requests: [], total: 0 };
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: mockResult });
+
+      await client.getNetworkLogs('session-123', { limit: 100 });
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+        '/sessions/session-123/logs/network?limit=100'
+      );
+    });
+  });
+
+  describe('createSession with record_blocks', () => {
+    it('should create session with record_blocks enabled', async () => {
+      const mockSession = {
+        id: 'session-rec',
+        status: 'starting',
+        created_at: '2026-01-24T10:00:00Z',
+      };
+      mockAxiosInstance.post.mockResolvedValueOnce({ data: mockSession });
+
+      await client.createSession({
+        record_blocks: true,
+      });
+
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/sessions', {
+        headless: true,
+        viewport: 'desktop',
+        timeout: 300,
+        record_blocks: true,
+      });
+    });
+
+    it('should not include record_blocks when not provided', async () => {
+      const mockSession = {
+        id: 'session-no-rec',
+        status: 'starting',
+        created_at: '2026-01-24T10:00:00Z',
+      };
+      mockAxiosInstance.post.mockResolvedValueOnce({ data: mockSession });
+
+      await client.createSession({});
+
+      const callArgs = mockAxiosInstance.post.mock.calls[0];
+      expect(callArgs[1]).not.toHaveProperty('record_blocks');
+    });
+  });
 });

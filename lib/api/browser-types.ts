@@ -15,6 +15,7 @@ export interface CreateBrowserSessionOptions {
   viewport?: ViewportType;
   timeout?: number; // Session timeout in seconds (60-3600)
   ws_url?: string; // WebSocket URL for remote/tunneled browser
+  record_blocks?: boolean; // Enable block recording for test generation
 }
 
 export interface BrowserSession {
@@ -26,6 +27,13 @@ export interface BrowserSession {
   viewport?: ViewportType;
   headless?: boolean;
   timeout?: number;
+  // Additional fields from API documentation
+  app_url?: string; // Frontend URL to view session visualization
+  last_action_at?: string; // Timestamp of last action
+  error_message?: string; // Error if session failed
+  recording_url?: string; // Video recording URL (after close)
+  har_url?: string; // HAR file URL (after close)
+  storage_state_url?: string; // Browser storage state URL (after close)
 }
 
 // ==========================================
@@ -47,6 +55,7 @@ export type BrowserActionType =
   | 'select'
   | 'check'
   | 'uncheck'
+  | 'set_checked'
   | 'wait'
   | 'wait_for_selector'
   | 'wait_for_load'
@@ -127,6 +136,13 @@ export interface UncheckAction {
   text?: string; // AI-based semantic element selection (alternative to ref)
 }
 
+export interface SetCheckedAction {
+  type: 'set_checked';
+  ref?: string;
+  text?: string; // AI-based semantic element selection (alternative to ref)
+  checked: boolean;
+}
+
 export interface ScrollIntoViewAction {
   type: 'scroll_into_view';
   ref?: string;
@@ -172,6 +188,7 @@ export type BrowserAction =
   | SelectAction
   | CheckAction
   | UncheckAction
+  | SetCheckedAction
   | WaitAction
   | WaitForSelectorAction
   | WaitForLoadAction
@@ -186,6 +203,10 @@ export interface ActionResult {
   success: boolean;
   error?: string;
   data?: unknown;
+  // Tracking fields
+  action_id?: string; // Unique action identifier
+  url_before?: string; // URL before action executed
+  url_after?: string; // URL after action executed
 }
 
 export interface SnapshotResult {
@@ -276,3 +297,67 @@ export interface GetStatusMessage {
 }
 
 export type ClientMessage = PingMessage | ActionMessage | GetStatusMessage;
+
+// ==========================================
+// Console Logs
+// ==========================================
+
+export type ConsoleLogLevel = 'log' | 'warn' | 'error' | 'info' | 'debug';
+
+export interface ConsoleLogEntry {
+  level: ConsoleLogLevel;
+  text: string;
+  timestamp: string;
+  url?: string;
+}
+
+export interface ConsoleLogsResult {
+  logs: ConsoleLogEntry[];
+  total: number;
+}
+
+export interface ConsoleLogsOptions {
+  level?: ConsoleLogLevel;
+  limit?: number;
+}
+
+// ==========================================
+// Network Logs
+// ==========================================
+
+export interface NetworkLogEntry {
+  method: string;
+  url: string;
+  status: number;
+  duration_ms: number;
+  request_headers?: Record<string, string>;
+  response_headers?: Record<string, string>;
+  timestamp: string;
+}
+
+export interface NetworkLogsResult {
+  requests: NetworkLogEntry[];
+  total: number;
+}
+
+export interface NetworkLogsOptions {
+  status?: string; // e.g., "4xx,5xx"
+  url_pattern?: string; // e.g., "*api*"
+  limit?: number;
+}
+
+// ==========================================
+// Test Generation
+// ==========================================
+
+export interface GenerateTestOptions {
+  name: string;
+  app_config?: string;
+  variables?: Record<string, string>;
+}
+
+export interface GenerateTestResult {
+  yaml: string;
+  test_definition: Record<string, unknown>;
+  block_count: number;
+}

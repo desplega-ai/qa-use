@@ -67,3 +67,42 @@ Or use `~/.qa-use.json` config file (env vars take precedence).
 - Use `.js` extensions in imports (ESM)
 - Debug with `console.error()` (stdout reserved for MCP)
 - Run `make all` (format + lint + build) before committing
+
+## E2E Testing with Browser API CLI
+
+Use this flow to manually test browser API functionality against a local backend:
+
+```bash
+# Set API URL to local backend
+export QA_USE_API_URL=http://localhost:5005
+
+# Create a browser session (--no-headless to see the browser)
+bun run cli browser create --no-headless
+
+# Navigate to test site
+bun run cli browser goto https://evals.desplega.ai/
+
+# Get page snapshot (shows ARIA tree with element refs)
+bun run cli browser snapshot
+
+# Click an element by ref (e.g., e31 for Buttons Demo link)
+bun run cli browser click e31
+
+# Or click by text (AI-based semantic selection)
+bun run cli browser click --text "Home"
+
+# Take a screenshot
+bun run cli browser screenshot /tmp/screenshot.png
+
+# Get session status (shows app_url for web UI)
+bun run cli browser status
+
+# Close the session
+bun run cli browser close
+
+# After closing, fetch logs
+bun run cli browser logs console -s <session-id>
+bun run cli browser logs network -s <session-id>
+```
+
+**Test site:** https://evals.desplega.ai/ has various UI components (buttons, checkboxes, forms, etc.) for testing browser interactions.

@@ -82,6 +82,22 @@ export const statusCommand = new Command('status')
         console.log(`URL:          ${session.current_url}`);
       }
 
+      // App URL (for viewing session in UI)
+      if (session.app_url) {
+        console.log(`App URL:      ${session.app_url}`);
+      }
+
+      // Last action time
+      if (session.last_action_at) {
+        const lastActionAt = new Date(session.last_action_at);
+        console.log(`Last Action:  ${lastActionAt.toISOString()}`);
+      }
+
+      // Error message if present
+      if (session.error_message) {
+        console.log(`Error:        \x1b[31m${session.error_message}\x1b[0m`);
+      }
+
       // Viewport
       if (session.viewport) {
         console.log(`Viewport:     ${session.viewport}`);
@@ -95,6 +111,17 @@ export const statusCommand = new Command('status')
       // Timeout
       if (session.timeout) {
         console.log(`Timeout:      ${session.timeout}s`);
+      }
+
+      // Recording URLs (available after session closes)
+      if (session.recording_url) {
+        console.log(`Recording:    ${session.recording_url}`);
+      }
+      if (session.har_url) {
+        console.log(`HAR File:     ${session.har_url}`);
+      }
+      if (session.storage_state_url) {
+        console.log(`Storage:      ${session.storage_state_url}`);
       }
 
       console.log('');

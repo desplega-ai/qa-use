@@ -417,6 +417,77 @@ export const runCommand = new Command('run')
           console.log(`ID: ${session.id}`);
           console.log(`Status: ${session.status}`);
           console.log(`URL: ${session.current_url || 'none'}`);
+          if (session.app_url) {
+            console.log(`App URL: ${session.app_url}`);
+          }
+          if (session.last_action_at) {
+            console.log(`Last Action: ${session.last_action_at}`);
+          }
+          if (session.error_message) {
+            console.log(`Error: ${session.error_message}`);
+          }
+        },
+        'logs-console': async (args, client, sessionId) => {
+          const levelIdx = args.indexOf('--level');
+          const limitIdx = args.indexOf('--limit');
+          const level = levelIdx !== -1 ? args[levelIdx + 1] : undefined;
+          const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
+
+          const result = await client.getConsoleLogs(sessionId, {
+            level: level as 'log' | 'warn' | 'error' | 'info' | 'debug' | undefined,
+            limit,
+          });
+
+          console.log(`Console logs (${result.total} total):\n`);
+          for (const log of result.logs) {
+            const prefix = log.level.toUpperCase().padEnd(5);
+            console.log(`[${prefix}] ${log.text}`);
+            if (log.url) console.log(`        at ${log.url}`);
+          }
+        },
+        'logs-network': async (args, client, sessionId) => {
+          const statusIdx = args.indexOf('--status');
+          const patternIdx = args.indexOf('--url-pattern');
+          const limitIdx = args.indexOf('--limit');
+          const status = statusIdx !== -1 ? args[statusIdx + 1] : undefined;
+          const url_pattern = patternIdx !== -1 ? args[patternIdx + 1] : undefined;
+          const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
+
+          const result = await client.getNetworkLogs(sessionId, { status, url_pattern, limit });
+
+          console.log(`Network requests (${result.total} total):\n`);
+          for (const req of result.requests) {
+            const statusColor = req.status >= 400 ? '!' : ' ';
+            console.log(
+              `${statusColor}${req.method.padEnd(6)} ${req.status} ${req.url} (${req.duration_ms}ms)`
+            );
+          }
+        },
+        'generate-test': async (args, client, sessionId) => {
+          const nameIdx = args.indexOf('--name');
+          const configIdx = args.indexOf('--app-config');
+          const outputIdx = args.indexOf('--output');
+
+          if (nameIdx === -1 || !args[nameIdx + 1]) {
+            console.log(
+              error('Usage: generate-test --name <name> [--app-config <id>] [--output <file>]')
+            );
+            return;
+          }
+
+          const name = args[nameIdx + 1];
+          const app_config = configIdx !== -1 ? args[configIdx + 1] : undefined;
+          const outputFile = outputIdx !== -1 ? args[outputIdx + 1] : undefined;
+
+          const result = await client.generateTest(sessionId, { name, app_config });
+
+          if (outputFile) {
+            const fs = await import('fs');
+            fs.writeFileSync(outputFile, result.yaml);
+            console.log(success(`Test written to ${outputFile} (${result.block_count} blocks)`));
+          } else {
+            console.log(result.yaml);
+          }
         },
       };
 
@@ -571,7 +642,14 @@ Available commands:
     screenshot [file]       Save screenshot
     url                     Get current URL
     get-blocks              Get recorded test steps (JSON)
-    status                  Get session status
+    status                  Get session status (includes app_url)
+
+  ${colors.cyan}Logs:${colors.reset}
+    logs-console            Get console logs [--level <level>] [--limit <n>]
+    logs-network            Get network logs [--status <codes>] [--url-pattern <pat>] [--limit <n>]
+
+  ${colors.cyan}Test Generation:${colors.reset}
+    generate-test           Generate test YAML --name <name> [--app-config <id>] [--output <file>]
 
   ${colors.cyan}Session:${colors.reset}
     exit, quit              Exit REPL (prompts to close session)
