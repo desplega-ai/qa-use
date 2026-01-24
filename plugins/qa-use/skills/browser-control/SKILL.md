@@ -38,12 +38,48 @@ npx @desplega.ai/qa-use browser <command>
 - If element not found, run `snapshot` to see available elements
 - **ALWAYS use `--tunnel` when testing localhost URLs** (e.g., `http://localhost:3000`) - the cloud cannot access your local machine without a tunnel!
 
+## Quick Start Example
+
+Here's a complete workflow - copy this pattern:
+
+```bash
+# 1. Create session (becomes active automatically)
+qa-use browser create --viewport desktop
+
+# 2. Navigate
+qa-use browser goto https://example.com
+
+# 3. Get snapshot to see elements
+qa-use browser snapshot
+# Output: - button "Submit" [ref=e3]
+
+# 4. Interact with elements
+qa-use browser click e3
+
+# 5. Take screenshot
+qa-use browser screenshot result.png
+
+# 6. Clean up
+qa-use browser close
+```
+
+**For localhost testing:**
+```bash
+# Use --tunnel for local apps
+qa-use browser create --tunnel
+qa-use browser goto http://localhost:3000
+qa-use browser snapshot
+qa-use browser close
+```
+
 ## Workflow
 
 ### 1. Session Management
 
+**IMPORTANT:** Sessions are automatically active after creation. Most commands DO NOT require passing a session ID!
+
 ```bash
-# Create session (remote browser managed by API)
+# Create session (becomes active automatically)
 qa-use browser create --viewport desktop
 
 # Create session with local browser + tunnel (visible browser on your machine)
@@ -52,12 +88,34 @@ qa-use browser create --tunnel
 # Create session with existing WebSocket URL (e.g., browserbase)
 qa-use browser create --ws-url wss://my-browser.example.com/ws
 
+# All subsequent commands use the active session automatically
+qa-use browser goto https://example.com
+qa-use browser snapshot
+qa-use browser click e3
+
 # List active sessions
 qa-use browser list
 
-# Close session (also stops tunnel if running)
+# Close active session (NO arguments needed)
 qa-use browser close
 ```
+
+**Multiple Sessions:**
+If you have multiple sessions and need to specify one, use the `-s` flag BEFORE the command:
+
+```bash
+# List sessions to get IDs
+qa-use browser list
+
+# Use specific session
+qa-use browser -s <session-id> goto https://example.com
+qa-use browser -s <session-id> snapshot
+```
+
+**Common Session Mistakes:**
+- ❌ `qa-use browser close <session-id>` → ✅ `qa-use browser close`
+- ❌ `qa-use browser goto --session <id> <url>` → ✅ `qa-use browser -s <id> goto <url>`
+- ❌ `qa-use browser destroy` → ✅ `qa-use browser close`
 
 **Local Browser with Tunnel (`--tunnel`):**
 - Starts a real browser on your machine (visible by default, use `--headless` for headless)
@@ -69,7 +127,7 @@ qa-use browser close
 ### 2. Navigation
 
 ```bash
-# Navigate to URL
+# Navigate to URL (NOT "navigate" - use "goto")
 qa-use browser goto https://example.com
 
 # History navigation
@@ -77,6 +135,9 @@ qa-use browser back
 qa-use browser forward
 qa-use browser reload
 ```
+
+**Common Navigation Mistakes:**
+- ❌ `qa-use browser navigate <url>` → ✅ `qa-use browser goto <url>`
 
 ### 3. Element Targeting
 
@@ -143,14 +204,18 @@ qa-use browser url
 # Get ARIA snapshot
 qa-use browser snapshot
 
-# Take screenshot
-qa-use browser screenshot                    # To file
-qa-use browser screenshot --base64           # Base64 to stdout
-qa-use browser screenshot screenshot.png     # Named file
+# Take screenshot (saves to current directory)
+qa-use browser screenshot                    # Saves as screenshot.png
+qa-use browser screenshot myfile.png         # Custom filename (positional arg)
+qa-use browser screenshot --base64           # Output base64 to stdout
 
 # Get recorded test blocks
 qa-use browser get-blocks
 ```
+
+**Common Screenshot Mistakes:**
+- ❌ `qa-use browser screenshot --output file.png` → ✅ `qa-use browser screenshot file.png`
+- ❌ `qa-use browser screenshot --path /tmp/file.png` → ✅ `qa-use browser screenshot /tmp/file.png`
 
 ### 6. Waiting
 
@@ -177,8 +242,19 @@ qa-use browser run
 
 Sessions are stored in `~/.qa-use.json`:
 - If only one active session, it's used automatically
-- Use `-s/--session-id` to specify a specific session
+- Use `-s <session-id>` to specify a specific session
 - Sessions expire after 1 hour of inactivity
+
+## Common Command Mistakes Reference
+
+| ❌ Wrong | ✅ Correct | Issue |
+|---------|----------|-------|
+| `browser navigate <url>` | `browser goto <url>` | Wrong command name |
+| `browser destroy` | `browser close` | Wrong command name |
+| `browser close <session-id>` | `browser close` | Unexpected argument |
+| `browser goto --session <id> <url>` | `browser -s <id> goto <url>` | Wrong flag position |
+| `browser screenshot --output file.png` | `browser screenshot file.png` | Use positional arg |
+| `browser screenshot --path /tmp/file.png` | `browser screenshot /tmp/file.png` | Use positional arg |
 
 ## Tips
 
@@ -186,3 +262,4 @@ Sessions are stored in `~/.qa-use.json`:
 2. **Use refs, not guessing** - Element refs are stable; don't guess CSS selectors
 3. **Close sessions** - Always close when done to free remote browser resources
 4. **Use --text for dynamic content** - When refs aren't stable, use semantic selection
+5. **Session IDs rarely needed** - Most commands work on the active session automatically
