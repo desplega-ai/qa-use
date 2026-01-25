@@ -18,9 +18,9 @@ const rootDir = join(__dirname, '..');
 const serverPath = join(rootDir, 'src', 'server.ts');
 const serverCode = readFileSync(serverPath, 'utf-8');
 
-// Read the README
-const readmePath = join(rootDir, 'README.md');
-let readme = readFileSync(readmePath, 'utf-8');
+// Read the MCP docs file (tools documentation moved from README)
+const mcpDocsPath = join(rootDir, 'MCP.md');
+let mcpDocs = readFileSync(mcpDocsPath, 'utf-8');
 
 // Tool definitions - SINGLE SOURCE OF TRUTH for documentation
 // These MUST match the tools defined in src/server.ts
@@ -177,21 +177,21 @@ function generateToolsMarkdown() {
 const startMarker = '<!-- AUTO-GENERATED-TOOLS-START -->';
 const endMarker = '<!-- AUTO-GENERATED-TOOLS-END -->';
 
-const startIndex = readme.indexOf(startMarker);
-const endIndex = readme.indexOf(endMarker);
+const startIndex = mcpDocs.indexOf(startMarker);
+const endIndex = mcpDocs.indexOf(endMarker);
 
 if (startIndex === -1 || endIndex === -1) {
-  console.error('Could not find auto-generation markers in README.md');
+  console.error('Could not find auto-generation markers in MCP.md');
   process.exit(1);
 }
 
-const before = readme.substring(0, startIndex + startMarker.length);
-const after = readme.substring(endIndex);
+const before = mcpDocs.substring(0, startIndex + startMarker.length);
+const after = mcpDocs.substring(endIndex);
 
 const toolsMarkdown = generateToolsMarkdown();
-const newReadme = before + '\n' + toolsMarkdown + after;
+const newMcpDocs = before + '\n' + toolsMarkdown + after;
 
-writeFileSync(readmePath, newReadme, 'utf-8');
+writeFileSync(mcpDocsPath, newMcpDocs, 'utf-8');
 
-console.log('✅ README.md tools section updated successfully!');
+console.log('✅ MCP.md tools section updated successfully!');
 console.log(`📝 Generated documentation for ${Object.keys(toolDefinitions).length} tools across ${Object.keys(categories).length} categories`);
