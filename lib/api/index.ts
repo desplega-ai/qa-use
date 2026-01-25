@@ -236,6 +236,7 @@ export interface RunCliTestOptions {
   store_recording?: boolean;
   store_har?: boolean;
   ws_url?: string;
+  vars?: Record<string, string>; // Variable overrides for cloud test (test_id)
 }
 
 export type SSECallback = (event: SSEEvent) => void;

@@ -24,6 +24,12 @@ interface CreateOptions {
   tunnel?: boolean;
   subdomain?: string;
   afterTestId?: string;
+  var?: Record<string, string>;
+}
+
+function collectVars(value: string, previous: Record<string, string>) {
+  const [key, val] = value.split('=');
+  return { ...previous, [key]: val };
 }
 
 export const createCommand = new Command('create')
@@ -40,6 +46,12 @@ export const createCommand = new Command('create')
   .option('--tunnel', 'Start local browser with tunnel (keeps process running)')
   .option('-s, --subdomain <name>', 'Custom tunnel subdomain (only with --tunnel)')
   .option('--after-test-id <uuid>', 'Run a test before session becomes interactive')
+  .option(
+    '--var <key=value...>',
+    'Variable overrides: base_url, login_url, login_username, login_password',
+    collectVars,
+    {}
+  )
   .action(async (options: CreateOptions) => {
     // Validate mutually exclusive options
     if (options.tunnel && options.wsUrl) {
@@ -117,6 +129,7 @@ async function createRemoteSession(
       timeout,
       ws_url: options.wsUrl,
       after_test_id: options.afterTestId,
+      vars: options.var,
     });
 
     console.log(info(`Session created: ${session.id}`));
@@ -151,6 +164,13 @@ async function createRemoteSession(
     }
     if (options.afterTestId) {
       console.log(`After Test ID: ${options.afterTestId}`);
+    }
+    if (options.var && Object.keys(options.var).length > 0) {
+      console.log(
+        `Variables: ${Object.entries(options.var)
+          .map(([k, v]) => `${k}=${v}`)
+          .join(', ')}`
+      );
     }
   } catch (err) {
     // Handle specific error cases for after_test_id

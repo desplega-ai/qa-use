@@ -41,11 +41,31 @@ qa-use browser close                      # Cleanup
 | `qa-use browser create --tunnel` | Create local browser with API tunnel |
 | `qa-use browser create --viewport <size>` | Set viewport: `desktop`, `tablet`, `mobile` |
 | `qa-use browser create --ws-url <url>` | Connect to existing WebSocket browser |
+| `qa-use browser create --after-test-id <uuid>` | Run a test first, then become interactive |
+| `qa-use browser create --var <key=value>` | Override app config variables (repeatable) |
 | `qa-use browser list` | List active sessions |
 | `qa-use browser status` | Show current session details (app_url, recording_url, etc.) |
 | `qa-use browser close` | Close active session |
 
 Sessions auto-persist in `~/.qa-use.json`. One active session = no `-s` flag needed.
+
+### Variable Overrides
+
+Use `--var` to override app config variables at runtime. Common variables:
+
+| Variable | Description |
+|----------|-------------|
+| `base_url` | Base URL for the app (e.g., preview deployment URL) |
+| `login_url` | Login page URL |
+| `login_username` | Username/email for authentication |
+| `login_password` | Password for authentication |
+
+Example with ephemeral preview URL:
+```bash
+qa-use browser create --after-test-id <login-test-uuid> \
+  --var base_url=https://preview-123.example.com \
+  --var login_url=https://preview-123.example.com/auth/login
+```
 
 ### Navigation
 

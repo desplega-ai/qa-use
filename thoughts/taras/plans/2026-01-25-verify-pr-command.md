@@ -1,9 +1,38 @@
 ---
 date: 2026-01-25T03:00:00Z
 topic: "verify-pr Command Implementation"
+status: implemented
 ---
 
 # `/qa-use:verify-pr` Command Implementation Plan
+
+## Implementation Status
+
+**Status: ✅ Implemented** (2026-01-25)
+
+### Completed:
+- [x] CLI `--var` flag on `browser create` and `browser run`
+- [x] `--var` works independently (not tied to `--after-test-id`)
+- [x] Common vars documented: `base_url`, `login_url`, `login_username`, `login_password`
+- [x] Command file: `plugins/qa-use/commands/verify-pr.md`
+- [x] CI reference: `plugins/qa-use/skills/qa-use/references/ci.md`
+- [x] SKILL.md updated with Variable Overrides section
+
+### Files Modified/Created:
+- `lib/api/browser-types.ts` - Added `vars` to `CreateBrowserSessionOptions`
+- `lib/api/browser.ts` - Pass `vars` in `createSession`
+- `src/cli/commands/browser/create.ts` - Added `--var` flag
+- `src/cli/commands/browser/run.ts` - Added `--var` flag
+- `plugins/qa-use/commands/verify-pr.md` - New command
+- `plugins/qa-use/skills/qa-use/references/ci.md` - New CI guide
+- `plugins/qa-use/skills/qa-use/SKILL.md` - Added Variable Overrides section
+
+### Pending Manual Testing:
+- [ ] Command appears in Claude Code completions when typing `/qa-use:`
+- [ ] Test with a real PR: `/qa-use:verify-pr #<test-pr>`
+- [ ] Test with ephemeral URL: `/qa-use:verify-pr #<test-pr> --base-url <preview-url>`
+
+---
 
 ## Overview
 
@@ -64,51 +93,39 @@ Key files to check:
 - **NO auto-posting PR comments** - User controls that via `gh pr comment`
 - **NO new agents** - Use existing browser-navigator
 
-## CLI Prerequisite: Variable Override on `browser create`
+## CLI Prerequisite: Variable Override on `browser create` ✅ IMPLEMENTED
 
-The `test run` command already supports `--var`:
-```bash
-qa-use test run login-test --var base_url=https://preview-123.example.com  # ✅ Already works
-```
-
-**How `test run --var` works**: Vars are applied **client-side** to the test definition via `applyVariableOverrides()` before sending to API. The modified `test_definitions` object is sent with vars already merged in.
-
-But `browser create --after-test-id` passes a **cloud test UUID** - there's no local definition to modify. We need **backend support** to accept vars separately:
+The `--var` flag is now available on both `browser create` and `browser run`:
 
 ```bash
-# Single var
-qa-use browser create --after-test-id <id> --var base_url=https://preview-123.example.com
+# Works independently (no --after-test-id required)
+qa-use browser create --var base_url=https://preview-123.example.com
 
-# Multiple vars (same pattern as test run)
+# With after-test-id for authenticated sessions
 qa-use browser create --after-test-id <id> \
   --var base_url=https://preview-123.example.com \
   --var login_url=https://preview-123.example.com/auth/login
 ```
 
-**Implementation**:
-
-1. **CLI** (`src/cli/commands/browser/create.ts`):
-   - Add `--var <key>=<value>` flag (repeatable, same `collectVars` pattern as `test run`)
-   - Pass `vars` object in API request
-
-2. **Backend** (API change required):
-   - Accept `vars` field in session creation request
-   - Apply vars when running the `after_test_id` test
+**Common variables** (documented in CLI help and SKILL.md):
+| Variable | Description |
+|----------|-------------|
+| `base_url` | Base URL for the app (e.g., preview deployment) |
+| `login_url` | Login page URL |
+| `login_username` | Username/email for authentication |
+| `login_password` | Password for authentication |
 
 **API Contract**:
 ```typescript
-// browser create with --after-test-id + vars
 POST /sessions
 {
-  after_test_id: "uuid",
-  vars: {  // NEW: backend applies these at runtime
+  after_test_id: "uuid",  // optional
+  vars: {
     base_url: "https://preview-123.example.com",
     login_url: "https://preview-123.example.com/auth/login"
   }
 }
 ```
-
-Variables in `vars` override any matching keys in the test's `variables` section at runtime.
 
 ## Prerequisites / Setup Required
 

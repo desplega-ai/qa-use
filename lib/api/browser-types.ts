@@ -17,6 +17,7 @@ export interface CreateBrowserSessionOptions {
   ws_url?: string; // WebSocket URL for remote/tunneled browser
   record_blocks?: boolean; // Enable block recording for test generation
   after_test_id?: string; // Run a test before session becomes interactive
+  vars?: Record<string, string>; // Variable overrides for after_test_id test
 }
 
 export interface BrowserSession {

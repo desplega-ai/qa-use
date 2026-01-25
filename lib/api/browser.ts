@@ -76,6 +76,7 @@ export class BrowserApiClient {
         ...(options.ws_url && { ws_url: options.ws_url }),
         ...(options.record_blocks !== undefined && { record_blocks: options.record_blocks }),
         ...(options.after_test_id && { after_test_id: options.after_test_id }),
+        ...(options.vars && Object.keys(options.vars).length > 0 && { vars: options.vars }),
       });
 
       return response.data as BrowserSession;

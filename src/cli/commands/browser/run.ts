@@ -20,6 +20,12 @@ interface RunOptions {
   sessionId?: string;
   headless?: boolean;
   afterTestId?: string;
+  var?: Record<string, string>;
+}
+
+function collectVars(value: string, previous: Record<string, string>) {
+  const [key, val] = value.split('=');
+  return { ...previous, [key]: val };
 }
 
 // ANSI color codes
@@ -41,6 +47,12 @@ export const runCommand = new Command('run')
   .option(
     '--after-test-id <uuid>',
     'Run a test before session becomes interactive (for new sessions)'
+  )
+  .option(
+    '--var <key=value...>',
+    'Variable overrides: base_url, login_url, login_username, login_password',
+    collectVars,
+    {}
   )
   .action(async (options: RunOptions) => {
     try {
@@ -96,6 +108,7 @@ export const runCommand = new Command('run')
               viewport: 'desktop',
               timeout: 300,
               after_test_id: options.afterTestId,
+              vars: options.var,
             });
           } catch (createErr) {
             // Handle specific error cases for after_test_id
