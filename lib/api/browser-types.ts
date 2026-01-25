@@ -167,6 +167,17 @@ export interface WaitForLoadAction {
 
 export interface SnapshotAction {
   type: 'snapshot';
+  interactive?: boolean;
+  compact?: boolean;
+  max_depth?: number;
+  scope?: string;
+}
+
+export interface SnapshotOptions {
+  interactive?: boolean; // Only include interactive elements
+  compact?: boolean; // Remove empty structural elements
+  max_depth?: number; // Limit tree depth (1-20)
+  scope?: string; // CSS selector to scope snapshot
 }
 
 export interface ScreenshotAction {
@@ -209,9 +220,16 @@ export interface ActionResult {
   url_after?: string; // URL after action executed
 }
 
+export interface SnapshotFilterStats {
+  original_lines: number;
+  filtered_lines: number;
+  reduction_percent: number;
+}
+
 export interface SnapshotResult {
   snapshot: string;
   url?: string;
+  filter_stats?: SnapshotFilterStats;
 }
 
 export interface UrlResult {

@@ -391,9 +391,28 @@ export const runCommand = new Command('run')
           }
         },
         snapshot: async (args, client, sessionId) => {
-          const snapshot = await client.getSnapshot(sessionId);
+          // Parse flags from args
+          const interactive = args.includes('--interactive') || args.includes('-i');
+          const compact = args.includes('--compact') || args.includes('-c');
+          const depthIdx = args.findIndex((a) => a === '--max-depth' || a === '-d');
+          const max_depth = depthIdx !== -1 ? parseInt(args[depthIdx + 1], 10) : undefined;
+          const scopeIdx = args.findIndex((a) => a === '--scope');
+          const scope = scopeIdx !== -1 ? args[scopeIdx + 1] : undefined;
+
+          const snapshot = await client.getSnapshot(sessionId, {
+            interactive,
+            compact,
+            max_depth,
+            scope,
+          });
+
           if (snapshot.url) {
             console.log(`URL: ${snapshot.url}\n`);
+          }
+          if (snapshot.filter_stats) {
+            console.log(
+              `Filtered: ${snapshot.filter_stats.filtered_lines}/${snapshot.filter_stats.original_lines} lines (${snapshot.filter_stats.reduction_percent}% reduction)\n`
+            );
           }
           console.log(snapshot.snapshot);
         },
@@ -638,7 +657,8 @@ Available commands:
     wait-for-load [state]   Wait for page load (load|domcontentloaded|networkidle)
 
   ${colors.cyan}Inspection:${colors.reset}
-    snapshot                Get ARIA accessibility tree
+    snapshot [-i] [-c] [-d N] [--scope sel]
+                            Get ARIA accessibility tree (with optional filtering)
     screenshot [file]       Save screenshot
     url                     Get current URL
     get-blocks              Get recorded test steps (JSON)

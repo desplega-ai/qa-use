@@ -44,7 +44,9 @@ Execute multi-step browsing tasks by cycling through snapshot → analyze → ac
    - Run: `qa-use browser goto <start_url>`
 
 3. **Loop until goal achieved or max_steps**
-   a. **Snapshot**: Run `qa-use browser snapshot`
+   a. **Snapshot**: Run `qa-use browser snapshot --interactive --max-depth 5`
+      - Use filtering to reduce token usage while preserving interactive elements
+      - Increase max_depth if needed elements aren't visible
    b. **Analyze**: Am I at the goal? What actions could get me closer?
    c. **Execute**: Run best action (click, scroll, fill)
    d. **Check**: Did the action succeed? Am I closer to goal?

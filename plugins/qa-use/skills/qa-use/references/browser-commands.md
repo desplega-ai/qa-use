@@ -98,8 +98,16 @@ qa-use browser reload
 Get the page's ARIA accessibility tree with element refs.
 
 ```bash
-qa-use browser snapshot
+qa-use browser snapshot [options]
 ```
+
+| Flag | Description |
+|------|-------------|
+| `-i, --interactive` | Only include interactive elements (buttons, inputs, links) |
+| `-c, --compact` | Remove empty structural elements |
+| `-d, --max-depth <n>` | Limit tree depth (1-20, where 1 = top level only) |
+| `--scope <selector>` | CSS selector to scope snapshot (e.g., `#main`, `.form`) |
+| `--json` | Output raw JSON including filter_stats |
 
 **Output format:**
 ```
@@ -108,6 +116,23 @@ qa-use browser snapshot
 - textbox "Email" [ref=e4]
 - link "Sign Up" [ref=e5]
 ```
+
+**Filtering examples:**
+```bash
+# Get only interactive elements (great for reducing token count)
+qa-use browser snapshot --interactive
+
+# Combine filters for maximum reduction
+qa-use browser snapshot --interactive --compact --max-depth 3
+
+# Scope to specific section
+qa-use browser snapshot --scope "#main-content"
+```
+
+**Typical reductions:**
+- `--max-depth 3`: ~98% reduction
+- `--interactive`: 0-80% depending on page
+- Combined `--interactive --max-depth 4`: ~95% reduction
 
 Use the `[ref=eN]` values in interaction commands.
 

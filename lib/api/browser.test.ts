@@ -286,6 +286,56 @@ describe('BrowserApiClient', () => {
       expect(snapshot.snapshot).toContain('Example');
       expect(snapshot.url).toBe('https://example.com');
     });
+
+    it('should get ARIA snapshot with filtering options', async () => {
+      const mockSnapshot = {
+        snapshot: '- button "Submit" [ref=e1]',
+        url: 'https://example.com',
+        filter_stats: {
+          original_lines: 450,
+          filtered_lines: 42,
+          reduction_percent: 91,
+        },
+      };
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: mockSnapshot });
+
+      const snapshot = await client.getSnapshot('session-123', {
+        interactive: true,
+        compact: true,
+        max_depth: 3,
+      });
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+        '/sessions/session-123/snapshot?interactive=true&compact=true&max_depth=3'
+      );
+      expect(snapshot.filter_stats?.reduction_percent).toBe(91);
+    });
+
+    it('should get ARIA snapshot with scope option', async () => {
+      const mockSnapshot = {
+        snapshot: '- heading "Main Content" [ref=e1]',
+        url: 'https://example.com',
+      };
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: mockSnapshot });
+
+      await client.getSnapshot('session-123', { scope: '#main' });
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+        '/sessions/session-123/snapshot?scope=%23main'
+      );
+    });
+
+    it('should get ARIA snapshot without options (backward compatible)', async () => {
+      const mockSnapshot = {
+        snapshot: '- heading "Example" [ref=e1]',
+        url: 'https://example.com',
+      };
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: mockSnapshot });
+
+      await client.getSnapshot('session-123');
+
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/sessions/session-123/snapshot');
+    });
   });
 
   describe('getScreenshot', () => {

@@ -10,6 +10,7 @@ import type {
   BrowserAction,
   ActionResult,
   SnapshotResult,
+  SnapshotOptions,
   UrlResult,
   BlocksResult,
   CreateBrowserSessionOptions,
@@ -174,10 +175,21 @@ export class BrowserApiClient {
 
   /**
    * Get the ARIA accessibility tree snapshot
+   * @param sessionId - The session ID
+   * @param options - Filtering options (interactive, compact, max_depth, scope)
    */
-  async getSnapshot(sessionId: string): Promise<SnapshotResult> {
+  async getSnapshot(sessionId: string, options: SnapshotOptions = {}): Promise<SnapshotResult> {
     try {
-      const response = await this.client.get(`/sessions/${sessionId}/snapshot`);
+      const params = new URLSearchParams();
+      if (options.interactive) params.append('interactive', 'true');
+      if (options.compact) params.append('compact', 'true');
+      if (options.max_depth !== undefined) params.append('max_depth', options.max_depth.toString());
+      if (options.scope) params.append('scope', options.scope);
+
+      const queryString = params.toString();
+      const url = `/sessions/${sessionId}/snapshot${queryString ? `?${queryString}` : ''}`;
+
+      const response = await this.client.get(url);
       return response.data as SnapshotResult;
     } catch (error) {
       throw this.handleError(error, 'get snapshot');
@@ -354,6 +366,8 @@ export type {
   BrowserAction,
   ActionResult,
   SnapshotResult,
+  SnapshotOptions,
+  SnapshotFilterStats,
   UrlResult,
   CreateBrowserSessionOptions,
   BrowserSessionStatus,
