@@ -25,8 +25,9 @@ export const gotoCommand = new Command('goto')
         process.exit(1);
       }
 
-      // Validate URL
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      // Validate URL - skip prefix if using variable syntax (backend handles substitution)
+      const hasVarSyntax = url.startsWith('<var>') || url.startsWith('{{');
+      if (!url.startsWith('http://') && !url.startsWith('https://') && !hasVarSyntax) {
         url = 'https://' + url;
       }
 

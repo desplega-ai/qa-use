@@ -175,7 +175,8 @@ export const runCommand = new Command('run')
             return;
           }
           let url = args[0];
-          if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          const hasVarSyntax = url.startsWith('<var>') || url.startsWith('{{');
+          if (!url.startsWith('http://') && !url.startsWith('https://') && !hasVarSyntax) {
             url = 'https://' + url;
           }
           const result = await client.executeAction(sessionId, { type: 'goto', url });
