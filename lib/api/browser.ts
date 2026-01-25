@@ -75,6 +75,7 @@ export class BrowserApiClient {
         timeout: options.timeout ?? 300,
         ...(options.ws_url && { ws_url: options.ws_url }),
         ...(options.record_blocks !== undefined && { record_blocks: options.record_blocks }),
+        ...(options.after_test_id && { after_test_id: options.after_test_id }),
       });
 
       return response.data as BrowserSession;
@@ -141,9 +142,14 @@ export class BrowserApiClient {
         return session;
       }
 
-      // If session is closed or failed, throw error
+      // If session is closed, throw error
       if (session.status === 'closed') {
         throw new Error(`Session ${sessionId} is closed`);
+      }
+
+      // If session failed (e.g., after_test_id test failed), return session for error handling
+      if (session.status === 'failed') {
+        return session;
       }
 
       // Wait before polling again

@@ -72,10 +72,7 @@ export function resolveTestPath(testNameOrPath: string, directory: string): stri
  * @param directory - Test directory root
  * @returns File path if found, null otherwise
  */
-export async function findLocalTestById(
-  testId: string,
-  directory: string
-): Promise<string | null> {
+export async function findLocalTestById(testId: string, directory: string): Promise<string | null> {
   const files = await discoverTests(directory);
 
   for (const file of files) {

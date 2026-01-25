@@ -19,6 +19,7 @@ qa-use browser create [options]
 | `--headless` | Run in headless mode (default with `--tunnel`) |
 | `--no-headless` | Show browser window (use with `--tunnel` for debugging) |
 | `--ws-url <url>` | Connect to existing WebSocket browser endpoint |
+| `--after-test-id <uuid>` | Run a test before session becomes interactive (start after login, etc.) |
 
 **Examples:**
 ```bash
@@ -27,7 +28,31 @@ qa-use browser create --viewport mobile      # Remote browser, mobile viewport
 qa-use browser create --tunnel               # Local headless browser with tunnel
 qa-use browser create --tunnel --no-headless # Local visible browser for debugging
 qa-use browser create --ws-url wss://...     # Connect to existing browser
+qa-use browser create --after-test-id <uuid> # Start session after running a test
 ```
+
+**Starting after login (--after-test-id):**
+
+The `--after-test-id` flag runs an existing test before the session becomes interactive. This is extremely useful for:
+- **Bypassing login walls** - use a test that logs in, then start exploring from the authenticated state
+- **Starting from a specific page state** - run a test that navigates to a complex form, then continue manually
+- **Resuming from checkpoints** - save common setup steps as a test, reuse across explorations
+
+```bash
+# First, create a login test and get its ID from the test listing
+qa-use test run --list
+
+# Then create a session that starts after login
+qa-use browser create --after-test-id 4292938b-338d-4c1c-952e-6bcdf3f7731a
+
+# Session is now logged in and ready for exploration
+qa-use browser snapshot
+```
+
+**Error handling for --after-test-id:**
+- If test not found: "Test not found" (exit 1)
+- If test belongs to different org: "Test belongs to different organization" (exit 1)
+- If test fails: Session status becomes "failed" with error message displayed
 
 **Session persistence:** Sessions are stored in `~/.qa-use.json`. If only one active session exists, it's used automatically for all commands.
 
@@ -344,9 +369,10 @@ For extended multi-command sessions:
 
 ```bash
 qa-use browser run
+qa-use browser run --after-test-id <uuid>  # Start REPL from post-test state
 ```
 
-Opens interactive REPL for browser commands.
+Opens interactive REPL for browser commands. Use `--after-test-id` to start the REPL in an authenticated or pre-configured state.
 
 ## Local Browser with Tunnel
 

@@ -19,6 +19,7 @@ import { success, error, info } from '../../lib/output.js';
 interface RunOptions {
   sessionId?: string;
   headless?: boolean;
+  afterTestId?: string;
 }
 
 // ANSI color codes
@@ -37,6 +38,10 @@ export const runCommand = new Command('run')
   .option('-s, --session-id <id>', 'Use existing session ID')
   .option('--headless', 'Run browser in headless mode (for new sessions)', true)
   .option('--no-headless', 'Run browser with visible UI (for new sessions)')
+  .option(
+    '--after-test-id <uuid>',
+    'Run a test before session becomes interactive (for new sessions)'
+  )
   .action(async (options: RunOptions) => {
     try {
       // Load configuration
@@ -76,20 +81,54 @@ export const runCommand = new Command('run')
           console.log(info(`Using existing session ${sessionId}`));
         } catch {
           // No existing session, create new one
-          console.log(info('Creating new browser session...'));
+          if (options.afterTestId) {
+            console.log(
+              info(`Creating new browser session with after-test: ${options.afterTestId}...`)
+            );
+          } else {
+            console.log(info('Creating new browser session...'));
+          }
 
-          const session = await client.createSession({
-            headless: options.headless !== false,
-            viewport: 'desktop',
-            timeout: 300,
-          });
+          let session;
+          try {
+            session = await client.createSession({
+              headless: options.headless !== false,
+              viewport: 'desktop',
+              timeout: 300,
+              after_test_id: options.afterTestId,
+            });
+          } catch (createErr) {
+            // Handle specific error cases for after_test_id
+            if (options.afterTestId && createErr instanceof Error) {
+              const message = createErr.message.toLowerCase();
+              if (message.includes('not found') || message.includes('404')) {
+                console.log(error('Test not found'));
+                process.exit(1);
+              }
+              if (message.includes('forbidden') || message.includes('403')) {
+                console.log(error('Test belongs to different organization'));
+                process.exit(1);
+              }
+            }
+            throw createErr;
+          }
 
           sessionId = session.id;
           sessionOwned = true;
 
           if (session.status === 'starting') {
             console.log(info('Waiting for session to become active...'));
-            await client.waitForStatus(session.id, 'active', 60000);
+            const waitedSession = await client.waitForStatus(session.id, 'active', 60000);
+            // Check if session failed (e.g., after_test_id test failed)
+            if (waitedSession.status === 'failed') {
+              const errorMsg = waitedSession.error_message || 'Test execution failed';
+              console.log(error(`Session failed: ${errorMsg}`));
+              process.exit(1);
+            }
+          } else if (session.status === 'failed') {
+            const errorMsg = session.error_message || 'Test execution failed';
+            console.log(error(`Session failed: ${errorMsg}`));
+            process.exit(1);
           }
 
           // Store session locally

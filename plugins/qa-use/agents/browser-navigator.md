@@ -111,6 +111,11 @@ If navigation requires authentication:
 - Report: "Login required. Unable to proceed without credentials."
 - Provide: current URL, what was visible before login wall
 - DO NOT attempt to guess or bypass credentials
+- **Suggest using --after-test-id**: If a login test exists, recommend creating a new session with:
+  ```bash
+  qa-use browser create --after-test-id <login-test-uuid>
+  ```
+  This runs the login test first, leaving the session in an authenticated state.
 
 ### CAPTCHAs
 If CAPTCHA is encountered:

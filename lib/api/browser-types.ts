@@ -6,7 +6,7 @@
 // Session Types
 // ==========================================
 
-export type BrowserSessionStatus = 'starting' | 'active' | 'closing' | 'closed';
+export type BrowserSessionStatus = 'starting' | 'active' | 'closing' | 'closed' | 'failed';
 
 export type ViewportType = 'desktop' | 'mobile' | 'tablet';
 
@@ -16,6 +16,7 @@ export interface CreateBrowserSessionOptions {
   timeout?: number; // Session timeout in seconds (60-3600)
   ws_url?: string; // WebSocket URL for remote/tunneled browser
   record_blocks?: boolean; // Enable block recording for test generation
+  after_test_id?: string; // Run a test before session becomes interactive
 }
 
 export interface BrowserSession {

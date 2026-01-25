@@ -23,6 +23,7 @@ interface CreateOptions {
   wsUrl?: string;
   tunnel?: boolean;
   subdomain?: string;
+  afterTestId?: string;
 }
 
 export const createCommand = new Command('create')
@@ -38,6 +39,7 @@ export const createCommand = new Command('create')
   .option('--ws-url <url>', 'WebSocket URL for remote/tunneled browser')
   .option('--tunnel', 'Start local browser with tunnel (keeps process running)')
   .option('-s, --subdomain <name>', 'Custom tunnel subdomain (only with --tunnel)')
+  .option('--after-test-id <uuid>', 'Run a test before session becomes interactive')
   .action(async (options: CreateOptions) => {
     // Validate mutually exclusive options
     if (options.tunnel && options.wsUrl) {
@@ -47,6 +49,11 @@ export const createCommand = new Command('create')
 
     if (options.subdomain && !options.tunnel) {
       console.log(error('--subdomain can only be used with --tunnel'));
+      process.exit(1);
+    }
+
+    if (options.afterTestId && options.tunnel) {
+      console.log(error('Cannot use --after-test-id with --tunnel mode'));
       process.exit(1);
     }
 
@@ -97,7 +104,11 @@ async function createRemoteSession(
   timeout: number
 ): Promise<void> {
   try {
-    console.log(info('Creating browser session...'));
+    if (options.afterTestId) {
+      console.log(info(`Creating browser session with after-test: ${options.afterTestId}...`));
+    } else {
+      console.log(info('Creating browser session...'));
+    }
 
     // Create session
     const session = await client.createSession({
@@ -105,6 +116,7 @@ async function createRemoteSession(
       viewport,
       timeout,
       ws_url: options.wsUrl,
+      after_test_id: options.afterTestId,
     });
 
     console.log(info(`Session created: ${session.id}`));
@@ -115,6 +127,11 @@ async function createRemoteSession(
       console.log(info('Waiting for session to become active...'));
       const activeSession = await client.waitForStatus(session.id, 'active', 60000);
       console.log(success(`Session ${activeSession.id} is now active`));
+    } else if (session.status === 'failed') {
+      // Test execution failed - display error and exit
+      const errorMsg = session.error_message || 'Test execution failed';
+      console.log(error(`Session failed: ${errorMsg}`));
+      process.exit(1);
     } else if (session.status === 'active') {
       console.log(success(`Session ${session.id} is active`));
     }
@@ -132,7 +149,22 @@ async function createRemoteSession(
     if (options.wsUrl) {
       console.log(`WebSocket URL: ${options.wsUrl}`);
     }
+    if (options.afterTestId) {
+      console.log(`After Test ID: ${options.afterTestId}`);
+    }
   } catch (err) {
+    // Handle specific error cases for after_test_id
+    if (options.afterTestId && err instanceof Error) {
+      const message = err.message.toLowerCase();
+      if (message.includes('not found') || message.includes('404')) {
+        console.log(error('Test not found'));
+        process.exit(1);
+      }
+      if (message.includes('forbidden') || message.includes('403')) {
+        console.log(error('Test belongs to different organization'));
+        process.exit(1);
+      }
+    }
     console.log(error(err instanceof Error ? err.message : 'Failed to create session'));
     process.exit(1);
   }

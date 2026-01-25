@@ -30,3 +30,22 @@ Explore a web page or complete a navigation goal.
 /qa-use:explore "find the pricing page"
 /qa-use:explore https://myapp.com/dashboard "find user settings"
 ```
+
+## Starting After Login
+
+Many pages require authentication. Use `--after-test-id` when creating the browser session to start from a logged-in state:
+
+```bash
+# Create session that runs login test first
+qa-use browser create --after-test-id <login-test-uuid>
+
+# Then explore the authenticated area
+/qa-use:explore https://myapp.com/dashboard
+```
+
+This is extremely useful for:
+- **Exploring authenticated pages** - bypass login walls automatically
+- **Testing user-specific features** - start as a logged-in user
+- **Complex setup flows** - run a setup test, then explore manually
+
+To get test UUIDs, use `qa-use test run --list` or check your tests in the desplega.ai dashboard.
