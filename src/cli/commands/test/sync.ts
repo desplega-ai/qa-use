@@ -5,10 +5,12 @@
 import { Command } from 'commander';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as yaml from 'yaml';
 import { loadConfig } from '../../lib/config.js';
 import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
 import { error, success, info, warning } from '../../lib/output.js';
 import { ApiClient } from '../../../../lib/api/index.js';
+import type { TestDefinition } from '../../../types/test-definition.js';
 
 export const syncCommand = new Command('sync')
   .description('Sync local tests with cloud')
@@ -72,46 +74,76 @@ async function pullFromCloud(
 
   let pulled = 0;
   let skipped = 0;
+  const writtenIds = new Set<string>(); // Track already written tests to avoid duplicates
 
   for (const test of cloudTests) {
-    const safeName = test.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
-    const outputPath = path.join(testDir, safeName + '.yaml');
-
-    // Check if file exists
-    let exists = false;
-    try {
-      await fs.access(outputPath);
-      exists = true;
-    } catch {
-      // File doesn't exist
-    }
-
-    if (exists && !force) {
-      console.log(`  Skip: ${safeName}.yaml (exists, use --force to overwrite)`);
-      skipped++;
+    // Skip if this test was already written as a dependency of another test
+    if (writtenIds.has(test.id)) {
       continue;
     }
 
     if (dryRun) {
-      console.log(`  Would pull: ${test.name} -> ${outputPath}`);
-    } else {
-      try {
-        const content = await client.exportTest(test.id, 'yaml', true);
-        await fs.writeFile(outputPath, content, 'utf-8');
-        console.log(success(`  ${safeName}.yaml`));
-        pulled++;
-      } catch (err) {
-        console.log(error(`  Failed to export ${test.name}: ${err}`));
+      const safeName = test.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+      console.log(`  Would pull: ${test.name} -> ${path.join(testDir, safeName + '.yaml')}`);
+      continue;
+    }
+
+    try {
+      // Export with dependencies
+      const content = await client.exportTest(test.id, 'yaml', true);
+
+      // Parse multi-document YAML to get all tests (deps + main)
+      const docs = yaml.parseAllDocuments(content);
+      const tests = docs.map((d) => d.toJSON() as TestDefinition);
+
+      // Write each test to its own file
+      for (const testDef of tests) {
+        // Skip if already written
+        if (testDef.id && writtenIds.has(testDef.id)) {
+          continue;
+        }
+
+        const safeName = (testDef.name || testDef.id || 'unnamed-test')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '');
+        const outputPath = path.join(testDir, safeName + '.yaml');
+
+        // Check if file exists
+        let exists = false;
+        try {
+          await fs.access(outputPath);
+          exists = true;
+        } catch {
+          // File doesn't exist
+        }
+
+        if (exists && !force) {
+          console.log(`  Skip: ${safeName}.yaml (exists, use --force to overwrite)`);
+          skipped++;
+        } else {
+          // Serialize individual test (depends_on stays as UUID)
+          const testContent = yaml.stringify(testDef);
+          await fs.writeFile(outputPath, testContent, 'utf-8');
+          console.log(success(`  ${safeName}.yaml`));
+          pulled++;
+        }
+
+        if (testDef.id) {
+          writtenIds.add(testDef.id);
+        }
       }
+    } catch (err) {
+      console.log(error(`  Failed to export ${test.name}: ${err}`));
     }
   }
 
   console.log('');
   if (dryRun) {
-    console.log(info(`Dry run complete. Would pull ${cloudTests.length - skipped} test(s).`));
+    console.log(info(`Dry run complete. Would pull ${cloudTests.length} test(s).`));
   } else {
     console.log(success(`Pulled ${pulled} test(s), skipped ${skipped}`));
   }

@@ -1,5 +1,0 @@
-name: Example
-app_config: 600dc916-16b9-4cb8-a7d1-09658f146e45
-steps:
-  - action: to_be_visible
-    target: dashboard

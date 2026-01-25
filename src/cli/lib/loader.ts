@@ -66,6 +66,33 @@ export function resolveTestPath(testNameOrPath: string, directory: string): stri
 }
 
 /**
+ * Find a local test file by its ID
+ *
+ * @param testId - The UUID to search for
+ * @param directory - Test directory root
+ * @returns File path if found, null otherwise
+ */
+export async function findLocalTestById(
+  testId: string,
+  directory: string
+): Promise<string | null> {
+  const files = await discoverTests(directory);
+
+  for (const file of files) {
+    try {
+      const def = await loadTestDefinition(file);
+      if (def.id === testId) {
+        return file;
+      }
+    } catch {
+      // Skip files that fail to load
+    }
+  }
+
+  return null;
+}
+
+/**
  * Load a test and all its dependencies recursively
  *
  * @param testName - Test name or path
@@ -79,26 +106,34 @@ export async function loadTestWithDeps(
   const definitions: TestDefinition[] = [];
   const loaded = new Set<string>();
 
-  async function loadRecursive(name: string) {
+  async function loadRecursive(nameOrPath: string, isFullPath: boolean = false) {
     // Avoid circular dependencies
-    if (loaded.has(name)) return;
-    loaded.add(name);
+    if (loaded.has(nameOrPath)) return;
+    loaded.add(nameOrPath);
 
-    const filePath = resolveTestPath(name, directory);
+    // If isFullPath is true (from findLocalTestById), use directly; otherwise resolve
+    const filePath = isFullPath ? nameOrPath : resolveTestPath(nameOrPath, directory);
     const def = await loadTestDefinition(filePath);
 
-    // Load dependency first (if it exists and is a local file)
+    // Load dependency first (if it exists)
     if (def.depends_on) {
       // Check if depends_on is a UUID (cloud test) or a file name
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         def.depends_on
       );
 
-      if (!isUuid) {
+      if (isUuid) {
+        // Try to find local file with this ID first
+        const localFile = await findLocalTestById(def.depends_on, directory);
+        if (localFile) {
+          // Load from local file (localFile is already a full path from discoverTests)
+          await loadRecursive(localFile, true);
+        }
+        // If not found locally, API will resolve at runtime
+      } else {
         // It's a local file reference
         await loadRecursive(def.depends_on);
       }
-      // If it's a UUID, the API will resolve it
     }
 
     definitions.push(def);

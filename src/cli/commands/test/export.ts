@@ -5,9 +5,11 @@
 import { Command } from 'commander';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as yaml from 'yaml';
 import { loadConfig } from '../../lib/config.js';
 import { error, success, info } from '../../lib/output.js';
 import { ApiClient } from '../../../../lib/api/index.js';
+import type { TestDefinition } from '../../../types/test-definition.js';
 
 export const exportCommand = new Command('export')
   .description('Export a cloud test to a local file')
@@ -37,54 +39,75 @@ export const exportCommand = new Command('export')
       const client = new ApiClient(config.api_url);
       client.setApiKey(config.api_key);
 
+      const includeDeps = options.deps !== false;
+
       if (!options.stdout) {
         console.log(info(`Exporting test ${testId}...`));
       }
 
       // Export from API
-      const content = await client.exportTest(testId, options.format, options.deps !== false);
+      const content = await client.exportTest(testId, options.format, includeDeps);
 
-      // Output to stdout if requested
+      // Output to stdout if requested (all tests concatenated)
       if (options.stdout) {
         console.log(content);
         return;
       }
 
-      // Determine output path
-      let outputPath = options.output;
-
-      if (!outputPath) {
-        // Get test info to use name for filename
-        try {
-          const testInfo = await client.getTest(testId);
-          const safeName = testInfo.name
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-|-$/g, '');
-          const ext = options.format === 'json' ? '.json' : '.yaml';
-          outputPath = path.join(config.test_directory || './qa-tests', safeName + ext);
-        } catch {
-          // Fall back to using test ID as filename
-          const ext = options.format === 'json' ? '.json' : '.yaml';
-          outputPath = path.join(config.test_directory || './qa-tests', testId + ext);
-        }
-      }
+      const testDir = config.test_directory || './qa-tests';
 
       // Ensure directory exists
-      const dir = path.dirname(outputPath);
-      await fs.mkdir(dir, { recursive: true });
+      await fs.mkdir(testDir, { recursive: true });
 
-      // Write file
-      await fs.writeFile(outputPath, content, 'utf-8');
+      // Parse tests from content
+      let tests: TestDefinition[];
+      if (options.format === 'json') {
+        const parsed = JSON.parse(content);
+        tests = Array.isArray(parsed) ? parsed : [parsed];
+      } else {
+        // Parse multi-document YAML
+        const docs = yaml.parseAllDocuments(content);
+        tests = docs.map((d) => d.toJSON() as TestDefinition);
+      }
 
-      console.log(success(`Exported to ${outputPath}`));
+      // If explicit output path provided, write single file (backward compat for single test)
+      if (options.output) {
+        const dir = path.dirname(options.output);
+        await fs.mkdir(dir, { recursive: true });
+        await fs.writeFile(options.output, content, 'utf-8');
+        console.log(success(`Exported to ${options.output}`));
+        console.log(`  Format: ${options.format}`);
+        console.log(`  Tests: ${tests.length}`);
+        return;
+      }
+
+      // Write each test to its own file
+      const ext = options.format === 'json' ? '.json' : '.yaml';
+      const written: string[] = [];
+
+      for (const test of tests) {
+        const safeName = (test.name || test.id || 'unnamed-test')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '');
+        const outputPath = path.join(testDir, safeName + ext);
+
+        // Serialize individual test (depends_on stays as UUID)
+        const testContent =
+          options.format === 'json' ? JSON.stringify(test, null, 2) : yaml.stringify(test);
+
+        await fs.writeFile(outputPath, testContent, 'utf-8');
+        written.push(outputPath);
+      }
 
       // Show summary
-      const lines = content.split('\n').length;
+      console.log(success(`Exported ${written.length} test(s):`));
+      for (const file of written) {
+        console.log(`  - ${file}`);
+      }
       console.log(`  Format: ${options.format}`);
-      console.log(`  Lines: ${lines}`);
-      if (options.deps !== false) {
-        console.log(`  Dependencies: included`);
+      if (includeDeps && tests.length > 1) {
+        console.log(`  Dependencies: ${tests.length - 1} included`);
       }
     } catch (err) {
       console.log(error(`Export failed: ${err}`));

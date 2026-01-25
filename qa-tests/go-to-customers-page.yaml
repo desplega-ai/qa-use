@@ -1,0 +1,26 @@
+name: Go to customers page
+id: 4292938b-338d-4c1c-952e-6bcdf3f7731a
+app_config: 600dc916-16b9-4cb8-a7d1-09658f146e45
+variables: {}
+steps:
+  - type: extended
+    action:
+      action: click
+      value: "{}"
+      value_can_be_variable: false
+      max_mode: false
+      ultra_mode: false
+      value_strategy: literal
+    locator:
+      chain:
+        - method: get_by_role
+          args:
+            - link
+          args_can_be_variable: false
+          kwargs:
+            name: Customers
+          kwargs_can_be_variable: false
+    name: Click Customers Link
+    description: Click on the Customers link in the navigation menu
+    aaa_phase: act
+    should_skip: false

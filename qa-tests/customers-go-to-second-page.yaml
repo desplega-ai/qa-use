@@ -1,0 +1,38 @@
+name: Customers > Go to second page
+id: 74628094-00ce-4f81-b928-9a369a63f25b
+app_config: 600dc916-16b9-4cb8-a7d1-09658f146e45
+variables: {}
+depends_on: 4292938b-338d-4c1c-952e-6bcdf3f7731a
+steps:
+  - type: extended
+    action:
+      action: click
+      value: "{}"
+      value_can_be_variable: false
+      max_mode: false
+      ultra_mode: false
+      value_strategy: literal
+    locator:
+      chain:
+        - method: get_by_label
+          args:
+            - Go to next page
+          args_can_be_variable: false
+          kwargs_can_be_variable: false
+    name: Click Next Page
+    description: Click the 'Next' button in the pagination section to go to the next
+      page of customers.
+    aaa_phase: act
+    should_skip: false
+  - type: extended
+    action:
+      action: scroll
+      value: "{'delta_y': -10000}"
+      value_can_be_variable: false
+      max_mode: false
+      ultra_mode: false
+      value_strategy: literal
+    name: Scroll to top
+    description: Scroll to the top of the page
+    aaa_phase: act
+    should_skip: false
