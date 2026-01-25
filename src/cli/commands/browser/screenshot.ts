@@ -14,6 +14,7 @@ interface ScreenshotOptions {
   sessionId?: string;
   base64?: boolean;
   stdout?: boolean;
+  url?: boolean;
 }
 
 export const screenshotCommand = new Command('screenshot')
@@ -22,6 +23,7 @@ export const screenshotCommand = new Command('screenshot')
   .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
   .option('--base64', 'Output as base64 to stdout')
   .option('--stdout', 'Output raw PNG bytes to stdout (for piping)')
+  .option('--url', 'Return pre-signed URL instead of image data')
   .action(async (file: string | undefined, options: ScreenshotOptions) => {
     try {
       // Load configuration
@@ -41,8 +43,16 @@ export const screenshotCommand = new Command('screenshot')
         client,
       });
 
-      // Get screenshot
-      const imageBuffer = await client.getScreenshot(resolved.id);
+      // Handle URL mode first (returns string, not buffer)
+      if (options.url) {
+        const url = await client.getScreenshot(resolved.id, { returnUrl: true });
+        await touchSession(resolved.id);
+        console.log(url);
+        return;
+      }
+
+      // Get screenshot as buffer for other modes
+      const imageBuffer = (await client.getScreenshot(resolved.id)) as Buffer;
 
       // Update session timestamp
       await touchSession(resolved.id);

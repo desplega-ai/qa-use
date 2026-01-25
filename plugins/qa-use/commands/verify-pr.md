@@ -15,6 +15,7 @@ Verify a pull request's frontend changes through automated browser testing.
 |----------|-------------|
 | `pr` | PR number (e.g., `#123`), URL, or omit to infer from current branch |
 | `--base-url <url>` | Override base URL for ephemeral/preview deployments |
+| `--concurrency <level>` | Control parallel execution: `sequential` (1 at a time), `low` (2), `medium` (3), `high` (all). Default: `medium` |
 
 ## What Happens
 
@@ -22,10 +23,12 @@ Verify a pull request's frontend changes through automated browser testing.
 2. Gets PR diff and identifies changed frontend files
 3. Maps changed files to routes/features
 4. Auto-discovers login test from cloud tests
-5. Creates authenticated browser session
-6. Spawns browser-navigator agent(s) to explore changed areas
-7. Captures screenshots and action blocks as evidence
-8. Generates markdown report to stdout AND temp file
+5. **Spawns feature-verifier agents in parallel** (one per route/feature)
+   - Each agent creates its own browser session
+   - Each agent captures screenshots and evidence independently
+   - Agents return structured results
+6. Aggregates results from all agents
+7. Generates unified markdown report with all evidence
 
 ## Examples
 
@@ -34,6 +37,8 @@ Verify a pull request's frontend changes through automated browser testing.
 /qa-use:verify-pr https://github.com/owner/repo/pull/123
 /qa-use:verify-pr                              # infer from current branch
 /qa-use:verify-pr #123 --base-url https://preview-123.example.com
+/qa-use:verify-pr #123 --concurrency high      # verify all features in parallel
+/qa-use:verify-pr #123 --concurrency sequential    # one at a time (for debugging)
 ```
 
 ## Workflow
@@ -82,64 +87,209 @@ qa-use test list --cloud --limit 1000 | grep -i -E "login|auth"
   2. Create session without `--after-test-id` and attempt manual login if credentials available
   3. Or proceed without auth and note in report
 
-### Step 5: Create Browser Session
+### Step 5: Prepare for Parallel Verification
 
-```bash
-# Without ephemeral URL override:
-qa-use browser create --after-test-id <login-test-uuid> --viewport desktop
+From Step 3, you have a list of routes/features to verify. For each feature, prepare the agent input:
 
-# With ephemeral URL override (--base-url flag provided):
-qa-use browser create --after-test-id <login-test-uuid> --viewport desktop \
-  --var base_url=<ephemeral-url> \
-  --var login_url=<ephemeral-url>/auth/login
+```json
+{
+  "features": [
+    {
+      "id": "autocomplete",
+      "route": "/autocomplete",
+      "description": "Autocomplete search with multi-select",
+      "changed_files": ["src/app/autocomplete/page.tsx"]
+    },
+    {
+      "id": "home",
+      "route": "/",
+      "description": "Home page navigation updated",
+      "changed_files": ["src/app/page.tsx"]
+    }
+  ],
+  "login_test_id": "<uuid from Step 4>",
+  "base_url": "<--base-url flag or app config base_url>"
+}
 ```
 
-Common `--var` overrides for app config:
+**Variables for session creation** (pass to each agent):
 | Variable | Description |
 |----------|-------------|
 | `base_url` | Base URL for the app (e.g., preview deployment) |
 | `login_url` | Login page URL |
-| `login_username` | Username/email for authentication |
-| `login_password` | Password for authentication |
+| `login_test_id` | UUID of login test to run before verification |
 
-- Store session ID for cleanup
-- Get initial `app_url` from `qa-use browser status --json`
-- The `--var` flag ensures the login test runs against the ephemeral URL
+### Step 6: Spawn Feature-Verifier Agents
 
-### Step 6: Navigate and Validate Changed Areas
+Parse `--concurrency` flag (default: `medium`):
+- `sequential`: 1 agent at a time
+- `low`: 2 agents in parallel
+- `medium`: 3 agents in parallel
+- `high`: all agents in parallel
 
-For each identified route/feature:
+For EACH feature identified, spawn a **feature-verifier agent** respecting concurrency limit:
 
 ```
-# Use --base-url override if provided, otherwise use app config base_url
-base = <--base-url flag> || <app config base_url>
+Spawn Task agents in parallel with subagent_type=qa-use:feature-verifier:
+[
+  {
+    "feature_id": "autocomplete",
+    "route": "/autocomplete",
+    "description": "Autocomplete search with multi-select",
+    "base_url": "<base_url>",
+    "login_test_id": "<login_test_id>",
+    "pr_number": "<pr>"
+  },
+  {
+    "feature_id": "home",
+    "route": "/",
+    "description": "Home page navigation",
+    "base_url": "<base_url>",
+    "login_test_id": "<login_test_id>",
+    "pr_number": "<pr>"
+  }
+]
+```
 
-Spawn browser-navigator agent with:
+**Each agent MUST return a structured result** (see Feature-Verifier Agent section below).
+
+Wait for ALL agents to complete before proceeding to Step 7.
+
+### Step 7: Aggregate Results (REDUCE)
+
+Collect structured results from all feature-verifier agents:
+
+```json
 {
-  "goal": "Navigate to <route> and verify <feature description> is working. Take screenshots of key states.",
-  "start_url": "<base><route>",
-  "max_steps": 10
+  "sessions": [
+    {
+      "feature_id": "autocomplete",
+      "session_id": "<session-id-1>",
+      "app_url": "<app_url>",
+      "recording_url": "<recording_url>",
+      "har_url": "<har_url>",
+      "screenshots": {
+        "initial": "https://presigned-url-to-initial.png",
+        "final": "https://presigned-url-to-final.png"
+      },
+      "blocks_file": "/tmp/pr-verify-<pr>-autocomplete-blocks.json",
+      "status": "verified|issues|failed",
+      "findings": ["finding 1", "finding 2"]
+    },
+    {
+      "feature_id": "home",
+      "session_id": "<session-id-2>",
+      ...
+    }
+  ]
 }
 ```
 
-- Capture screenshots at each significant state
-- Record findings from agent output
+**MANDATORY CHECKPOINT - All Results Collected**:
+- [ ] All spawned agents have completed
+- [ ] Each agent returned session_id, app_url, recording_url, har_url
+- [ ] Each agent returned screenshot URLs (initial and final)
+- [ ] Each agent returned blocks_file path
 
-### Step 7: Capture Evidence
+### Step 8: Verify Evidence Files
 
-```bash
-qa-use browser get-blocks > /tmp/pr-verify-<pr>-blocks.json
-qa-use browser screenshot /tmp/pr-verify-<pr>-final.png
-qa-use browser status --json > /tmp/pr-verify-<pr>-status.json
-```
-
-### Step 8: Close Session and Get Artifacts
+The feature-verifier agents close their own sessions. Screenshots are returned as pre-signed URLs (no local files). Verify blocks files exist:
 
 ```bash
-qa-use browser close
-# Session ID is still accessible for status
-qa-use browser status -s <session-id> --json  # Get recording_url, har_url
+# Verify blocks files exist (screenshots are URLs, not local files)
+ls -la /tmp/pr-verify-<pr>-*-blocks.json
+
+# Expected files per feature:
+# /tmp/pr-verify-<pr>-<feature>-blocks.json
 ```
+
+If any blocks files are missing, note which feature's agent failed to capture evidence. Screenshot URLs are returned in the agent's structured result.
+
+## Feature-Verifier Agent
+
+Each feature-verifier agent runs independently and MUST:
+
+### Input
+
+```json
+{
+  "feature_id": "string",      // Unique identifier for this feature
+  "route": "string",           // Route to navigate to (e.g., "/autocomplete")
+  "description": "string",     // What to verify
+  "base_url": "string",        // Base URL for the app
+  "login_test_id": "string",   // Login test UUID (optional)
+  "pr_number": "string"        // PR number for file naming
+}
+```
+
+### Agent Workflow
+
+1. **Create session**:
+   ```bash
+   qa-use browser create --after-test-id <login_test_id> --viewport desktop \
+     --var base_url=<base_url>
+   ```
+   Store: `SESSION_ID`
+
+2. **Get session info**:
+   ```bash
+   qa-use browser status --json
+   ```
+   Store: `APP_URL`
+
+3. **Capture initial screenshot**:
+   ```bash
+   INITIAL_SCREENSHOT_URL=$(qa-use browser screenshot --url)
+   ```
+
+4. **Navigate and verify**:
+   ```bash
+   qa-use browser goto <base_url><route>
+   ```
+   Perform verification interactions based on `description`.
+
+5. **Capture final screenshot**:
+   ```bash
+   FINAL_SCREENSHOT_URL=$(qa-use browser screenshot --url)
+   ```
+
+6. **Capture action blocks**:
+   ```bash
+   qa-use browser get-blocks > /tmp/pr-verify-<pr>-<feature_id>-blocks.json
+   ```
+
+7. **Close session and get artifacts**:
+   ```bash
+   qa-use browser close
+   qa-use browser status -s <SESSION_ID> --json
+   ```
+   Store: `RECORDING_URL`, `HAR_URL`
+
+### Required Output
+
+The agent MUST return this structured result:
+
+```json
+{
+  "feature_id": "<feature_id>",
+  "session_id": "<SESSION_ID>",
+  "app_url": "<APP_URL>",
+  "recording_url": "<RECORDING_URL>",
+  "har_url": "<HAR_URL>",
+  "screenshots": {
+    "initial": "https://presigned-url-to-initial-screenshot.png",
+    "final": "https://presigned-url-to-final-screenshot.png"
+  },
+  "blocks_file": "/tmp/pr-verify-<pr>-<feature_id>-blocks.json",
+  "status": "verified|issues|failed",
+  "findings": [
+    "Finding 1",
+    "Finding 2"
+  ]
+}
+```
+
+**CRITICAL**: All fields are REQUIRED. If any field cannot be captured, include it with an error message explaining why (e.g., `"recording_url": "ERROR: Session closed before recording available"`).
 
 ### Step 9: Generate Report
 
@@ -156,10 +306,12 @@ Output markdown report to:
 **Branch**: <branch>
 **Verified**: <timestamp>
 
-### Session Info
-- **Live View**: [App URL](<app_url>)
-- **Recording**: [Video](<recording_url>) *(available after close)*
-- **HAR Logs**: [Network Logs](<har_url>)
+### Sessions
+
+| Feature | Session ID | Live View | Recording | HAR Logs |
+|---------|------------|-----------|-----------|----------|
+| <feature_id> | `<session_id>` | [View](<app_url>) | [Video](<recording_url>) | [Logs](<har_url>) |
+| <feature_id> | `<session_id>` | [View](<app_url>) | [Video](<recording_url>) | [Logs](<har_url>) |
 
 ### Changes Analyzed
 | File | Type | Route/Feature |
@@ -168,22 +320,29 @@ Output markdown report to:
 
 ### Verification Results
 
-#### <Route/Feature 1>
+#### <Feature ID 1>: <Route>
 **Status**: ✅ Verified / ⚠️ Issues Found / ❌ Failed
+**Session**: `<session_id>`
 
 **Screenshots**:
-- Initial state: `/tmp/pr-verify-<pr>-<feature>-1.png`
-- After interaction: `/tmp/pr-verify-<pr>-<feature>-2.png`
-
-**Navigation Log**:
-<browser-navigator output>
+| State | Preview |
+|-------|---------|
+| Initial | ![Initial](<initial_screenshot_url>) |
+| Final | ![Final](<final_screenshot_url>) |
 
 **Findings**:
-- <finding 1>
-- <finding 2>
+- <finding from agent>
+- <finding from agent>
 
-### Actions Performed
-<formatted get-blocks output>
+**Actions Performed**:
+```json
+<contents of /tmp/pr-verify-<pr>-<feature>-blocks.json or summary>
+```
+
+---
+
+#### <Feature ID 2>: <Route>
+(repeat structure)
 
 ### Proposed Tests
 If new tests are recommended based on verification:

@@ -68,13 +68,23 @@ Or use `~/.qa-use.json` config file (env vars take precedence).
 - Debug with `console.error()` (stdout reserved for MCP)
 - Run `make all` (format + lint + build) before committing
 
+## Browser CLI & REPL Sync
+
+**IMPORTANT:** When modifying browser commands in `src/cli/commands/browser/*.ts`, also update the REPL in `src/cli/commands/browser/run.ts`, and vice versa. They share the same functionality:
+
+- CLI: `qa-use browser <command>` (individual command files)
+- REPL: `qa-use browser run` then `<command>` (commands object in run.ts)
+
+Both must support the same options and behavior.
+
 ## E2E Testing with Browser API CLI
 
-Use this flow to manually test browser API functionality against a local backend:
+Use this flow to manually test browser API functionality against a local backend.
+
+**Note:** The `.qa-use-tests.json` file is pre-configured with localhost:5005 and a valid API key. No env setup needed - just run commands directly.
 
 ```bash
-# Set API URL to local backend
-export QA_USE_API_URL=http://localhost:5005
+# No env setup required - .qa-use-tests.json handles it
 
 # Create a browser session (--no-headless to see the browser)
 bun run cli browser create --no-headless

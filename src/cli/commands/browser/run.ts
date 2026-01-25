@@ -470,8 +470,17 @@ export const runCommand = new Command('run')
           console.log(snapshot.snapshot);
         },
         screenshot: async (args, client, sessionId) => {
-          const buffer = await client.getScreenshot(sessionId);
-          const filename = args[0] || `screenshot-${Date.now()}.png`;
+          const urlMode = args.includes('--url');
+
+          if (urlMode) {
+            const url = await client.getScreenshot(sessionId, { returnUrl: true });
+            console.log(url);
+            return;
+          }
+
+          const buffer = (await client.getScreenshot(sessionId)) as Buffer;
+          const filteredArgs = args.filter((a) => a !== '--url');
+          const filename = filteredArgs[0] || `screenshot-${Date.now()}.png`;
           const fs = await import('fs');
           fs.writeFileSync(filename, buffer);
           console.log(success(`Screenshot saved to ${filename}`));
@@ -712,7 +721,8 @@ Available commands:
   ${colors.cyan}Inspection:${colors.reset}
     snapshot [-i] [-c] [-d N] [--scope sel]
                             Get ARIA accessibility tree (with optional filtering)
-    screenshot [file]       Save screenshot
+    screenshot [file] [--url]
+                            Save screenshot or return pre-signed URL
     url                     Get current URL
     get-blocks              Get recorded test steps (JSON)
     status                  Get session status (includes app_url)

@@ -205,10 +205,23 @@ export class BrowserApiClient {
 
   /**
    * Get a screenshot of the current page
-   * @returns Buffer containing PNG image data
+   * @param sessionId - The session ID
+   * @param options - Optional settings
+   * @param options.returnUrl - If true, returns a pre-signed URL instead of binary data
+   * @returns Buffer containing PNG image data, or string URL if returnUrl is true
    */
-  async getScreenshot(sessionId: string): Promise<Buffer> {
+  async getScreenshot(
+    sessionId: string,
+    options?: { returnUrl?: boolean }
+  ): Promise<Buffer | string> {
     try {
+      if (options?.returnUrl) {
+        const response = await this.client.get(`/sessions/${sessionId}/screenshot`, {
+          params: { return_url: true },
+        });
+        return response.data.url as string;
+      }
+
       const response = await this.client.get(`/sessions/${sessionId}/screenshot`, {
         responseType: 'arraybuffer',
       });
