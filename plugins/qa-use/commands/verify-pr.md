@@ -43,9 +43,28 @@ Extract from arguments:
 - `pr`: PR number/URL or empty (agent will infer from branch)
 - `base_url`: Optional URL override from `--base-url` flag
 
-### Step 2: Spawn PR-Verifier Agent
+### Step 2: Detect Environment
 
-Spawn a single `pr-verifier` agent in background:
+Check if running in CI:
+```bash
+# CI environment detected if either is "true"
+echo $CI
+echo $GITHUB_ACTIONS
+```
+
+### Step 3: Spawn PR-Verifier Agent
+
+**In CI** (`CI=true` or `GITHUB_ACTIONS=true`): Run synchronously and wait for completion.
+
+```
+Task(
+  subagent_type: "qa-use:pr-verifier",
+  run_in_background: false,  # MUST wait in CI
+  prompt: "Verify PR <pr> with base_url=<base_url>"
+)
+```
+
+**Locally** (interactive): Run in background so user can continue working.
 
 ```
 Task(
@@ -55,12 +74,13 @@ Task(
 )
 ```
 
-### Step 3: Return Immediately
+### Step 4: Output
 
-Tell the user:
+**In CI**: Wait for agent to complete, then output the report path and suggest posting to PR.
+
+**Locally**: Return immediately with:
 ```
 🚀 PR verification started in background.
-   Progress: Check with TaskOutput
    Report will be at: /tmp/pr-verify-report-<pr>.md
    To post: gh pr comment <pr> --body-file /tmp/pr-verify-report-<pr>.md
 ```
