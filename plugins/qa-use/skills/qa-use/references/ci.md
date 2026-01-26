@@ -70,34 +70,78 @@ name: PR Verification
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to verify"
+        required: true
+        type: number
+
+concurrency:
+  group: pr-verify-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
 
 jobs:
   verify-pr:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: read
+      pull-requests: write
+      statuses: read
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Full history for diff analysis
+
+      - name: Check PR approval status
+        id: approval
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # REVIEW_DECISION=$(gh pr view ${{ github.event.pull_request.number || inputs.pr_number }} --json reviewDecision -q '.reviewDecision')
+          # echo "Review decision: $REVIEW_DECISION"
+          # if [ "$REVIEW_DECISION" != "APPROVED" ]; then
+          #   echo "PR is not approved yet. Skipping verification."
+          #   echo "approved=false" >> $GITHUB_OUTPUT
+          # else
+          #   echo "approved=true" >> $GITHUB_OUTPUT
+          # fi
+          # For demonstration purposes, we will assume all PRs are approved.
+          echo "approved=true" >> $GITHUB_OUTPUT
 
       - name: Setup Node.js
+        if: steps.approval.outputs.approved == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install Claude Code CLI
+        if: steps.approval.outputs.approved == 'true'
         run: |
           curl -fsSL https://claude.ai/install.sh | bash
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Install qa-use plugin and CLI
+      - name: Verify Claude CLI Installation
+        if: steps.approval.outputs.approved == 'true'
         run: |
-          claude mcp add-from-marketplace qa-use
+          claude --version || (echo "Claude CLI installation failed" && exit 1)
+
+      - name: Install qa-use plugin and CLI
+        if: steps.approval.outputs.approved == 'true'
+        run: |
+          claude plugin marketplace add desplega-ai/qa-use
+          claude plugin install qa-use@desplega.ai
           npm install -g @desplega.ai/qa-use
 
-      # Wait for Vercel preview deployment
       - name: Wait for Vercel Preview
+        if: steps.approval.outputs.approved == 'true'
         uses: patrickedqvist/wait-for-vercel-preview@v1.3.1
         id: vercel
         with:
@@ -105,24 +149,37 @@ jobs:
           max_timeout: 300
 
       - name: Run PR Verification
+        if: steps.approval.outputs.approved == 'true'
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           QA_USE_API_KEY: ${{ secrets.QA_USE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI: true
         run: |
-          # Run with preview URL override
-          claude --print "/qa-use:verify-pr #${{ github.event.pull_request.number }} --base-url ${{ steps.vercel.outputs.url }}"
+          # Run Claude Code with the verify-pr command using Vercel preview URL
+          claude --print --verbose --dangerously-skip-permissions --output-format stream-json --model haiku "/qa-use:verify-pr #${{ github.event.pull_request.number || inputs.pr_number }} --base-url ${{ steps.vercel.outputs.url }}" 2>&1 | jq -c 'select(.type == "assistant" or .type == "tool_use" or .type == "result")'
 
       - name: Post Report to PR
-        if: always()
+        if: always() && steps.approval.outputs.approved == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ -f /tmp/pr-verify-report-${{ github.event.pull_request.number }}.md ]; then
-            gh pr comment ${{ github.event.pull_request.number }} \
-              --body-file /tmp/pr-verify-report-${{ github.event.pull_request.number }}.md
+          if [ -f /tmp/pr-verify-report-${{ github.event.pull_request.number || inputs.pr_number }}.md ]; then
+            gh pr comment ${{ github.event.pull_request.number || inputs.pr_number }} \
+              --body-file /tmp/pr-verify-report-${{ github.event.pull_request.number || inputs.pr_number }}.md
           fi
+
+      - name: Upload Verification Artifacts
+        if: always() && steps.approval.outputs.approved == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-verification-${{ github.event.pull_request.number || inputs.pr_number }}
+          path: |
+            /tmp/pr-verify-*.png
+            /tmp/pr-verify-*.json
+            /tmp/pr-verify-*.jsonl
+            /tmp/pr-verify-*.log
+            /tmp/pr-verify-report-*.md
 ```
 
 ### Netlify Preview Deployment
