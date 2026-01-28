@@ -90,6 +90,7 @@ export type IssueType =
   | 'security_vulnerability'
   | 'observation'
   | 'other';
+
 export type Severity = 'low' | 'medium' | 'high' | 'critical' | 'minor' | 'major' | 'blocker';
 
 export interface IssueReport {

@@ -1,0 +1,157 @@
+name: Login
+id: a362969f-0b1a-4de8-b0aa-694717b60a7e
+app_config: 34a5db67-e9a8-4f18-ad87-5bbdb07a18dc
+tags: []
+description: >-
+  # Test: Login
+
+
+  ## Arrange
+
+  - Navigate to the login page
+
+  - Ensure the email input field is accessible and ready for user input
+
+  - Prepare valid user credentials (email and password)
+
+  - Verify the login form is displayed with all required fields
+
+
+  ## Act
+
+  - Enter the email address in the email field
+
+  - Click the 'Continue' button to advance to the password entry screen
+
+  - Enter the password in the password field
+
+  - Click the 'Continue' button to submit the credentials and complete the login
+  process
+
+
+  ## Assert
+
+  - Verify the user is successfully authenticated and redirected to the
+  dashboard
+
+  - Confirm the dashboard heading is visible and properly displayed
+
+  - Validate that user profile elements are present and accessible
+
+  - Ensure the login flow completes without errors or exceptions
+variables: {}
+steps:
+  - type: extended
+    action:
+      action: fill
+      value: <var>login_username</var>
+      value_can_be_variable: false
+      max_mode: false
+      ultra_mode: false
+      value_strategy: literal
+    locator:
+      chain:
+        - method: get_by_role
+          args:
+            - textbox
+          args_can_be_variable: false
+          kwargs:
+            name: Email address
+          kwargs_can_be_variable: false
+    name: Enter Email
+    description: Enter the login username into the email address field.
+    aaa_phase: act
+    should_skip: false
+  - type: extended
+    action:
+      action: click
+      value: "{}"
+      value_can_be_variable: false
+      max_mode: false
+      ultra_mode: false
+      value_strategy: literal
+    locator:
+      chain:
+        - method: get_by_role
+          args:
+            - button
+          args_can_be_variable: false
+          kwargs:
+            name: Continue
+            exact: true
+          kwargs_can_be_variable: false
+    name: Click Continue
+    description: Click the 'Continue' button to proceed with the login flow.
+    aaa_phase: act
+    should_skip: false
+  - type: extended
+    action:
+      action: fill
+      value: <var>login_password</var>
+      value_can_be_variable: false
+      max_mode: false
+      ultra_mode: false
+      value_strategy: literal
+    locator:
+      chain:
+        - method: get_by_role
+          args:
+            - textbox
+          args_can_be_variable: false
+          kwargs:
+            name: Password
+          kwargs_can_be_variable: false
+    name: Enter Password
+    description: Enter the password into the password field.
+    aaa_phase: act
+    should_skip: false
+  - type: extended
+    action:
+      action: click
+      value: "{}"
+      value_can_be_variable: false
+      max_mode: false
+      ultra_mode: false
+      value_strategy: literal
+    locator:
+      chain:
+        - method: get_by_role
+          args:
+            - button
+          args_can_be_variable: false
+          kwargs:
+            name: Continue
+          kwargs_can_be_variable: false
+    name: Click Continue
+    description: Click the Continue button to proceed with the login process.
+    aaa_phase: act
+    should_skip: false
+  - type: extended
+    action:
+      action: ai_assertion
+      value: The user is successfully logged in and redirected to the dashboard.
+      value_can_be_variable: false
+      max_mode: false
+      ultra_mode: false
+      value_strategy: literal
+    name: The user is successfully logged in and redirected to the dashboard.
+    aaa_phase: assert
+    should_skip: true
+  - type: extended
+    action:
+      action: to_be_visible
+      value: Do nothing
+      value_can_be_variable: false
+      max_mode: false
+      ultra_mode: false
+      value_strategy: literal
+    locator:
+      chain:
+        - method: get_by_text
+          args:
+            - What do you want to do today?
+          args_can_be_variable: false
+          kwargs_can_be_variable: false
+    name: Welcome text visible
+    description: <some description>
+    should_skip: false

@@ -1,0 +1,50 @@
+name: Navigation > Checks
+id: 6c48fb50-d76f-4346-93b1-845fb4ace2e6
+app_config: 34a5db67-e9a8-4f18-ad87-5bbdb07a18dc
+tags:
+  - e2e
+  - other
+description: >-
+  # Test: Navigation > Checks
+
+  ## Arrange
+
+  - User is on the application with the sidebar navigation visible - The
+  'Checks' menu item is accessible in the sidebar navigation
+
+
+  ## Act
+
+  - Click the 'Checks' link in the sidebar navigation menu to navigate to the
+  'Checks' page
+
+
+  ## Assert
+
+  - The 'Checks' page loads successfully
+variables: {}
+depends_on: a362969f-0b1a-4de8-b0aa-694717b60a7e
+steps:
+  - type: extended
+    action:
+      action: click
+      value: "{}"
+      value_can_be_variable: false
+      max_mode: false
+      ultra_mode: false
+      value_strategy: literal
+    locator:
+      chain:
+        - method: get_by_text
+          args:
+            - Checks
+          args_can_be_variable: false
+          kwargs_can_be_variable: false
+    name: Click Checks link
+    description: Click on the 'Checks' link in the sidebar navigation.
+    aaa_phase: act
+    should_skip: false
+severity: critical
+priority: medium
+success_criteria: lelele
+is_positive: true

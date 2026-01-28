@@ -5,12 +5,14 @@
  * Run 'pnpm generate:types' to regenerate
  *
  * Source: http://localhost:5005/vibe-qa/cli/schema
- * Generated: 2026-01-22T01:14:59.542Z
+ * Generated: 2026-01-28T15:38:08.910Z
  */
 
 export type Name = string;
 export type Id = string | null;
 export type AppConfig = string | null;
+export type Tags = string[];
+export type Description = string | null;
 export type DependsOn = string | null;
 export type Type = 'simple';
 export type Action =
@@ -294,10 +296,14 @@ export type SelectorStrategy =
   | 'fallback'
   | 'ai_based';
 export type Name2 = string | null;
-export type Description = string | null;
+export type Description1 = string | null;
 export type AaaPhase1 = ('arrange' | 'act' | 'assert') | null;
 export type ShouldSkip = boolean;
 export type Steps = (SimpleStep | ExtendedStep)[];
+export type Severity = ('low' | 'medium' | 'high' | 'critical') | null;
+export type Priority = ('low' | 'medium' | 'high' | 'urgent') | null;
+export type SuccessCriteria = string | null;
+export type IsPositive = boolean | null;
 
 /**
  * Schema for qa-use test definition files
@@ -306,11 +312,15 @@ export interface TestDefinition {
   name: Name;
   id?: Id;
   app_config?: AppConfig;
-  tags?: string[];
-  description?: string | null;
+  tags?: Tags;
+  description?: Description;
   variables?: Variables;
   depends_on?: DependsOn;
   steps: Steps;
+  severity?: Severity;
+  priority?: Priority;
+  success_criteria?: SuccessCriteria;
+  is_positive?: IsPositive;
   [k: string]: unknown;
 }
 export interface Variables {
@@ -347,7 +357,7 @@ export interface ExtendedStep {
   action: ActionInstruction;
   locator?: LocatorInstruction | null;
   name?: Name2;
-  description?: Description;
+  description?: Description1;
   aaa_phase?: AaaPhase1;
   should_skip?: ShouldSkip;
   [k: string]: unknown;
