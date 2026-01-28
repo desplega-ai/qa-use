@@ -123,7 +123,9 @@ export const runsCommand = new Command('runs')
       // Human-readable output
       if (runs.length === 0) {
         if (testId) {
-          console.log(warning(`No runs found for test${testDisplayName ? ` "${testDisplayName}"` : ''}`));
+          console.log(
+            warning(`No runs found for test${testDisplayName ? ` "${testDisplayName}"` : ''}`)
+          );
         } else if (options.status) {
           console.log(warning(`No runs found with status "${options.status}"`));
         } else {
@@ -134,7 +136,9 @@ export const runsCommand = new Command('runs')
 
       // Header
       if (testDisplayName) {
-        console.log(`Test Runs for: ${testDisplayName} (${runs.length} run${runs.length === 1 ? '' : 's'})\n`);
+        console.log(
+          `Test Runs for: ${testDisplayName} (${runs.length} run${runs.length === 1 ? '' : 's'})\n`
+        );
       } else {
         console.log(`Test Runs (${runs.length} result${runs.length === 1 ? '' : 's'})\n`);
       }

@@ -117,6 +117,9 @@ Each step has an `action` and action-specific fields:
 | `select` | `target`, `value` | Select dropdown option |
 | `hover` | `target` | Hover over element |
 | `scroll` | `target` or direction | Scroll page or element |
+| `drag` | `target`, `to` | Drag element to target |
+| `mfa_totp` | `target` (optional), `secret` | Generate TOTP and optionally fill |
+| `set_input_files` | `target`, `files` | Upload files to input |
 
 ```yaml
 - action: click
@@ -136,6 +139,20 @@ Each step has an `action` and action-specific fields:
 - action: select
   target: country dropdown
   value: United States
+
+- action: drag
+  target: draggable item
+  to: drop zone
+
+- action: mfa_totp
+  target: OTP input field
+  secret: $totp_secret
+
+- action: set_input_files
+  target: file upload button
+  files:
+    - /path/to/file1.pdf
+    - /path/to/file2.pdf
 ```
 
 ### Assertions

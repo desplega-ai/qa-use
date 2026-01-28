@@ -91,6 +91,9 @@ qa-use browser create --after-test-id <login-test-uuid> \
 | `qa-use browser hover <ref>` | Hover over element |
 | `qa-use browser scroll down 500` | Scroll by pixels |
 | `qa-use browser scroll-into-view <ref>` | Scroll element into view |
+| `qa-use browser drag <ref> --target <ref>` | Drag element to target |
+| `qa-use browser mfa-totp [ref] <secret>` | Generate TOTP code (optionally fill) |
+| `qa-use browser upload <ref> <file>...` | Upload file(s) to input |
 
 ### Inspection
 

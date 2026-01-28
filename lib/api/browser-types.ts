@@ -62,7 +62,10 @@ export type BrowserActionType =
   | 'wait_for_selector'
   | 'wait_for_load'
   | 'snapshot'
-  | 'screenshot';
+  | 'screenshot'
+  | 'drag_and_drop'
+  | 'mfa_totp'
+  | 'set_input_files';
 
 export type ScrollDirection = 'up' | 'down' | 'left' | 'right';
 
@@ -186,6 +189,28 @@ export interface ScreenshotAction {
   type: 'screenshot';
 }
 
+export interface DragAndDropAction {
+  type: 'drag_and_drop';
+  ref?: string;
+  text?: string;
+  target_ref?: string;
+  target_selector?: string;
+}
+
+export interface MfaTotpAction {
+  type: 'mfa_totp';
+  secret: string;
+  ref?: string;
+  text?: string;
+}
+
+export interface SetInputFilesAction {
+  type: 'set_input_files';
+  ref?: string;
+  text?: string;
+  files: string[];
+}
+
 export type BrowserAction =
   | GotoAction
   | BackAction
@@ -206,7 +231,10 @@ export type BrowserAction =
   | WaitForSelectorAction
   | WaitForLoadAction
   | SnapshotAction
-  | ScreenshotAction;
+  | ScreenshotAction
+  | DragAndDropAction
+  | MfaTotpAction
+  | SetInputFilesAction;
 
 // ==========================================
 // API Response Types

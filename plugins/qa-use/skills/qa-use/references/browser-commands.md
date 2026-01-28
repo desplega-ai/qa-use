@@ -241,6 +241,77 @@ qa-use browser scroll up 300      # Scroll up 300px
 qa-use browser scroll-into-view <ref>  # Scroll element into viewport
 ```
 
+### drag
+
+Drag an element to a target element.
+
+```bash
+qa-use browser drag <ref> --target <target-ref>
+qa-use browser drag <ref> --target-selector ".drop-zone"
+qa-use browser drag --text "Draggable item" --target <target-ref>
+```
+
+| Argument | Description |
+|----------|-------------|
+| `<ref>` | Source element ref from snapshot |
+| `--text` | Semantic source description for AI selection |
+| `--target <ref>` | Target element ref |
+| `--target-selector <sel>` | Target CSS selector |
+
+**Examples:**
+```bash
+qa-use browser drag e5 --target e10          # Drag by ref to ref
+qa-use browser drag e5 --target-selector ".canvas"  # Drag to CSS selector
+qa-use browser drag --text "Process node" --target e10  # Drag by text
+```
+
+### mfa-totp
+
+Generate TOTP code and optionally fill into an input field.
+
+```bash
+qa-use browser mfa-totp <secret>                    # Generate only
+qa-use browser mfa-totp <ref> <secret>              # Generate and fill by ref
+qa-use browser mfa-totp --text "OTP input" <secret> # Generate and fill by text
+```
+
+| Argument | Description |
+|----------|-------------|
+| `<secret>` | TOTP secret (base32 encoded) |
+| `<ref>` | Element ref to fill (optional) |
+| `--text` | Semantic element description for AI selection |
+
+**Examples:**
+```bash
+qa-use browser mfa-totp JBSWY3DPEHPK3PXP              # Generate code only
+qa-use browser mfa-totp e15 JBSWY3DPEHPK3PXP          # Fill into element e15
+qa-use browser mfa-totp --text "verification code" JBSWY3DPEHPK3PXP
+```
+
+### upload
+
+Upload file(s) to a file input element.
+
+```bash
+qa-use browser upload <ref> <file>...
+qa-use browser upload --text "Choose file" <file>...
+```
+
+| Argument | Description |
+|----------|-------------|
+| `<ref>` | File input element ref from snapshot |
+| `--text` | Semantic element description for AI selection |
+| `<file>...` | One or more file paths to upload |
+
+**Examples:**
+```bash
+qa-use browser upload e8 /tmp/document.pdf                    # Single file
+qa-use browser upload e8 /tmp/file1.pdf /tmp/file2.pdf        # Multiple files
+qa-use browser upload --text "Upload attachment" /tmp/doc.pdf # By text
+```
+
+**Note:** File paths must exist locally. The command validates files before sending.
+
 ## Inspection
 
 ### url

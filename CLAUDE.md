@@ -68,6 +68,16 @@ Or use `~/.qa-use.json` config file (env vars take precedence).
 - Debug with `console.error()` (stdout reserved for MCP)
 - Run `make all` (format + lint + build) before committing
 
+## Mandatory Verification After Code Changes
+
+**IMPORTANT:** After making any code changes, always run:
+
+```bash
+bun run lint:fix && bun run format
+```
+
+This is especially critical when implementing plans - run this verification step after completing each phase before proceeding to the next one. This ensures consistent code style and catches issues early.
+
 ## Browser CLI & REPL Sync
 
 **IMPORTANT:** When modifying browser commands in `src/cli/commands/browser/*.ts`, also update the REPL in `src/cli/commands/browser/run.ts`, and vice versa. They share the same functionality:

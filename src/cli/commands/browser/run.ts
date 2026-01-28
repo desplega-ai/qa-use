@@ -570,6 +570,183 @@ export const runCommand = new Command('run')
             console.log(result.yaml);
           }
         },
+        drag: async (args, client, sessionId) => {
+          // Parse: drag <ref> --target <target-ref> or --target-selector <sel>
+          // Also support: drag -t "text" --target <ref>
+          const parsed = parseTextOption(args);
+          if (!parsed.ref && !parsed.text) {
+            console.log(error('Usage: drag <ref> --target <ref> or drag -t "text" --target <ref>'));
+            return;
+          }
+
+          // Parse target options from remaining args
+          const targetIdx = parsed.remaining.indexOf('--target');
+          const targetSelectorIdx = parsed.remaining.indexOf('--target-selector');
+
+          if (targetIdx === -1 && targetSelectorIdx === -1) {
+            console.log(error('Either --target <ref> or --target-selector <selector> is required'));
+            return;
+          }
+
+          const targetRef =
+            targetIdx !== -1 && parsed.remaining[targetIdx + 1]
+              ? normalizeRef(parsed.remaining[targetIdx + 1])
+              : undefined;
+          const targetSelector =
+            targetSelectorIdx !== -1 && parsed.remaining[targetSelectorIdx + 1]
+              ? parsed.remaining[targetSelectorIdx + 1]
+              : undefined;
+
+          const action: {
+            type: 'drag_and_drop';
+            ref?: string;
+            text?: string;
+            target_ref?: string;
+            target_selector?: string;
+          } = { type: 'drag_and_drop' };
+
+          if (parsed.ref) action.ref = normalizeRef(parsed.ref);
+          if (parsed.text) action.text = parsed.text;
+          if (targetRef) action.target_ref = targetRef;
+          if (targetSelector) action.target_selector = targetSelector;
+
+          const result = await client.executeAction(sessionId, action);
+          if (result.success) {
+            const source = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
+            const target = targetRef ? targetRef : `selector "${targetSelector}"`;
+            console.log(success(`Dragged ${source} to ${target}`));
+          } else {
+            console.log(error(result.error || 'Drag failed'));
+          }
+        },
+        'mfa-totp': async (args, client, sessionId) => {
+          // Parse: mfa-totp [ref] <secret> or mfa-totp -t "text" <secret>
+          // Also support: mfa-totp <secret> (generate only)
+          const parsed = parseTextOption(args);
+
+          let ref: string | undefined;
+          let secret: string;
+
+          if (parsed.text) {
+            // Using -t "text" <secret>
+            if (parsed.remaining.length === 0) {
+              console.log(error('Usage: mfa-totp -t "description" <secret>'));
+              return;
+            }
+            secret = parsed.remaining[0];
+          } else if (parsed.ref) {
+            // Could be <ref> <secret> or just <secret>
+            if (parsed.remaining.length > 0) {
+              // <ref> <secret>
+              ref = normalizeRef(parsed.ref);
+              secret = parsed.remaining[0];
+            } else {
+              // Just <secret> (generate only)
+              secret = parsed.ref;
+            }
+          } else {
+            console.log(
+              error(
+                'Usage: mfa-totp <secret> or mfa-totp <ref> <secret> or mfa-totp -t "text" <secret>'
+              )
+            );
+            return;
+          }
+
+          const action: {
+            type: 'mfa_totp';
+            secret: string;
+            ref?: string;
+            text?: string;
+          } = { type: 'mfa_totp', secret };
+
+          if (ref) action.ref = ref;
+          if (parsed.text) action.text = parsed.text;
+
+          const result = await client.executeAction(sessionId, action);
+          if (result.success) {
+            const code =
+              result.data && typeof result.data === 'object' && 'code' in result.data
+                ? (result.data as { code: string }).code
+                : undefined;
+
+            if (ref || parsed.text) {
+              const target = ref ? `element ${ref}` : `"${parsed.text}"`;
+              if (code) {
+                console.log(success(`Generated TOTP code ${code} and filled into ${target}`));
+              } else {
+                console.log(success(`Generated TOTP code and filled into ${target}`));
+              }
+            } else {
+              if (code) {
+                console.log(info(`Generated TOTP code: ${code}`));
+              } else {
+                console.log(success('Generated TOTP code'));
+              }
+            }
+          } else {
+            console.log(error(result.error || 'MFA TOTP failed'));
+          }
+        },
+        upload: async (args, client, sessionId) => {
+          // Parse: upload <ref> <file>... or upload -t "text" <file>...
+          const parsed = parseTextOption(args);
+
+          let ref: string | undefined;
+          let files: string[];
+
+          if (parsed.text) {
+            // Using -t "text" <file>...
+            if (parsed.remaining.length === 0) {
+              console.log(error('Usage: upload -t "description" <file>...'));
+              return;
+            }
+            files = parsed.remaining;
+          } else if (parsed.ref) {
+            // <ref> <file>...
+            ref = normalizeRef(parsed.ref);
+            if (parsed.remaining.length === 0) {
+              console.log(error('Usage: upload <ref> <file>...'));
+              return;
+            }
+            files = parsed.remaining;
+          } else {
+            console.log(error('Usage: upload <ref> <file>... or upload -t "text" <file>...'));
+            return;
+          }
+
+          // Resolve file paths
+          const path = await import('path');
+          const fs = await import('fs');
+          const resolvedFiles: string[] = [];
+          for (const filePath of files) {
+            const resolved = path.resolve(filePath);
+            if (!fs.existsSync(resolved)) {
+              console.log(error(`File not found: ${filePath}`));
+              return;
+            }
+            resolvedFiles.push(resolved);
+          }
+
+          const action: {
+            type: 'set_input_files';
+            ref?: string;
+            text?: string;
+            files: string[];
+          } = { type: 'set_input_files', files: resolvedFiles };
+
+          if (ref) action.ref = ref;
+          if (parsed.text) action.text = parsed.text;
+
+          const result = await client.executeAction(sessionId, action);
+          if (result.success) {
+            const target = ref ? `element ${ref}` : `"${parsed.text}"`;
+            const fileNames = resolvedFiles.map((f) => path.basename(f)).join(', ');
+            console.log(success(`Uploaded ${fileNames} to ${target}`));
+          } else {
+            console.log(error(result.error || 'Upload failed'));
+          }
+        },
       };
 
       // Handle input
@@ -712,6 +889,10 @@ Available commands:
     select <ref> <value>    Select dropdown option
     check <ref>             Check checkbox
     uncheck <ref>           Uncheck checkbox
+    drag <ref> --target <ref>
+                            Drag element to target (--target-selector for CSS)
+    mfa-totp [ref] <secret> Generate TOTP code (optionally fill into ref)
+    upload <ref> <file>...  Upload file(s) to input
 
   ${colors.cyan}Wait Commands:${colors.reset}
     wait <ms>               Wait for duration
