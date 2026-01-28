@@ -306,6 +306,8 @@ export interface TestDefinition {
   name: Name;
   id?: Id;
   app_config?: AppConfig;
+  tags?: string[];
+  description?: string | null;
   variables?: Variables;
   depends_on?: DependsOn;
   steps: Steps;

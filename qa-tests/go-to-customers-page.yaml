@@ -2,6 +2,12 @@ name: Go to customers page
 id: 4292938b-338d-4c1c-952e-6bcdf3f7731a
 app_config: 600dc916-16b9-4cb8-a7d1-09658f146e45
 variables: {}
+tags:
+  - helper
+description: |
+  This script navigates to the Customers page by clicking on the Customers link in the navigation menu.
+  It is designed to be used in a web application where the Customers link is accessible via a role of 'link'.
+  The script does not require any input variables and is intended for use in automated testing or navigation tasks.
 steps:
   - type: extended
     action:

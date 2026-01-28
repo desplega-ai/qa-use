@@ -61,6 +61,7 @@ export const listCommand = new Command('list')
               name: relativePath,
               steps: def.steps?.length,
               deps: def.depends_on || undefined,
+              tags: def.tags,
             });
           } catch (err) {
             console.log(error(`Failed to load ${file}: ${err}`));

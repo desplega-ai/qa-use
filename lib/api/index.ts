@@ -104,6 +104,7 @@ export interface AutomatedTest {
   id: string;
   name: string;
   description?: string;
+  tags?: string[];
   url?: string;
   task?: string;
   status?: string;

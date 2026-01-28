@@ -406,7 +406,9 @@ export function printSSEProgress(
 /**
  * Print test list table
  */
-export function printTestList(tests: Array<{ name: string; steps?: number; deps?: string }>): void {
+export function printTestList(
+  tests: Array<{ name: string; steps?: number; deps?: string; tags?: string[] }>
+): void {
   if (tests.length === 0) {
     console.log(warning('No tests found'));
     return;
@@ -417,7 +419,11 @@ export function printTestList(tests: Array<{ name: string; steps?: number; deps?
   for (const test of tests) {
     const stepCount = test.steps ? ` (${test.steps} steps)` : '';
     const deps = test.deps ? ` ${colors.gray}[depends: ${test.deps}]${colors.reset}` : '';
-    console.log(`  • ${test.name}${stepCount}${deps}`);
+    const tags =
+      test.tags && test.tags.length > 0
+        ? ` ${colors.gray}[tags: ${test.tags.join(', ')}]${colors.reset}`
+        : '';
+    console.log(`  • ${test.name}${stepCount}${deps}${tags}`);
   }
 }
 

@@ -12,6 +12,7 @@ import { testCommand } from './commands/test/index.js';
 import { mcpCommand } from './commands/mcp.js';
 import { browserCommand } from './commands/browser/index.js';
 import { installDepsCommand } from './commands/install-deps.js';
+import { updateCommand } from './commands/update.js';
 
 // Get version from package.json
 const require = createRequire(import.meta.url);
@@ -28,6 +29,7 @@ program.addCommand(testCommand);
 program.addCommand(mcpCommand);
 program.addCommand(browserCommand);
 program.addCommand(installDepsCommand);
+program.addCommand(updateCommand);
 
 // Parse command line arguments
 program.parse();

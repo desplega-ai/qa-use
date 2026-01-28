@@ -143,6 +143,8 @@ qa-use browser create --after-test-id <login-test-uuid> \
 | `qa-use test run <name> --var key=value` | Override variable |
 | `qa-use test validate <name>` | Validate test syntax |
 | `qa-use test list` | List available tests |
+| `qa-use test info <name>` | Show test details (steps, tags, description) |
+| `qa-use test info --id <uuid>` | Show cloud test details by ID |
 | `qa-use test runs [name]` | List test run history |
 | `qa-use test runs --id <uuid>` | Filter runs by test ID |
 | `qa-use test runs --status failed` | Filter runs by status |
@@ -164,6 +166,10 @@ qa-use browser create --after-test-id <login-test-uuid> \
 
 ```yaml
 name: Login Test
+description: Validates login functionality with valid credentials
+tags:
+  - smoke
+  - auth
 app_config: <app-config-id>
 variables:
   email: test@example.com

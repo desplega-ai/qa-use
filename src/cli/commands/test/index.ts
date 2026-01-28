@@ -5,6 +5,7 @@
 import { Command } from 'commander';
 import { runCommand } from './run.js';
 import { listCommand } from './list.js';
+import { infoCommand } from './info.js';
 import { validateCommand } from './validate.js';
 import { initCommand } from './init.js';
 import { exportCommand } from './export.js';
@@ -16,6 +17,7 @@ export const testCommand = new Command('test').description('Manage and run test 
 // Register subcommands
 testCommand.addCommand(runCommand);
 testCommand.addCommand(listCommand);
+testCommand.addCommand(infoCommand);
 testCommand.addCommand(runsCommand);
 testCommand.addCommand(validateCommand);
 testCommand.addCommand(initCommand);

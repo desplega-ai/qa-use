@@ -65,6 +65,7 @@ The primary way to use this plugin is the **verify → explore → record → te
 | `/qa-use:record [start\|stop] [name]` | Record browser actions into test YAML |
 | `/qa-use:test-init` | Initialize test directory |
 | `/qa-use:test-run [name] [flags]` | Run E2E tests |
+| `/qa-use:test-info <name> [--id <uuid>]` | Show test details (steps, tags, description) |
 | `/qa-use:test-validate [name]` | Validate test syntax |
 | `/qa-use:test-sync [--pull\|--push]` | Sync with cloud |
 | `/qa-use:test-update [name]` | AI-assisted test editing |

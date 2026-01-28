@@ -7,6 +7,9 @@ Complete specification for qa-use test YAML files.
 ```yaml
 name: Test Name
 description: Optional description of what this test verifies
+tags:
+  - smoke
+  - auth
 app_config: <app-config-id>
 variables:
   key: value
@@ -29,6 +32,7 @@ steps:
 | Field | Description |
 |-------|-------------|
 | `description` | What this test verifies |
+| `tags` | Array of strings for categorization (e.g., `smoke`, `auth`, `critical`) |
 | `variables` | Key-value pairs for parameterization |
 | `depends_on` | Name of test that must run first |
 
@@ -247,6 +251,10 @@ The AI matches your description against the page's ARIA accessibility tree. Be s
 ```yaml
 name: User Registration
 description: Tests the full user registration flow
+tags:
+  - smoke
+  - registration
+  - critical
 app_config: my-app-config-id
 variables:
   email: newuser@example.com
