@@ -140,6 +140,9 @@ qa-use browser create --after-test-id <login-test-uuid> \
 | `qa-use test run <name> --var key=value` | Override variable |
 | `qa-use test validate <name>` | Validate test syntax |
 | `qa-use test list` | List available tests |
+| `qa-use test runs [name]` | List test run history |
+| `qa-use test runs --id <uuid>` | Filter runs by test ID |
+| `qa-use test runs --status failed` | Filter runs by status |
 | `qa-use test init` | Initialize test directory |
 | `qa-use test sync --pull` | Pull tests from cloud |
 | `qa-use test sync --push` | Push tests to cloud |

@@ -157,6 +157,7 @@ export interface TestRun {
 export interface ListTestRunsOptions {
   test_id?: string;
   run_id?: string;
+  run_status?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped' | 'cancelled' | 'timeout';
   limit?: number;
   offset?: number;
 }
@@ -652,11 +653,14 @@ export class ApiClient {
       const params = new URLSearchParams();
       if (options.test_id) params.append('test_id', options.test_id);
       if (options.run_id) params.append('run_id', options.run_id);
+      if (options.run_status) params.append('run_status', options.run_status);
       if (options.limit !== undefined) params.append('limit', options.limit.toString());
       if (options.offset !== undefined) params.append('offset', options.offset.toString());
 
+      // Use /api/v1/test-runs instead of /vibe-qa/tests-runs
+      // The v1 endpoint properly supports limit, offset, and run_status filters
       const response: AxiosResponse = await this.client.get(
-        `/vibe-qa/tests-runs?${params.toString()}`
+        `/api/v1/test-runs?${params.toString()}`
       );
       return response.data as TestRun[];
     } catch (error) {

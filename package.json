@@ -1,6 +1,6 @@
 {
   "name": "@desplega.ai/qa-use",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "packageManager": "bun@^1.3.4",
   "description": "QA automation tool for browser testing with MCP server support",
   "type": "module",
