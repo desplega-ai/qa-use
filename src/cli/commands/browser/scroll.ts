@@ -7,7 +7,7 @@ import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import type { ScrollDirection } from '../../../../lib/api/browser-types.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
-import { success, error } from '../../lib/output.js';
+import { error, success } from '../../lib/output.js';
 
 interface ScrollOptions {
   sessionId?: string;
@@ -40,7 +40,7 @@ export const scrollCommand = new Command('scroll')
 
       // Parse amount
       const amount = parseInt(amountStr, 10);
-      if (isNaN(amount) || amount <= 0) {
+      if (Number.isNaN(amount) || amount <= 0) {
         console.log(error('Amount must be a positive number'));
         process.exit(1);
       }

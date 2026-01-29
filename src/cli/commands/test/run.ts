@@ -3,31 +3,31 @@
  */
 
 import { Command } from 'commander';
-import { loadConfig } from '../../lib/config.js';
-import {
-  loadTestWithDeps,
-  loadAllTests,
-  applyVariableOverrides,
-  resolveTestPath,
-} from '../../lib/loader.js';
-import { runTest } from '../../lib/runner.js';
-import {
-  error,
-  success,
-  printScreenshotsSummary,
-  clearStepScreenshots,
-  printDownloadedFilesSummary,
-  clearDownloadedFiles,
-  addDownloadedFile,
-} from '../../lib/output.js';
 import { ApiClient } from '../../../../lib/api/index.js';
-import { downloadAssets } from '../../lib/download.js';
 import {
+  type BrowserTunnelSession,
+  getEffectiveWsUrl,
   startBrowserWithTunnel,
   stopBrowserWithTunnel,
-  getEffectiveWsUrl,
-  type BrowserTunnelSession,
 } from '../../lib/browser.js';
+import { loadConfig } from '../../lib/config.js';
+import { downloadAssets } from '../../lib/download.js';
+import {
+  applyVariableOverrides,
+  loadAllTests,
+  loadTestWithDeps,
+  resolveTestPath,
+} from '../../lib/loader.js';
+import {
+  addDownloadedFile,
+  clearDownloadedFiles,
+  clearStepScreenshots,
+  error,
+  printDownloadedFilesSummary,
+  printScreenshotsSummary,
+  success,
+} from '../../lib/output.js';
+import { runTest } from '../../lib/runner.js';
 
 function collectVars(value: string, previous: Record<string, string>) {
   const [key, val] = value.split('=');

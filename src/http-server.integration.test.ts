@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
-import { QAUseMcpServer } from './server.js';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { HttpMcpServer } from './http-server.js';
+import { QAUseMcpServer } from './server.js';
 
 /**
  * HTTP Server Integration Tests

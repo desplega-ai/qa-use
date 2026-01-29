@@ -6,7 +6,7 @@ import { Command } from 'commander';
 import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
-import { success, error } from '../../lib/output.js';
+import { error, success } from '../../lib/output.js';
 
 interface TypeOptions {
   sessionId?: string;
@@ -55,7 +55,7 @@ export const typeCommand = new Command('type')
 
       if (result.success) {
         // Truncate text for display if too long
-        const displayText = text.length > 50 ? text.slice(0, 47) + '...' : text;
+        const displayText = text.length > 50 ? `${text.slice(0, 47)}...` : text;
         console.log(success(`Typed "${displayText}" into ${normalizedRef}`));
         await touchSession(resolved.id);
       } else {

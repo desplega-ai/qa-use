@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import http from 'node:http';
 import { TunnelManager } from './index';
-import http from 'http';
 
 describe('TunnelManager Integration Tests', () => {
   let tunnelManager: TunnelManager;
@@ -12,7 +12,7 @@ describe('TunnelManager Integration Tests', () => {
 
     // Create a simple test HTTP server
     return new Promise<void>((resolve) => {
-      testServer = http.createServer((req, res) => {
+      testServer = http.createServer((_req, res) => {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('Hello from test server');
       });

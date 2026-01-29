@@ -2,27 +2,27 @@
  * BrowserApiClient - Client for the desplega.ai Browser API (/browsers/v1/)
  */
 
-import axios from 'axios';
 import type { AxiosInstance } from 'axios';
+import axios from 'axios';
+import type { ExtendedStep } from '../../src/types/test-definition.js';
 import { getEnv } from '../env/index.js';
 import type {
-  BrowserSession,
-  BrowserAction,
   ActionResult,
-  SnapshotResult,
-  SnapshotOptions,
-  UrlResult,
   BlocksResult,
-  CreateBrowserSessionOptions,
+  BrowserAction,
+  BrowserSession,
   BrowserSessionStatus,
-  GenerateTestOptions,
-  GenerateTestResult,
   ConsoleLogsOptions,
   ConsoleLogsResult,
+  CreateBrowserSessionOptions,
+  GenerateTestOptions,
+  GenerateTestResult,
   NetworkLogsOptions,
   NetworkLogsResult,
+  SnapshotOptions,
+  SnapshotResult,
+  UrlResult,
 } from './browser-types.js';
-import type { ExtendedStep } from '../../src/types/test-definition.js';
 
 export class BrowserApiClient {
   private readonly client: AxiosInstance;
@@ -49,7 +49,7 @@ export class BrowserApiClient {
 
   setApiKey(apiKey: string): void {
     this.apiKey = apiKey;
-    this.client.defaults.headers['Authorization'] = `Bearer ${apiKey}`;
+    this.client.defaults.headers.Authorization = `Bearer ${apiKey}`;
   }
 
   getApiKey(): string | null {
@@ -382,21 +382,21 @@ export class BrowserApiClient {
 
 // Re-export types for convenience
 export type {
-  BrowserSession,
-  BrowserAction,
   ActionResult,
-  SnapshotResult,
-  SnapshotOptions,
-  SnapshotFilterStats,
-  UrlResult,
-  CreateBrowserSessionOptions,
+  BrowserAction,
+  BrowserSession,
   BrowserSessionStatus,
-  GenerateTestOptions,
-  GenerateTestResult,
+  ConsoleLogEntry,
   ConsoleLogsOptions,
   ConsoleLogsResult,
-  ConsoleLogEntry,
+  CreateBrowserSessionOptions,
+  GenerateTestOptions,
+  GenerateTestResult,
+  NetworkLogEntry,
   NetworkLogsOptions,
   NetworkLogsResult,
-  NetworkLogEntry,
+  SnapshotFilterStats,
+  SnapshotOptions,
+  SnapshotResult,
+  UrlResult,
 } from './browser-types.js';

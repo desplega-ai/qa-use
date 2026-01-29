@@ -6,7 +6,7 @@
  * round-trip synchronization between local files and cloud tests.
  */
 
-import * as fs from 'fs/promises';
+import * as fs from 'node:fs/promises';
 import * as yaml from 'yaml';
 import type { TestDefinition } from '../../types/test-definition.js';
 

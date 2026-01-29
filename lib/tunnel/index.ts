@@ -1,7 +1,7 @@
+import crypto from 'node:crypto';
+import https from 'node:https';
+import { URL } from 'node:url';
 import localtunnel from '@desplega.ai/localtunnel';
-import { URL } from 'url';
-import https from 'https';
-import crypto from 'crypto';
 import { getEnv } from '../env/index.js';
 
 export interface TunnelSession {
@@ -124,7 +124,7 @@ export class TunnelManager {
 
     try {
       await session.tunnel.close();
-    } catch (error) {
+    } catch {
       // Silently handle cleanup errors
     }
   }
@@ -155,7 +155,7 @@ export class TunnelManager {
       clearTimeout(timeout);
       // 426 = Upgrade Required (expected for WebSocket endpoint)
       return response.ok || response.status === 426;
-    } catch (error) {
+    } catch {
       this.session.isActive = false;
       return false;
     }
@@ -190,7 +190,7 @@ export class TunnelManager {
       return (
         this.session.publicUrl.replace('https://', 'wss://').replace('http://', 'ws://') + wsPath
       );
-    } catch (error) {
+    } catch {
       return null;
     }
   }

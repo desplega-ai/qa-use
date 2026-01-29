@@ -2,19 +2,19 @@
  * qa-use browser run - Interactive REPL mode
  */
 
+import * as readline from 'node:readline';
 import { Command } from 'commander';
-import * as readline from 'readline';
 import { BrowserApiClient } from '../../../../lib/api/browser.js';
-import type { ViewportType, ScrollDirection } from '../../../../lib/api/browser-types.js';
+import type { ScrollDirection } from '../../../../lib/api/browser-types.js';
 import {
+  createStoredSession,
+  removeStoredSession,
   resolveSessionId,
   storeSession,
-  removeStoredSession,
   touchSession,
-  createStoredSession,
 } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
-import { success, error, info } from '../../lib/output.js';
+import { error, info, success } from '../../lib/output.js';
 
 interface RunOptions {
   sessionId?: string;
@@ -177,7 +177,7 @@ export const runCommand = new Command('run')
           let url = args[0];
           const hasVarSyntax = url.startsWith('<var>') || url.startsWith('{{');
           if (!url.startsWith('http://') && !url.startsWith('https://') && !hasVarSyntax) {
-            url = 'https://' + url;
+            url = `https://${url}`;
           }
           const result = await client.executeAction(sessionId, { type: 'goto', url });
           if (result.success) {
@@ -186,7 +186,7 @@ export const runCommand = new Command('run')
             console.log(error(result.error || 'Navigation failed'));
           }
         },
-        back: async (args, client, sessionId) => {
+        back: async (_args, client, sessionId) => {
           const result = await client.executeAction(sessionId, { type: 'back' });
           if (result.success) {
             console.log(success('Navigated back'));
@@ -194,7 +194,7 @@ export const runCommand = new Command('run')
             console.log(error(result.error || 'Back failed'));
           }
         },
-        forward: async (args, client, sessionId) => {
+        forward: async (_args, client, sessionId) => {
           const result = await client.executeAction(sessionId, { type: 'forward' });
           if (result.success) {
             console.log(success('Navigated forward'));
@@ -202,7 +202,7 @@ export const runCommand = new Command('run')
             console.log(error(result.error || 'Forward failed'));
           }
         },
-        reload: async (args, client, sessionId) => {
+        reload: async (_args, client, sessionId) => {
           const result = await client.executeAction(sessionId, { type: 'reload' });
           if (result.success) {
             console.log(success('Page reloaded'));
@@ -449,7 +449,7 @@ export const runCommand = new Command('run')
           const compact = args.includes('--compact') || args.includes('-c');
           const depthIdx = args.findIndex((a) => a === '--max-depth' || a === '-d');
           const max_depth = depthIdx !== -1 ? parseInt(args[depthIdx + 1], 10) : undefined;
-          const scopeIdx = args.findIndex((a) => a === '--scope');
+          const scopeIdx = args.indexOf('--scope');
           const scope = scopeIdx !== -1 ? args[scopeIdx + 1] : undefined;
 
           const snapshot = await client.getSnapshot(sessionId, {
@@ -481,19 +481,19 @@ export const runCommand = new Command('run')
           const buffer = (await client.getScreenshot(sessionId)) as Buffer;
           const filteredArgs = args.filter((a) => a !== '--url');
           const filename = filteredArgs[0] || `screenshot-${Date.now()}.png`;
-          const fs = await import('fs');
+          const fs = await import('node:fs');
           fs.writeFileSync(filename, buffer);
           console.log(success(`Screenshot saved to ${filename}`));
         },
-        url: async (args, client, sessionId) => {
+        url: async (_args, client, sessionId) => {
           const url = await client.getUrl(sessionId);
           console.log(url);
         },
-        'get-blocks': async (args, client, sessionId) => {
+        'get-blocks': async (_args, client, sessionId) => {
           const blocks = await client.getBlocks(sessionId);
           console.log(JSON.stringify(blocks, null, 2));
         },
-        status: async (args, client, sessionId) => {
+        status: async (_args, client, sessionId) => {
           const session = await client.getSession(sessionId);
           console.log(`ID: ${session.id}`);
           console.log(`Status: ${session.status}`);
@@ -563,7 +563,7 @@ export const runCommand = new Command('run')
           const result = await client.generateTest(sessionId, { name, app_config });
 
           if (outputFile) {
-            const fs = await import('fs');
+            const fs = await import('node:fs');
             fs.writeFileSync(outputFile, result.yaml);
             console.log(success(`Test written to ${outputFile} (${result.block_count} blocks)`));
           } else {
@@ -716,8 +716,8 @@ export const runCommand = new Command('run')
           }
 
           // Resolve file paths
-          const path = await import('path');
-          const fs = await import('fs');
+          const path = await import('node:path');
+          const fs = await import('node:fs');
           const resolvedFiles: string[] = [];
           for (const filePath of files) {
             const resolved = path.resolve(filePath);
@@ -963,7 +963,7 @@ async function handleExit(
         await client.deleteSession(sessionId);
         await removeStoredSession(sessionId);
         console.log(success('Session closed.'));
-      } catch (err) {
+      } catch {
         console.log(error('Failed to close session'));
       }
     } else {

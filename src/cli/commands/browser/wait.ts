@@ -6,7 +6,7 @@ import { Command } from 'commander';
 import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
-import { success, error } from '../../lib/output.js';
+import { error, success } from '../../lib/output.js';
 
 interface WaitOptions {
   sessionId?: string;
@@ -27,7 +27,7 @@ export const waitCommand = new Command('wait')
 
       // Parse duration
       const durationMs = parseInt(msStr, 10);
-      if (isNaN(durationMs) || durationMs <= 0) {
+      if (Number.isNaN(durationMs) || durationMs <= 0) {
         console.log(error('Duration must be a positive number in milliseconds'));
         process.exit(1);
       }

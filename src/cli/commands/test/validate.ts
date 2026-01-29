@@ -3,10 +3,10 @@
  */
 
 import { Command } from 'commander';
+import { ApiClient } from '../../../../lib/api/index.js';
 import { loadConfig } from '../../lib/config.js';
 import { loadTestWithDeps } from '../../lib/loader.js';
-import { error, success, printValidationErrors } from '../../lib/output.js';
-import { ApiClient } from '../../../../lib/api/index.js';
+import { error, printValidationErrors, success } from '../../lib/output.js';
 
 export const validateCommand = new Command('validate')
   .description('Validate test definition without running')

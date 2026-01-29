@@ -1,12 +1,12 @@
-import express from 'express';
-import type { Request, Response, NextFunction } from 'express';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import type { NextFunction, Request, Response } from 'express';
+import express from 'express';
 import { ApiClient } from '../lib/api/index.js';
-import { getName, getVersion } from './utils/package.js';
 import type { QAUseMcpServer } from './server.js';
+import { getName, getVersion } from './utils/package.js';
 
 interface AuthRequest extends IncomingMessage {
   apiKey?: string;
@@ -72,7 +72,7 @@ export class HttpMcpServer {
 
   private setupRoutes(): void {
     // Health check endpoint
-    this.app.get('/health', (req: Request, res: Response) => {
+    this.app.get('/health', (_req: Request, res: Response) => {
       res.json({
         status: 'ok',
         name: getName(),

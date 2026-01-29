@@ -1,23 +1,23 @@
-import axios from 'axios';
 import type { AxiosInstance, AxiosResponse } from 'axios';
+import axios from 'axios';
 import 'dotenv/config';
-import { getEnv } from '../env/index.js';
+import type { TestDefinition } from '../../src/types/test-definition.js';
 import type {
-  TestAgentV2Session,
+  IssueReport,
   IssueType,
   Severity,
-  IssueReport,
+  TestAgentV2Session,
   TestCreatorDoneIntent,
 } from '../../src/types.js';
+import type { BlockSummary, EnhancedTestSummary } from '../../src/utils/summary.js';
 import {
-  generateEnhancedTestSummary,
-  formatEnhancedTestReport,
-  generateIssueStatistics,
   categorizeIssues,
+  formatEnhancedTestReport,
+  generateEnhancedTestSummary,
+  generateIssueStatistics,
 } from '../../src/utils/summary.js';
-import type { EnhancedTestSummary, BlockSummary } from '../../src/utils/summary.js';
-import { streamSSE, type SSEEvent } from './sse.js';
-import type { TestDefinition } from '../../src/types/test-definition.js';
+import { getEnv } from '../env/index.js';
+import { type SSEEvent, streamSSE } from './sse.js';
 
 // Re-export new types for external consumers
 export type { IssueType, Severity, IssueReport, TestCreatorDoneIntent };
@@ -285,12 +285,16 @@ export interface ValidationResult {
 export interface ImportOptions {
   upsert?: boolean;
   dry_run?: boolean;
+  force?: boolean; // Override version conflicts
 }
 
 export interface ImportedTest {
   name: string;
   id: string;
-  action: 'created' | 'updated' | 'skipped';
+  action: 'created' | 'updated' | 'skipped' | 'unchanged' | 'conflict';
+  message?: string; // Warning/conflict details
+  prev_version_hash?: string; // Hash before operation
+  version_hash?: string; // Hash after operation
 }
 
 export interface ImportResult {
@@ -331,7 +335,7 @@ export class ApiClient {
 
   setApiKey(apiKey: string): void {
     this.apiKey = apiKey;
-    this.client.defaults.headers['Authorization'] = `Bearer ${apiKey}`;
+    this.client.defaults.headers.Authorization = `Bearer ${apiKey}`;
   }
 
   getApiKey(): string | null {
@@ -936,6 +940,7 @@ export class ApiClient {
         test_definitions: definitions,
         upsert: options.upsert ?? true,
         dry_run: options.dry_run ?? false,
+        force: options.force ?? false,
       });
 
       return response.data as ImportResult;
@@ -943,6 +948,15 @@ export class ApiClient {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;
         const errorData = error.response?.data;
+
+        // Handle validation errors (detail is an array of error objects)
+        if (Array.isArray(errorData?.detail)) {
+          const messages = errorData.detail.map((e: { msg?: string; loc?: string[] }) => {
+            const field = e.loc?.slice(2).join('.') || 'unknown';
+            return `${field}: ${e.msg || 'validation error'}`;
+          });
+          throw new Error(`Validation failed:\n  ${messages.join('\n  ')}`);
+        }
 
         throw new Error(
           errorData?.message ||

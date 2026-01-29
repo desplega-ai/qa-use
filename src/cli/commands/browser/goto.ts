@@ -6,7 +6,7 @@ import { Command } from 'commander';
 import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
-import { success, error } from '../../lib/output.js';
+import { error, success } from '../../lib/output.js';
 
 interface GotoOptions {
   sessionId?: string;
@@ -28,7 +28,7 @@ export const gotoCommand = new Command('goto')
       // Validate URL - skip prefix if using variable syntax (backend handles substitution)
       const hasVarSyntax = url.startsWith('<var>') || url.startsWith('{{');
       if (!url.startsWith('http://') && !url.startsWith('https://') && !hasVarSyntax) {
-        url = 'https://' + url;
+        url = `https://${url}`;
       }
 
       // Create client and set API key

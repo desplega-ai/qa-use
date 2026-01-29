@@ -4,14 +4,14 @@
  * QA-Use CLI - Command line interface for test automation
  */
 
+import { createRequire } from 'node:module';
 import { Command } from 'commander';
-import { createRequire } from 'module';
-import { setupCommand } from './commands/setup.js';
-import { infoCommand } from './commands/info.js';
-import { testCommand } from './commands/test/index.js';
-import { mcpCommand } from './commands/mcp.js';
 import { browserCommand } from './commands/browser/index.js';
+import { infoCommand } from './commands/info.js';
 import { installDepsCommand } from './commands/install-deps.js';
+import { mcpCommand } from './commands/mcp.js';
+import { setupCommand } from './commands/setup.js';
+import { testCommand } from './commands/test/index.js';
 import { updateCommand } from './commands/update.js';
 
 // Get version from package.json

@@ -4,17 +4,17 @@
 
 import { Command } from 'commander';
 import { BrowserApiClient } from '../../../../lib/api/browser.js';
+import type { ViewportType } from '../../../../lib/api/browser-types.js';
 import { BrowserManager } from '../../../../lib/browser/index.js';
 import { TunnelManager } from '../../../../lib/tunnel/index.js';
-import type { ViewportType } from '../../../../lib/api/browser-types.js';
+import { ensureBrowsersInstalled } from '../../lib/browser.js';
 import {
-  storeSession,
   createStoredSession,
   removeStoredSession,
+  storeSession,
 } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
-import { success, error, info, warning } from '../../lib/output.js';
-import { ensureBrowsersInstalled } from '../../lib/browser.js';
+import { error, info, success, warning } from '../../lib/output.js';
 
 interface CreateOptions {
   headless?: boolean;
@@ -88,7 +88,7 @@ export const createCommand = new Command('create')
 
     // Parse timeout
     const timeout = parseInt(String(options.timeout), 10);
-    if (isNaN(timeout) || timeout < 60 || timeout > 3600) {
+    if (Number.isNaN(timeout) || timeout < 60 || timeout > 3600) {
       console.log(error('Timeout must be between 60 and 3600 seconds'));
       process.exit(1);
     }
@@ -286,7 +286,7 @@ async function runTunnelMode(
     console.log(info('Creating tunnel...'));
     tunnel = new TunnelManager();
     const wsUrl = new URL(wsEndpoint);
-    const browserPort = parseInt(wsUrl.port);
+    const browserPort = parseInt(wsUrl.port, 10);
 
     await tunnel.startTunnel(browserPort, {
       subdomain: options.subdomain,

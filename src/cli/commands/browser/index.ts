@@ -6,46 +6,42 @@
  */
 
 import { Command } from 'commander';
-
+import { backCommand } from './back.js';
+import { checkCommand } from './check.js';
+import { clickCommand } from './click.js';
+import { closeCommand } from './close.js';
 // Session management commands
 import { createCommand } from './create.js';
-import { listCommand } from './list.js';
-import { statusCommand } from './status.js';
-import { closeCommand } from './close.js';
-
+import { dragCommand } from './drag.js';
+import { fillCommand } from './fill.js';
+import { forwardCommand } from './forward.js';
+import { generateTestCommand } from './generate-test.js';
+import { getBlocksCommand } from './get-blocks.js';
 // Navigation & action commands
 import { gotoCommand } from './goto.js';
-import { backCommand } from './back.js';
-import { forwardCommand } from './forward.js';
-import { reloadCommand } from './reload.js';
-import { clickCommand } from './click.js';
-import { fillCommand } from './fill.js';
-import { typeCommand } from './type.js';
-import { pressCommand } from './press.js';
 import { hoverCommand } from './hover.js';
+import { listCommand } from './list.js';
+import { logsCommand } from './logs.js';
+import { mfaTotpCommand } from './mfa-totp.js';
+import { pressCommand } from './press.js';
+import { reloadCommand } from './reload.js';
+import { runCommand } from './run.js';
+import { screenshotCommand } from './screenshot.js';
 import { scrollCommand } from './scroll.js';
 import { scrollIntoViewCommand } from './scroll-into-view.js';
 import { selectCommand } from './select.js';
-import { checkCommand } from './check.js';
-import { uncheckCommand } from './uncheck.js';
-import { dragCommand } from './drag.js';
-import { mfaTotpCommand } from './mfa-totp.js';
-import { uploadCommand } from './upload.js';
-import { waitCommand } from './wait.js';
-import { waitForSelectorCommand } from './wait-for-selector.js';
-import { waitForLoadCommand } from './wait-for-load.js';
-
 // Inspection commands
 import { snapshotCommand } from './snapshot.js';
-import { screenshotCommand } from './screenshot.js';
-import { urlCommand } from './url.js';
-import { getBlocksCommand } from './get-blocks.js';
-import { logsCommand } from './logs.js';
-import { generateTestCommand } from './generate-test.js';
-
+import { statusCommand } from './status.js';
 // Advanced commands
 import { streamCommand } from './stream.js';
-import { runCommand } from './run.js';
+import { typeCommand } from './type.js';
+import { uncheckCommand } from './uncheck.js';
+import { uploadCommand } from './upload.js';
+import { urlCommand } from './url.js';
+import { waitCommand } from './wait.js';
+import { waitForLoadCommand } from './wait-for-load.js';
+import { waitForSelectorCommand } from './wait-for-selector.js';
 
 export const browserCommand = new Command('browser').description('Control remote browsers');
 

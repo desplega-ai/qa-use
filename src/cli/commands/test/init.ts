@@ -2,11 +2,11 @@
  * qa-use test init - Initialize test directory with examples
  */
 
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { Command } from 'commander';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 import { loadConfig } from '../../lib/config.js';
-import { success, error } from '../../lib/output.js';
+import { error, success } from '../../lib/output.js';
 
 const EXAMPLE_TEST = `# Example test definition
 name: Example Test
@@ -40,7 +40,7 @@ export const initCommand = new Command('init')
       try {
         await fs.mkdir(testDir, { recursive: true });
         console.log(success(`Created directory: ${testDir}`));
-      } catch (err) {
+      } catch {
         console.log(`Directory ${testDir} already exists`);
       }
 

@@ -2,15 +2,15 @@
  * qa-use test sync - Sync local and cloud tests
  */
 
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { Command } from 'commander';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 import * as yaml from 'yaml';
-import { loadConfig } from '../../lib/config.js';
-import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
-import { error, success, info, warning } from '../../lib/output.js';
 import { ApiClient } from '../../../../lib/api/index.js';
 import type { TestDefinition } from '../../../types/test-definition.js';
+import { loadConfig } from '../../lib/config.js';
+import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
+import { error, info, success, warning } from '../../lib/output.js';
 
 export const syncCommand = new Command('sync')
   .description('Sync local tests with cloud')
@@ -87,7 +87,7 @@ async function pullFromCloud(
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
-      console.log(`  Would pull: ${test.name} -> ${path.join(testDir, safeName + '.yaml')}`);
+      console.log(`  Would pull: ${test.name} -> ${path.join(testDir, `${safeName}.yaml`)}`);
       continue;
     }
 
@@ -110,7 +110,7 @@ async function pullFromCloud(
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/^-|-$/g, '');
-        const outputPath = path.join(testDir, safeName + '.yaml');
+        const outputPath = path.join(testDir, `${safeName}.yaml`);
 
         // Check if file exists
         let exists = false;
@@ -150,13 +150,24 @@ async function pullFromCloud(
 }
 
 /**
+ * Update version_hash in a local YAML file
+ * @internal Exported for testing
+ */
+export async function updateLocalVersionHash(filePath: string, versionHash: string): Promise<void> {
+  const content = await fs.readFile(filePath, 'utf-8');
+  const doc = yaml.parseDocument(content);
+  doc.set('version_hash', versionHash);
+  await fs.writeFile(filePath, doc.toString(), 'utf-8');
+}
+
+/**
  * Push local tests to cloud
  */
 async function pushToCloud(
   client: ApiClient,
   testDir: string,
   dryRun: boolean = false,
-  _force: boolean = false
+  force: boolean = false
 ): Promise<void> {
   console.log(info(`Loading local tests from ${testDir}...\n`));
 
@@ -171,7 +182,7 @@ async function pushToCloud(
   console.log(`Found ${files.length} local test(s)\n`);
 
   // Load all test definitions
-  const definitions = [];
+  const definitions: Array<{ file: string; def: TestDefinition }> = [];
   for (const file of files) {
     try {
       const def = await loadTestDefinition(file);
@@ -201,16 +212,73 @@ async function pushToCloud(
 
   const result = await client.importTestDefinition(
     definitions.map((d) => d.def),
-    { upsert: true }
+    { upsert: true, force }
   );
 
   if (result.success) {
+    const conflictFiles: string[] = [];
+
     for (const imported of result.imported) {
-      const action = imported.action === 'created' ? 'Created' : 'Updated';
-      console.log(success(`  ${action}: ${imported.name} (${imported.id})`));
+      switch (imported.action) {
+        case 'created':
+          console.log(success(`  Created: ${imported.name} (${imported.id})`));
+          break;
+        case 'updated':
+          console.log(success(`  Updated: ${imported.name} (${imported.id})`));
+          break;
+        case 'unchanged':
+          console.log(info(`  Unchanged: ${imported.name}`));
+          break;
+        case 'conflict': {
+          console.log(warning(`  CONFLICT: ${imported.name} - ${imported.message}`));
+          // Find the local file for this conflict
+          const localDef = definitions.find(
+            (d) => d.def.id === imported.id || d.def.name === imported.name
+          );
+          if (localDef) {
+            // Strip extension for cleaner command suggestion
+            const relPath = path.relative(testDir, localDef.file);
+            const nameWithoutExt = relPath.replace(/\.(yaml|yml|json)$/, '');
+            conflictFiles.push(nameWithoutExt);
+          }
+          break;
+        }
+        case 'skipped':
+          console.log(info(`  Skipped: ${imported.name}`));
+          break;
+      }
+    }
+
+    // Update local files with new version_hash after successful push
+    for (const imported of result.imported) {
+      if (
+        imported.version_hash &&
+        (imported.action === 'created' || imported.action === 'updated')
+      ) {
+        const localDef = definitions.find(
+          (d) => d.def.id === imported.id || d.def.name === imported.name
+        );
+        if (localDef) {
+          try {
+            await updateLocalVersionHash(localDef.file, imported.version_hash);
+          } catch (err) {
+            console.log(warning(`  Failed to update version_hash in ${localDef.file}: ${err}`));
+          }
+        }
+      }
     }
 
     console.log('');
+
+    if (conflictFiles.length > 0) {
+      console.log(warning('Conflicts detected. To see differences, run:'));
+      for (const file of conflictFiles) {
+        console.log(`  qa-use test diff ${file}`);
+      }
+      console.log('');
+      console.log(info('Then use --force to overwrite, or --pull to get latest versions.'));
+    }
+
     console.log(success(`Pushed ${result.imported.length} test(s)`));
   } else {
     console.log(error('Import failed'));

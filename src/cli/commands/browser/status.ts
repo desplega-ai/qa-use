@@ -6,7 +6,7 @@ import { Command } from 'commander';
 import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import { resolveSessionId } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
-import { success, error, info } from '../../lib/output.js';
+import { error, info } from '../../lib/output.js';
 
 interface StatusOptions {
   sessionId?: string;

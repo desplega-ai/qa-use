@@ -2,11 +2,11 @@
  * Download utilities for saving test assets locally
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import * as https from 'https';
-import * as http from 'http';
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
+import * as fs from 'node:fs';
+import * as http from 'node:http';
+import * as https from 'node:https';
+import * as path from 'node:path';
 
 /**
  * Generate short hash from file path for deterministic directory naming
@@ -88,7 +88,7 @@ export function buildDownloadPath(
   } else {
     testDir = 'unknown-test';
   }
-  return path.join(baseDir, testDir, runId, assetType + 's', fileName);
+  return path.join(baseDir, testDir, runId, `${assetType}s`, fileName);
 }
 
 /**

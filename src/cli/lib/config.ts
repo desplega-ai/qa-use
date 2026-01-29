@@ -2,9 +2,9 @@
  * Configuration file management for .qa-use-tests.json
  */
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { homedir } from 'os';
+import * as fs from 'node:fs/promises';
+import { homedir } from 'node:os';
+import * as path from 'node:path';
 
 export interface CliConfig {
   env?: Record<string, string>;

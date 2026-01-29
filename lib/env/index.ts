@@ -6,9 +6,9 @@
  * 2. Config file (~/.qa-use.json) with structure: { "env": { "VAR_NAME": "value" } }
  */
 
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
+import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 interface QaUseConfig {
   env?: Record<string, string>;
@@ -133,7 +133,7 @@ export function logConfigSources(): void {
   const sources: string[] = [];
 
   if (apiKey.value) {
-    const maskedKey = apiKey.value.slice(0, 8) + '...' + apiKey.value.slice(-4);
+    const maskedKey = `${apiKey.value.slice(0, 8)}...${apiKey.value.slice(-4)}`;
     sources.push(`  API Key: ${maskedKey} (from ${getSourceDescription(apiKey.source)})`);
   }
 

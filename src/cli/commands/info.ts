@@ -3,12 +3,12 @@
  */
 
 import { Command } from 'commander';
-import { loadConfig, configExists } from '../lib/config.js';
-import { success, error, warning } from '../lib/output.js';
-import { ApiClient } from '../../../lib/api/index.js';
 import type { AppConfig } from '../../../lib/api/index.js';
-import { getEnvWithSource } from '../../../lib/env/index.js';
+import { ApiClient } from '../../../lib/api/index.js';
 import { BrowserManager } from '../../../lib/browser/index.js';
+import { getEnvWithSource } from '../../../lib/env/index.js';
+import { configExists, loadConfig } from '../lib/config.js';
+import { error, success, warning } from '../lib/output.js';
 
 /**
  * Mask a sensitive value (show first 10 chars or asterisks)
@@ -52,7 +52,7 @@ export const infoCommand = new Command('info')
 
     // Show basic configuration
     console.log('Configuration:');
-    console.log(`  API Key: ${apiKey ? apiKey.slice(0, 12) + '...' : '(not set)'}${apiKeySource}`);
+    console.log(`  API Key: ${apiKey ? `${apiKey.slice(0, 12)}...` : '(not set)'}${apiKeySource}`);
     console.log(
       `  API URL: ${config.api_url || process.env.QA_USE_API_URL || 'https://api.desplega.ai'}`
     );

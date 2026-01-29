@@ -1,10 +1,9 @@
+import { fork } from 'node:child_process';
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
+import path from 'node:path';
+import type { Browser, BrowserServer } from 'playwright';
 import { chromium } from 'playwright';
-import type { BrowserServer, Browser } from 'playwright';
-import { fork } from 'child_process';
-import path from 'path';
-import fs from 'fs';
-import { createRequire } from 'module';
-import { fileURLToPath } from 'url';
 
 export interface BrowserInstallationStatus {
   installed: boolean;
@@ -90,7 +89,7 @@ export class BrowserManager {
 
     try {
       await session.browserServer.close();
-    } catch (error) {
+    } catch {
       // Silently handle cleanup errors
     }
   }
@@ -102,7 +101,7 @@ export class BrowserManager {
 
     try {
       return await chromium.connect(this.session.wsEndpoint);
-    } catch (error) {
+    } catch {
       return null;
     }
   }
@@ -127,7 +126,7 @@ export class BrowserManager {
       });
       await browser.close();
       return true;
-    } catch (error) {
+    } catch {
       this.session.isActive = false;
       return false;
     }

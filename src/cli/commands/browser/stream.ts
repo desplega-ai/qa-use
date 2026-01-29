@@ -78,7 +78,7 @@ export const streamCommand = new Command('stream')
           // Parse JSON message
           const message = JSON.parse(data.toString());
           formatEvent(message);
-        } catch (err) {
+        } catch {
           console.log(`${colors.gray}Raw: ${data.toString()}${colors.reset}`);
         }
       });

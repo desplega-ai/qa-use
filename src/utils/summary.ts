@@ -1,4 +1,4 @@
-import type { TestAgentV2Data, IssueReport, DoneIntent, Block, HistoryItem } from '../types.js';
+import type { IssueReport, TestAgentV2Data } from '../types.js';
 import { isTestCreatorDoneIntent } from '../types.js';
 
 export interface BlockSummary {
@@ -206,8 +206,7 @@ export function formatEnhancedTestReport(summary: EnhancedTestSummary): string {
 
   report += `## Test Blocks\n`;
   summary.blocks.forEach((block) => {
-    const statusIcon =
-      block.status === 'completed' ? '✅' : block.status === 'failed' ? '❌' : '⏭️';
+    const statusIcon = block.status === 'completed' ? '✅' : block.status === 'failed' ? '❌' : '⏭️';
     report += `${statusIcon} **${block.name}** (${block.action})`;
     if (block.confidence) {
       report += ` - Confidence: ${block.confidence}`;

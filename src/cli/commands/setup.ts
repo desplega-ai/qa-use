@@ -2,11 +2,11 @@
  * qa-use setup - Interactive API key configuration
  */
 
+import * as readline from 'node:readline/promises';
 import { Command } from 'commander';
-import { saveConfig, loadConfig } from '../lib/config.js';
 import { ApiClient } from '../../../lib/api/index.js';
-import { success, error } from '../lib/output.js';
-import * as readline from 'readline/promises';
+import { loadConfig, saveConfig } from '../lib/config.js';
+import { error, success } from '../lib/output.js';
 
 export const setupCommand = new Command('setup')
   .description('Configure API key and default settings')
@@ -60,7 +60,7 @@ export const setupCommand = new Command('setup')
 
       // Save configuration
       await saveConfig(config);
-      console.log('\n' + success('Configuration saved to .qa-use-tests.json'));
+      console.log(`\n${success('Configuration saved to .qa-use-tests.json')}`);
     } catch (err) {
       console.log(error(`Setup failed: ${err}`));
       process.exit(1);

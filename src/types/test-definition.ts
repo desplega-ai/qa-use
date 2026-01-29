@@ -4,8 +4,8 @@
  * DO NOT EDIT MANUALLY - Generated from API schema
  * Run 'pnpm generate:types' to regenerate
  *
- * Source: http://localhost:5005/vibe-qa/cli/schema
- * Generated: 2026-01-28T15:38:08.910Z
+ * Source: https://api.desplega.ai/vibe-qa/cli/schema
+ * Generated: 2026-01-29T17:34:44.085Z
  */
 
 export type Name = string;
@@ -304,6 +304,7 @@ export type Severity = ('low' | 'medium' | 'high' | 'critical') | null;
 export type Priority = ('low' | 'medium' | 'high' | 'urgent') | null;
 export type SuccessCriteria = string | null;
 export type IsPositive = boolean | null;
+export type VersionHash = string | null;
 
 /**
  * Schema for qa-use test definition files
@@ -321,6 +322,7 @@ export interface TestDefinition {
   priority?: Priority;
   success_criteria?: SuccessCriteria;
   is_positive?: IsPositive;
+  version_hash?: VersionHash;
   [k: string]: unknown;
 }
 export interface Variables {

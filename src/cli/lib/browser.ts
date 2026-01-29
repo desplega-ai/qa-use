@@ -5,9 +5,9 @@
  * and browser WebSocket connection for remote test execution.
  */
 
-import { TunnelManager } from '../../../lib/tunnel/index.js';
+import { URL } from 'node:url';
 import { BrowserManager } from '../../../lib/browser/index.js';
-import { URL } from 'url';
+import { TunnelManager } from '../../../lib/tunnel/index.js';
 import { error } from './output.js';
 
 export interface BrowserTunnelSession {

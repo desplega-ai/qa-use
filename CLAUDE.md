@@ -63,17 +63,17 @@ Or use `~/.qa-use.json` config file (env vars take precedence).
 
 ## Code Style
 
-- ESLint + Prettier configured
+- Biome (formatting + linting) + oxlint configured
 - Use `.js` extensions in imports (ESM)
 - Debug with `console.error()` (stdout reserved for MCP)
-- Run `make all` (format + lint + build) before committing
+- Run `bun run check:fix` before committing
 
 ## Mandatory Verification After Code Changes
 
 **IMPORTANT:** After making any code changes, always run:
 
 ```bash
-bun run lint:fix && bun run format
+bun run check:fix
 ```
 
 This is especially critical when implementing plans - run this verification step after completing each phase before proceeding to the next one. This ensures consistent code style and catches issues early.

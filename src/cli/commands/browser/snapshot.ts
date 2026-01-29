@@ -90,14 +90,14 @@ function formatAriaTree(tree: string): string {
   };
 
   // Highlight refs like [ref=e3]
-  const highlighted = tree.replace(/\[ref=(\w+)\]/g, (match, ref) => {
+  const highlighted = tree.replace(/\[ref=(\w+)\]/g, (_match, ref) => {
     return `${colors.cyan}[ref=${colors.yellow}${ref}${colors.cyan}]${colors.reset}`;
   });
 
   // Highlight element types (heading, button, link, textbox, etc.)
   const withElements = highlighted.replace(
     /^(\s*-\s+)(heading|button|link|textbox|combobox|listbox|checkbox|radio|menu|menuitem|dialog|img|paragraph|list|listitem|table|row|cell|tab|tablist|tabpanel)/gm,
-    (match, prefix, element) => {
+    (_match, prefix, element) => {
       return `${prefix}${colors.green}${element}${colors.reset}`;
     }
   );

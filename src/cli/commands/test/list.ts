@@ -2,12 +2,12 @@
  * qa-use test list - List test definitions
  */
 
+import * as path from 'node:path';
 import { Command } from 'commander';
-import * as path from 'path';
+import { ApiClient } from '../../../../lib/api/index.js';
 import { loadConfig } from '../../lib/config.js';
 import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
-import { printTestList, error } from '../../lib/output.js';
-import { ApiClient } from '../../../../lib/api/index.js';
+import { error, printTestList } from '../../lib/output.js';
 
 export const listCommand = new Command('list')
   .description('List test definitions')
@@ -29,7 +29,7 @@ export const listCommand = new Command('list')
         client.setApiKey(config.api_key);
 
         console.log('Fetching tests from cloud...\n');
-        const tests = await client.listTests({ limit: parseInt(options.limit) });
+        const tests = await client.listTests({ limit: parseInt(options.limit, 10) });
 
         const formatted = tests.map((t) => ({
           name: `${t.name} (${t.id})`,

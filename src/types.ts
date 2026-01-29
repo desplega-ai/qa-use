@@ -169,8 +169,7 @@ export interface Intent<TDone extends DoneIntent = DoneIntent> extends General {
 export const isDoneIntent = <TDone extends DoneIntent = DoneIntent>(
   intent: Intent<TDone>['intent']
 ): intent is TDone => {
-  // eslint-disable-next-line no-prototype-builtins
-  return intent.hasOwnProperty('status');
+  return Object.hasOwn(intent, 'status');
 };
 
 export const isTestCreatorDoneIntent = (intent: DoneIntent): intent is TestCreatorDoneIntent => {
@@ -185,33 +184,25 @@ export const isTestCreatorDoneIntent = (intent: DoneIntent): intent is TestCreat
 export const isUserInputIntent = <TDone extends DoneIntent = DoneIntent>(
   intent: Intent<TDone>['intent']
 ): intent is UserInputIntent => {
-  // eslint-disable-next-line no-prototype-builtins
-  return intent.hasOwnProperty('question');
+  return Object.hasOwn(intent, 'question');
 };
 
 export const isNextTaskIntent = <TDone extends DoneIntent = DoneIntent>(
   intent: Intent<TDone>['intent']
 ): intent is NextTaskIntent => {
-  // eslint-disable-next-line no-prototype-builtins
-  return intent.hasOwnProperty('next_task');
+  return Object.hasOwn(intent, 'next_task');
 };
 
 export const isClarificationIntent = <TDone extends DoneIntent = DoneIntent>(
   intent: Intent<TDone>['intent']
 ): intent is ClarificationIntent => {
-  return (
-    // eslint-disable-next-line no-prototype-builtins
-    intent.hasOwnProperty('type') && (intent as AnyDict).type !== undefined
-  );
+  return Object.hasOwn(intent, 'type') && (intent as AnyDict).type !== undefined;
 };
 
 export const isActionIntent = <TDone extends DoneIntent = DoneIntent>(
   intent: Intent<TDone>['intent']
 ): intent is ActionIntent => {
-  return (
-    // eslint-disable-next-line no-prototype-builtins
-    intent.hasOwnProperty('type') && (intent as AnyDict).type !== undefined
-  );
+  return Object.hasOwn(intent, 'type') && (intent as AnyDict).type !== undefined;
 };
 
 // ExpandedRef

@@ -2,8 +2,7 @@
  * BrowserApiClient Unit Tests
  */
 
-import { describe, it, expect, beforeEach, mock, spyOn } from 'bun:test';
-import axios from 'axios';
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
 import { BrowserApiClient } from './browser.js';
 
 // Mock axios
@@ -48,7 +47,7 @@ describe('BrowserApiClient', () => {
     });
 
     it('should use custom API URL', () => {
-      const c = new BrowserApiClient('https://custom.api.com');
+      new BrowserApiClient('https://custom.api.com');
       // The URL should be set via axios.create
       expect(mockAxiosInstance.defaults.baseURL).toBeDefined();
     });

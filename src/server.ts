@@ -1,27 +1,21 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
   CallToolRequestSchema,
-  ListToolsRequestSchema,
-  ListResourcesRequestSchema,
-  ReadResourceRequestSchema,
-  ListPromptsRequestSchema,
   GetPromptRequestSchema,
+  ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
+  ListToolsRequestSchema,
+  ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-
+import { ApiClient } from '../lib/api/index.js';
 import { BrowserManager } from '../lib/browser/index.js';
 import { TunnelManager } from '../lib/tunnel/index.js';
-import { ApiClient } from '../lib/api/index.js';
-import { getName, getVersion } from './utils/package.js';
-import type { TestAgentV2Session, UserInputIntent } from './types.js';
+import type { TestAgentV2Session } from './types.js';
 import { isTestCreatorDoneIntent } from './types.js';
-import {
-  generateEnhancedTestSummary,
-  formatEnhancedTestReport,
-  generateIssueStatistics,
-  categorizeIssues,
-} from './utils/summary.js';
+import { getName, getVersion } from './utils/package.js';
+import { categorizeIssues } from './utils/summary.js';
 
 interface EnsureInstalledParams {
   apiKey?: string;
@@ -112,30 +106,6 @@ interface SessionSummary {
   note: string;
 }
 
-interface SessionDetails {
-  id: string;
-  status: string;
-  createdAt: string;
-  data: {
-    status?: string;
-    url?: string;
-    task?: string;
-    test_id?: string;
-    agent_id?: string;
-    liveview_url?: string;
-    pending_user_input?: UserInputIntent;
-    last_done?: unknown;
-    model_name?: string;
-    recording_path?: string;
-    dependency_test_ids?: string[];
-    history: unknown[];
-    historyNote?: string;
-    blocks: unknown[];
-    blocksNote?: string;
-  };
-  source?: string;
-}
-
 interface TestSummary {
   id: string;
   name: string;
@@ -146,28 +116,6 @@ interface TestSummary {
   created_at: string;
   dependency_test_ids?: string[];
   note: string;
-}
-
-interface StartSessionResult {
-  success: boolean;
-  message: string;
-  sessionId: string;
-  note: string;
-  session: {
-    id: string;
-    status: string;
-    createdAt: string;
-    data: {
-      agent_id?: string;
-      test_id?: string;
-      url?: string;
-      task?: string;
-      status?: string;
-      liveview_url?: string;
-      dependency_test_ids?: string[];
-    };
-    source?: string;
-  };
 }
 
 type SessionType = 'dev' | 'automated' | 'test_run';
@@ -214,12 +162,12 @@ class BrowserSession {
   async cleanup(): Promise<void> {
     try {
       await this.tunnel.stopTunnel();
-    } catch (error) {
+    } catch {
       // Ignore cleanup errors
     }
     try {
       await this.browser.stopBrowser();
-    } catch (error) {
+    } catch {
       // Ignore cleanup errors
     }
   }
@@ -305,10 +253,10 @@ class QAUseMcpServer {
       name: test.name,
       description:
         test.description && test.description.length > 60
-          ? test.description.substring(0, 60) + '...'
+          ? `${test.description.substring(0, 60)}...`
           : test.description,
       url: test.url,
-      task: test.task && test.task.length > 60 ? test.task.substring(0, 60) + '...' : test.task,
+      task: test.task && test.task.length > 60 ? `${test.task.substring(0, 60)}...` : test.task,
       status: test.status,
       created_at: test.created_at,
       dependency_test_ids: test.dependency_test_ids,
@@ -343,7 +291,7 @@ class QAUseMcpServer {
       if (lastDone.reasoning) {
         progressSummary =
           lastDone.reasoning.length > 150
-            ? lastDone.reasoning.substring(0, 150) + '...'
+            ? `${lastDone.reasoning.substring(0, 150)}...`
             : lastDone.reasoning;
       }
     }
@@ -382,7 +330,7 @@ class QAUseMcpServer {
       if (lastDone.explanation) {
         const shortExplanation =
           lastDone.explanation.length > 100
-            ? lastDone.explanation.substring(0, 100) + '...'
+            ? `${lastDone.explanation.substring(0, 100)}...`
             : lastDone.explanation;
         enhancedTestInfo += `\n📝 **Explanation**: ${shortExplanation}`;
       }
@@ -428,72 +376,11 @@ ${enhancedTestInfo}
 
 ${liveviewUrl ? `👀 **Watch Live**: ${liveviewUrl}` : ''}
 
-${status === 'active' ? '🎯 **Next step**: monitor_qa_session({sessionId: "' + sessionId + '", wait_for_completion: true}) to wait for completion' : ''}
+${status === 'active' ? `🎯 **Next step**: monitor_qa_session({sessionId: "${sessionId}", wait_for_completion: true}) to wait for completion` : ''}
 ${status === 'pending' ? '❓ **Needs Input**: Check for pending_user_input and use interact_with_qa_session to respond' : ''}
 ${status === 'closed' ? '✅ **Completed**: Session finished successfully' : ''}
 ${status === 'idle' ? '⏸️ **Paused**: Session is idle, may need intervention' : ''}`;
     }
-  }
-
-  private formatSessionCompletion(session: any, elapsed: number, iterations: number): string {
-    const status = session.data?.status || session.status;
-    const sessionId = session.id;
-    const liveviewUrl = session.data?.liveview_url;
-    const lastDone = session.data?.last_done;
-    const task = session.data?.task;
-
-    // Build final result context
-    let resultContext = '';
-    if (lastDone) {
-      if (typeof lastDone === 'string') {
-        resultContext = lastDone.length > 150 ? lastDone.substring(0, 150) + '...' : lastDone;
-      } else if (lastDone.action || lastDone.description) {
-        resultContext = lastDone.action || lastDone.description || 'Session completed';
-        if (resultContext.length > 150) {
-          resultContext = resultContext.substring(0, 150) + '...';
-        }
-      }
-    }
-
-    const statusEmoji = status === 'closed' ? '✅' : '⏸️';
-    const statusText = status === 'closed' ? 'Completed Successfully' : 'Paused';
-
-    let baseReport = `${statusEmoji} **Session ${statusText}** (${elapsed}s total)
-
-🎯 **Task**: ${task || 'QA Testing Session'}
-
-📍 **Final Status**: ${status}
-
-${resultContext ? `📋 **Final Result**: ${resultContext}` : '✅ **Status**: Session completed'}
-
-${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
-
-⏰ **Session Info**: Monitored for ${elapsed}s with ${iterations} status checks
-
-🎯 **Next step**: Session complete! You can now start a new session or view results${liveviewUrl ? ' in the recording' : ''}`;
-
-    // Add enhanced summary if TestCreatorDoneIntent is available
-    if (lastDone && isTestCreatorDoneIntent(lastDone)) {
-      try {
-        const enhancedSummary = generateEnhancedTestSummary(session.data);
-        const enhancedReport = formatEnhancedTestReport(enhancedSummary);
-        baseReport += '\n\n---\n\n' + enhancedReport;
-
-        // Add issue statistics if issues were found
-        if (enhancedSummary.discoveredIssues.length > 0) {
-          const stats = generateIssueStatistics(enhancedSummary.discoveredIssues);
-          baseReport += `\n\n## Issue Statistics\n`;
-          baseReport += `- Total Issues: ${stats.totalIssues}\n`;
-          baseReport += `- Critical/Blocker: ${stats.criticalCount}\n`;
-          baseReport += `- Most Common Type: ${stats.mostCommonType || 'N/A'}\n`;
-        }
-      } catch (error) {
-        // Silently fail if enhanced summary generation fails
-        console.error('Failed to generate enhanced summary:', error);
-      }
-    }
-
-    return baseReport;
   }
 
   private startCleanupTask(): void {
@@ -515,7 +402,7 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
               action: 'close',
               data: 'Session expired due to inactivity',
             });
-          } catch (error) {
+          } catch {
             // If API call fails, continue with cleanup
           }
         }
@@ -525,7 +412,7 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
         this.browserSessions = this.browserSessions.filter(
           (s) => s.session_id !== session.session_id
         );
-      } catch (error) {
+      } catch {
         // Silent cleanup - continue with next session
       }
     }
@@ -660,7 +547,7 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
     });
 
     const wsUrl = new URL(wsEndpoint);
-    const browserPort = parseInt(wsUrl.port);
+    const browserPort = parseInt(wsUrl.port, 10);
 
     // Pass API key and session index 0 to tunnel for deterministic subdomain
     await this.globalTunnel.startTunnel(browserPort, {
@@ -742,7 +629,7 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
     if (this.globalTunnel) {
       try {
         await this.globalTunnel.stopTunnel();
-      } catch (error) {
+      } catch {
         // Silent cleanup
       }
       this.globalTunnel = null;
@@ -751,7 +638,7 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
     if (this.globalBrowser) {
       try {
         await this.globalBrowser.stopBrowser();
-      } catch (error) {
+      } catch {
         // Silent cleanup
       }
       this.globalBrowser = null;
@@ -1562,16 +1449,6 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
           this.browserSessions = this.browserSessions.filter((s) => s.session_id !== sessionId);
         }
 
-        const result = {
-          sessionId: session.id,
-          status: status,
-          hasPendingInput: !!session.data?.pending_user_input,
-          pendingInput: session.data?.pending_user_input,
-          lastDone: session.data?.last_done,
-          liveviewUrl: session.data?.liveview_url,
-          note: 'Keep calling monitor_session until status is "closed".',
-        };
-
         // Alert on specific statuses
         if (status === 'idle' || status === 'pending' || status === 'need_user_input') {
           let alertMessage = `⚠️ Session ${sessionId} is in "${status}" state`;
@@ -1640,7 +1517,6 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
     timeout: number
   ): Promise<CallToolResult> {
     const startTime = Date.now();
-    const timeoutMs = timeout * 1000;
     let iteration = 0;
 
     try {
@@ -1710,12 +1586,11 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
           if (i < maxChecks - 1) {
             await new Promise((resolve) => setTimeout(resolve, checkInterval * 1000));
           }
-        } catch (sessionError) {
+        } catch {
           // If session not found or error, wait a bit and try again
           if (i < maxChecks - 1) {
             await new Promise((resolve) => setTimeout(resolve, checkInterval * 1000));
           }
-          continue;
         }
       }
 
@@ -1725,7 +1600,6 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
       try {
         // Get final status before returning
         const session = await this.globalApiClient.getSession(sessionId);
-        const status = session.data?.status || session.status;
 
         // Create conversational timeout message with context
         const timeoutText = this.formatSessionProgress(session, elapsed, iteration);
@@ -1739,7 +1613,7 @@ ${liveviewUrl ? `👀 **Recording**: ${liveviewUrl}` : ''}
           ],
           isError: false, // Not an error, just incomplete
         };
-      } catch (error) {
+      } catch {
         return {
           content: [
             {

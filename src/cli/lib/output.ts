@@ -2,10 +2,10 @@
  * Console output formatting utilities
  */
 
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import * as yaml from 'yaml';
 import type { SSEEvent } from '../../../lib/api/sse.js';
-import { downloadFile, buildDownloadPath, getExtensionFromUrl } from './download.js';
+import { buildDownloadPath, downloadFile, getExtensionFromUrl } from './download.js';
 
 /**
  * Context for SSE progress output, used for features like --update-local and --download
@@ -330,17 +330,17 @@ export function printSSEProgress(
       let status: string;
       let timeStr: string;
       if (event.data.status === 'passed') {
-        status = colors.green + '✓';
+        status = `${colors.green}✓`;
         timeStr = ` ${colors.gray}${duration(event.data.duration)}${colors.reset}`;
       } else if (event.data.status === 'skipped') {
-        status = colors.yellow + '⊘';
+        status = `${colors.yellow}⊘`;
         // For skipped steps, print the step name since step_start wasn't shown
         console.log(
           `${colors.gray}[${event.data.step_index}]${colors.reset} ${event.data.name}...`
         );
         timeStr = ` ${colors.gray}skipped${colors.reset}`;
       } else {
-        status = colors.red + '✗';
+        status = `${colors.red}✗`;
         timeStr = ` ${colors.gray}${duration(event.data.duration)}${colors.reset}`;
       }
       const hasScreenshots = event.data.pre_screenshot_url || event.data.post_screenshot_url;
@@ -436,10 +436,10 @@ export function printValidationErrors(
   for (const err of errors) {
     const icon =
       err.severity === 'error'
-        ? colors.red + '✗'
+        ? `${colors.red}✗`
         : err.severity === 'warning'
-          ? colors.yellow + '⚠'
-          : colors.blue + 'ℹ';
+          ? `${colors.yellow}⚠`
+          : `${colors.blue}ℹ`;
     console.log(`  ${icon}${colors.reset} ${err.path}: ${err.message}`);
   }
 }

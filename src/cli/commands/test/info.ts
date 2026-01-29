@@ -2,14 +2,14 @@
  * qa-use test info - Show test definition details
  */
 
+import * as path from 'node:path';
 import { Command } from 'commander';
-import * as path from 'path';
 import * as yaml from 'yaml';
-import { loadConfig } from '../../lib/config.js';
-import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
-import { error, info, success } from '../../lib/output.js';
 import { ApiClient } from '../../../../lib/api/index.js';
 import type { TestDefinition } from '../../../types/test-definition.js';
+import { loadConfig } from '../../lib/config.js';
+import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
+import { error, info } from '../../lib/output.js';
 
 // ANSI color codes
 const colors = {
@@ -58,7 +58,7 @@ function displayTestInfo(test: TestDefinition, source: string): void {
   if (test.variables && Object.keys(test.variables).length > 0) {
     console.log(`  Variables:`);
     for (const [key, value] of Object.entries(test.variables)) {
-      const displayValue = value.length > 50 ? value.substring(0, 47) + '...' : value;
+      const displayValue = value.length > 50 ? `${value.substring(0, 47)}...` : value;
       console.log(`    ${key}: ${colors.gray}${displayValue}${colors.reset}`);
     }
   }

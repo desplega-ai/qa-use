@@ -2,8 +2,8 @@
  * Test definition file discovery and loading
  */
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { glob } from 'glob';
 import * as yaml from 'yaml';
 import type { TestDefinition } from '../../../src/types/test-definition.js';

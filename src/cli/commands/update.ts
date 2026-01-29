@@ -4,12 +4,12 @@
  * Handles both global npm installs and local linked/dev installs.
  */
 
+import { execSync, spawnSync } from 'node:child_process';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { Command } from 'commander';
-import { execSync, spawnSync } from 'child_process';
-import { realpathSync, existsSync, readFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { createRequire } from 'module';
-import { success, error, info, warning } from '../lib/output.js';
+import { error, info, success, warning } from '../lib/output.js';
 
 // Get current version from package.json
 const require = createRequire(import.meta.url);

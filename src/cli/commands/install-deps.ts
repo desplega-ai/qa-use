@@ -4,7 +4,7 @@
 
 import { Command } from 'commander';
 import { BrowserManager } from '../../../lib/browser/index.js';
-import { success, error, info } from '../lib/output.js';
+import { error, info, success } from '../lib/output.js';
 
 export const installDepsCommand = new Command('install-deps')
   .description('Install Playwright browser dependencies (Chromium)')

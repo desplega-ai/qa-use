@@ -1,6 +1,7 @@
 name: Customers > Go to second page
 id: 74628094-00ce-4f81-b928-9a369a63f25b
 app_config: 600dc916-16b9-4cb8-a7d1-09658f146e45
+tags: []
 variables: {}
 depends_on: 4292938b-338d-4c1c-952e-6bcdf3f7731a
 steps:
@@ -36,3 +37,4 @@ steps:
     description: Scroll to the top of the page
     aaa_phase: act
     should_skip: false
+version_hash: 436792b6b5692d25476bf775e4df1521c9992f422f73327657d945222d763f22

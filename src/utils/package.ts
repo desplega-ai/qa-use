@@ -1,6 +1,6 @@
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Get the directory of the current module
 const __filename = fileURLToPath(import.meta.url);
@@ -23,7 +23,7 @@ export function getPackageInfo(): PackageJson {
     try {
       const packageContent = readFileSync(packageJsonPath, 'utf-8');
       packageJson = JSON.parse(packageContent);
-    } catch (error) {
+    } catch {
       // Fallback values if package.json can't be read
       packageJson = {
         name: 'qa-use-mcp',

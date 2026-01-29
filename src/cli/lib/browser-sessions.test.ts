@@ -2,20 +2,20 @@
  * Browser Session Persistence Unit Tests
  */
 
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import {
-  loadStoredSessions,
-  storeSession,
-  removeStoredSession,
-  touchSession,
-  isSessionStale,
   cleanStaleSessions,
-  getActiveSessions,
   createStoredSession,
+  getActiveSessions,
+  isSessionStale,
+  loadStoredSessions,
+  removeStoredSession,
   type StoredSession,
+  storeSession,
+  touchSession,
 } from './browser-sessions.js';
 
 const TEST_CONFIG_PATH = path.join(os.homedir(), '.qa-use.json');

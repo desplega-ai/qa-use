@@ -151,6 +151,8 @@ qa-use browser create --after-test-id <login-test-uuid> \
 | `qa-use test init` | Initialize test directory |
 | `qa-use test sync --pull` | Pull tests from cloud |
 | `qa-use test sync --push` | Push tests to cloud |
+| `qa-use test sync --push --force` | Push tests, overwriting conflicts |
+| `qa-use test diff <file>` | Compare local vs cloud test |
 
 ## Common Mistakes
 

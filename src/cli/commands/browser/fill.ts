@@ -6,7 +6,7 @@ import { Command } from 'commander';
 import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
-import { success, error } from '../../lib/output.js';
+import { error, success } from '../../lib/output.js';
 
 interface FillOptions {
   sessionId?: string;
@@ -80,7 +80,7 @@ export const fillCommand = new Command('fill')
         const result = await client.executeAction(resolved.id, action);
 
         if (result.success) {
-          const displayValue = value.length > 50 ? value.slice(0, 47) + '...' : value;
+          const displayValue = value.length > 50 ? `${value.slice(0, 47)}...` : value;
           const target = ref ? normalizeRef(ref) : `"${options.text}"`;
           console.log(success(`Filled ${target} with "${displayValue}"`));
           await touchSession(resolved.id);

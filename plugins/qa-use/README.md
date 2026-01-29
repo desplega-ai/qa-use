@@ -68,6 +68,7 @@ The primary way to use this plugin is the **verify → explore → record → te
 | `/qa-use:test-info <name> [--id <uuid>]` | Show test details (steps, tags, description) |
 | `/qa-use:test-validate [name]` | Validate test syntax |
 | `/qa-use:test-sync [--pull\|--push]` | Sync with cloud |
+| `/qa-use:test-diff <file>` | Compare local vs cloud test |
 | `/qa-use:test-update [name]` | AI-assisted test editing |
 
 ### Common Flags for test-run

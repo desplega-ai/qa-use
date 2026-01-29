@@ -4,7 +4,7 @@
 
 import { Command } from 'commander';
 import { BrowserApiClient } from '../../../../lib/api/browser.js';
-import { loadStoredSessions, isSessionStale } from '../../lib/browser-sessions.js';
+import { isSessionStale, loadStoredSessions } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, warning } from '../../lib/output.js';
 
@@ -66,7 +66,7 @@ export const listCommand = new Command('list')
 
         // Format URL (truncate if too long)
         const url = session.current_url || '-';
-        const truncatedUrl = url.length > 30 ? url.slice(0, 27) + '...' : url;
+        const truncatedUrl = url.length > 30 ? `${url.slice(0, 27)}...` : url;
 
         // Status with color indicator
         let statusStr = session.status.padEnd(8);

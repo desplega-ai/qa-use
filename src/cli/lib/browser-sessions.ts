@@ -5,9 +5,9 @@
  * Provides session resolution logic for commands that need a session ID.
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import type { BrowserApiClient } from '../../../lib/api/browser.js';
 
 // ==========================================
@@ -221,7 +221,7 @@ export async function resolveSessionId(
   if (verify) {
     try {
       await client.getSession(sessionId);
-    } catch (error) {
+    } catch {
       // If session not found on API, remove from local storage
       await removeStoredSession(sessionId);
 

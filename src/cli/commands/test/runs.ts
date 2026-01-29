@@ -3,8 +3,8 @@
  */
 
 import { Command } from 'commander';
-import { loadConfig } from '../../lib/config.js';
 import { ApiClient } from '../../../../lib/api/index.js';
+import { loadConfig } from '../../lib/config.js';
 import { error, warning } from '../../lib/output.js';
 
 // ANSI color codes
@@ -110,8 +110,8 @@ export const runsCommand = new Command('runs')
       const runs = await client.listTestRuns({
         test_id: testId,
         run_status: options.status,
-        limit: parseInt(options.limit),
-        offset: parseInt(options.offset),
+        limit: parseInt(options.limit, 10),
+        offset: parseInt(options.offset, 10),
       });
 
       // JSON output
@@ -156,9 +156,9 @@ export const runsCommand = new Command('runs')
       }
 
       // Pagination hint
-      if (runs.length === parseInt(options.limit)) {
+      if (runs.length === parseInt(options.limit, 10)) {
         console.log(
-          `\n${colors.gray}Use --offset ${parseInt(options.offset) + parseInt(options.limit)} to see more${colors.reset}`
+          `\n${colors.gray}Use --offset ${parseInt(options.offset, 10) + parseInt(options.limit, 10)} to see more${colors.reset}`
         );
       }
     } catch (err) {

@@ -2,13 +2,13 @@
  * qa-use browser upload - Upload files to input[type=file] elements
  */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { Command } from 'commander';
-import * as fs from 'fs';
-import * as path from 'path';
 import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
-import { success, error } from '../../lib/output.js';
+import { error, success } from '../../lib/output.js';
 
 interface UploadOptions {
   sessionId?: string;

@@ -2,12 +2,12 @@
  * qa-use browser generate-test - Generate test YAML from recorded session blocks
  */
 
-import * as fs from 'fs/promises';
+import * as fs from 'node:fs/promises';
 import { Command } from 'commander';
 import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import { resolveSessionId } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
-import { success, error } from '../../lib/output.js';
+import { error, success } from '../../lib/output.js';
 
 interface GenerateTestOptions {
   sessionId?: string;

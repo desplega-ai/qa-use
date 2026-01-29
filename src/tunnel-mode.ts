@@ -4,9 +4,9 @@
  * using the local browser connection.
  */
 
+import { ApiClient } from '../lib/api/index.js';
 import { BrowserManager } from '../lib/browser/index.js';
 import { TunnelManager } from '../lib/tunnel/index.js';
-import { ApiClient } from '../lib/api/index.js';
 
 interface TunnelModeOptions {
   headless?: boolean;
@@ -70,7 +70,7 @@ export async function startTunnelMode(options: TunnelModeOptions = {}): Promise<
   // Step 4: Start tunnel with deterministic subdomain (or custom if provided)
   const tunnel = new TunnelManager();
   const wsUrl = new URL(wsEndpoint);
-  const browserPort = parseInt(wsUrl.port);
+  const browserPort = parseInt(wsUrl.port, 10);
 
   try {
     await tunnel.startTunnel(browserPort, {
