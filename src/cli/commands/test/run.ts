@@ -24,6 +24,7 @@ import {
   clearStepScreenshots,
   error,
   formatError,
+  info,
   printDownloadedFilesSummary,
   printScreenshotsSummary,
   success,
@@ -218,7 +219,18 @@ export const runCommand = new Command('run')
         }
       }
     } catch (err) {
-      console.log(error(`Test execution failed: ${formatError(err)}`));
+      const errorMsg = formatError(err);
+      console.log(error(`Test execution failed: ${errorMsg}`));
+
+      // Hint to use validate command for validation-like errors
+      if (errorMsg.includes('Validation failed') || errorMsg.includes('validation error')) {
+        console.log(
+          info(
+            `\nTip: Run 'qa-use test validate ${test || '<test-name>'}' to see detailed validation errors.`
+          )
+        );
+      }
+
       process.exit(1);
     }
   });

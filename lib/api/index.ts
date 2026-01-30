@@ -19,6 +19,37 @@ import {
 import { getEnv } from '../env/index.js';
 import { type SSEEvent, streamSSE } from './sse.js';
 
+/**
+ * Format API error data to a human-readable message
+ * Handles both string errors and Pydantic validation error arrays
+ */
+function formatApiError(
+  errorData: { message?: string; detail?: string | unknown[] } | undefined,
+  fallback: string
+): string {
+  if (!errorData) return fallback;
+
+  if (errorData.message && typeof errorData.message === 'string') {
+    return errorData.message;
+  }
+
+  if (errorData.detail) {
+    if (typeof errorData.detail === 'string') {
+      return errorData.detail;
+    }
+    if (Array.isArray(errorData.detail)) {
+      const messages = errorData.detail.map((e: unknown) => {
+        const err = e as { msg?: string; loc?: unknown[] };
+        const field = Array.isArray(err.loc) ? err.loc.slice(2).join('.') || 'unknown' : 'unknown';
+        return `${field}: ${err.msg || 'validation error'}`;
+      });
+      return `Validation failed:\n  ${messages.join('\n  ')}`;
+    }
+  }
+
+  return fallback;
+}
+
 // Re-export new types for external consumers
 export type { IssueType, Severity, IssueReport, TestCreatorDoneIntent };
 export type { EnhancedTestSummary, BlockSummary };
@@ -434,9 +465,7 @@ export class ApiClient {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;
         const errorData = error.response?.data;
-        throw new Error(
-          errorData?.message || errorData?.detail || `HTTP ${statusCode}: Failed to create session`
-        );
+        throw new Error(formatApiError(errorData, `HTTP ${statusCode}: Failed to create session`));
       }
       throw new Error(error instanceof Error ? error.message : 'Unknown error creating session');
     }
@@ -460,9 +489,7 @@ export class ApiClient {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;
         const errorData = error.response?.data;
-        throw new Error(
-          errorData?.message || errorData?.detail || `HTTP ${statusCode}: Failed to fetch sessions`
-        );
+        throw new Error(formatApiError(errorData, `HTTP ${statusCode}: Failed to fetch sessions`));
       }
       throw new Error(error instanceof Error ? error.message : 'Unknown error fetching sessions');
     }
@@ -490,9 +517,7 @@ export class ApiClient {
           throw new Error(`Session not found: ${sessionId}`);
         }
 
-        throw new Error(
-          errorData?.message || errorData?.detail || `HTTP ${statusCode}: Failed to fetch session`
-        );
+        throw new Error(formatApiError(errorData, `HTTP ${statusCode}: Failed to fetch session`));
       }
       throw new Error(error instanceof Error ? error.message : 'Unknown error fetching session');
     }
@@ -516,9 +541,7 @@ export class ApiClient {
         const statusCode = error.response?.status;
         const errorData = error.response?.data;
         throw new Error(
-          errorData?.message ||
-            errorData?.detail ||
-            `HTTP ${statusCode}: Failed to send message to session`
+          formatApiError(errorData, `HTTP ${statusCode}: Failed to send message to session`)
         );
       }
       throw new Error(
@@ -548,8 +571,7 @@ export class ApiClient {
 
         return {
           success: false,
-          message:
-            errorData?.message || errorData?.detail || `HTTP ${statusCode}: Registration failed`,
+          message: formatApiError(errorData, `HTTP ${statusCode}: Registration failed`),
         };
       }
 
@@ -579,9 +601,7 @@ export class ApiClient {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;
         const errorData = error.response?.data;
-        throw new Error(
-          errorData?.message || errorData?.detail || `HTTP ${statusCode}: Failed to fetch tests`
-        );
+        throw new Error(formatApiError(errorData, `HTTP ${statusCode}: Failed to fetch tests`));
       }
       throw new Error(error instanceof Error ? error.message : 'Unknown error fetching tests');
     }
@@ -609,9 +629,7 @@ export class ApiClient {
           throw new Error(`Test not found: ${testId}`);
         }
 
-        throw new Error(
-          errorData?.message || errorData?.detail || `HTTP ${statusCode}: Failed to fetch test`
-        );
+        throw new Error(formatApiError(errorData, `HTTP ${statusCode}: Failed to fetch test`));
       }
       throw new Error(error instanceof Error ? error.message : 'Unknown error fetching test');
     }
@@ -641,8 +659,7 @@ export class ApiClient {
 
         return {
           success: false,
-          message:
-            errorData?.message || errorData?.detail || `HTTP ${statusCode}: Failed to run tests`,
+          message: formatApiError(errorData, `HTTP ${statusCode}: Failed to run tests`),
         };
       }
 
@@ -672,9 +689,7 @@ export class ApiClient {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;
         const errorData = error.response?.data;
-        throw new Error(
-          errorData?.message || errorData?.detail || `HTTP ${statusCode}: Failed to fetch test runs`
-        );
+        throw new Error(formatApiError(errorData, `HTTP ${statusCode}: Failed to fetch test runs`));
       }
       throw new Error(error instanceof Error ? error.message : 'Unknown error fetching test runs');
     }
@@ -713,10 +728,7 @@ export class ApiClient {
 
         return {
           success: false,
-          message:
-            errorData?.message ||
-            errorData?.detail ||
-            `HTTP ${statusCode}: Failed to update app config`,
+          message: formatApiError(errorData, `HTTP ${statusCode}: Failed to update app config`),
         };
       }
 
@@ -750,9 +762,7 @@ export class ApiClient {
         const statusCode = error.response?.status;
         const errorData = error.response?.data;
         throw new Error(
-          errorData?.message ||
-            errorData?.detail ||
-            `HTTP ${statusCode}: Failed to fetch app configs`
+          formatApiError(errorData, `HTTP ${statusCode}: Failed to fetch app configs`)
         );
       }
       throw new Error(
@@ -786,10 +796,7 @@ export class ApiClient {
 
         return {
           success: false,
-          message:
-            errorData?.message ||
-            errorData?.detail ||
-            `HTTP ${statusCode}: Failed to set WebSocket URL`,
+          message: formatApiError(errorData, `HTTP ${statusCode}: Failed to set WebSocket URL`),
         };
       }
 
@@ -825,11 +832,9 @@ export class ApiClient {
       if (!response.ok) {
         const errorData = (await response.json().catch(() => ({}))) as {
           message?: string;
-          detail?: string;
+          detail?: string | unknown[];
         };
-        throw new Error(
-          errorData?.message || errorData?.detail || `HTTP ${response.status}: Failed to run test`
-        );
+        throw new Error(formatApiError(errorData, `HTTP ${response.status}: Failed to run test`));
       }
 
       let result: RunCliTestResult | null = null;
@@ -888,9 +893,7 @@ export class ApiClient {
           throw new Error(`Test not found: ${testId}`);
         }
 
-        throw new Error(
-          errorData?.message || errorData?.detail || `HTTP ${statusCode}: Failed to export test`
-        );
+        throw new Error(formatApiError(errorData, `HTTP ${statusCode}: Failed to export test`));
       }
       throw new Error(error instanceof Error ? error.message : 'Unknown error exporting test');
     }
@@ -914,9 +917,7 @@ export class ApiClient {
         const errorData = error.response?.data;
 
         throw new Error(
-          errorData?.message ||
-            errorData?.detail ||
-            `HTTP ${statusCode}: Failed to validate test definition`
+          formatApiError(errorData, `HTTP ${statusCode}: Failed to validate test definition`)
         );
       }
       throw new Error(
@@ -948,20 +949,8 @@ export class ApiClient {
       if (axios.isAxiosError(error)) {
         const statusCode = error.response?.status;
         const errorData = error.response?.data;
-
-        // Handle validation errors (detail is an array of error objects)
-        if (Array.isArray(errorData?.detail)) {
-          const messages = errorData.detail.map((e: { msg?: string; loc?: string[] }) => {
-            const field = e.loc?.slice(2).join('.') || 'unknown';
-            return `${field}: ${e.msg || 'validation error'}`;
-          });
-          throw new Error(`Validation failed:\n  ${messages.join('\n  ')}`);
-        }
-
         throw new Error(
-          errorData?.message ||
-            errorData?.detail ||
-            `HTTP ${statusCode}: Failed to import test definition`
+          formatApiError(errorData, `HTTP ${statusCode}: Failed to import test definition`)
         );
       }
       throw new Error(
@@ -984,9 +973,7 @@ export class ApiClient {
         const errorData = error.response?.data;
 
         throw new Error(
-          errorData?.message ||
-            errorData?.detail ||
-            `HTTP ${statusCode}: Failed to fetch test definition schema`
+          formatApiError(errorData, `HTTP ${statusCode}: Failed to fetch test definition schema`)
         );
       }
       throw new Error(

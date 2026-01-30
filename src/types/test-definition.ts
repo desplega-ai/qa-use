@@ -4,8 +4,8 @@
  * DO NOT EDIT MANUALLY - Generated from API schema
  * Run 'pnpm generate:types' to regenerate
  *
- * Source: https://api.desplega.ai/vibe-qa/cli/schema
- * Generated: 2026-01-29T17:34:44.085Z
+ * Source: http://localhost:5005/vibe-qa/cli/schema
+ * Generated: 2026-01-30T16:52:48.310Z
  */
 
 export type Name = string;
@@ -22,6 +22,7 @@ export type Action =
   | 'hover'
   | 'scroll'
   | 'select_option'
+  | 'drag'
   | 'wait'
   | 'wait_for_timeout'
   | 'to_contain_text'
@@ -30,6 +31,7 @@ export type Action =
   | 'to_have_url';
 export type Target = string | null;
 export type Value = string | null;
+export type To = string | null;
 export type Url = string | null;
 export type Timeout = number | null;
 export type AaaPhase = ('arrange' | 'act' | 'assert') | null;
@@ -158,6 +160,8 @@ export type ExtractionVariableTargetName = string;
 export type ExtractionType = 'text' | 'attribute' | 'property' | 'inner_html' | 'inner_text';
 export type AttributeName = string;
 export type TargetLocator = string;
+export type TargetSelector = string | null;
+export type TargetRef = string | null;
 export type JsonPath = string;
 export type RequestMethod = string;
 export type RequestUrl = string;
@@ -333,6 +337,18 @@ export interface Variables {
  *
  * This is the default format for YAML/JSON test files.
  *
+ * Examples:
+ *     - action: goto
+ *       url: /login
+ *
+ *     - action: fill
+ *       target: email input
+ *       value: test@example.com
+ *
+ *     - action: drag
+ *       target: draggable item
+ *       to: drop zone
+ *
  * This interface was referenced by `TestDefinition`'s JSON-Schema
  * via the `definition` "SimpleStep".
  */
@@ -341,6 +357,7 @@ export interface SimpleStep {
   action: Action;
   target?: Target;
   value?: Value;
+  to?: To;
   url?: Url;
   timeout?: Timeout;
   aaa_phase?: AaaPhase;
@@ -426,6 +443,8 @@ export interface AnyDict {
   extraction_type?: ExtractionType;
   attribute_name?: AttributeName;
   target_locator?: TargetLocator;
+  target_selector?: TargetSelector;
+  target_ref?: TargetRef;
   json_path?: JsonPath;
   request_method?: RequestMethod;
   request_url?: RequestUrl;

@@ -6,7 +6,7 @@ import * as readline from 'node:readline/promises';
 import { Command } from 'commander';
 import { ApiClient } from '../../../lib/api/index.js';
 import { loadConfig, saveConfig } from '../lib/config.js';
-import { error, success } from '../lib/output.js';
+import { error, formatError, success } from '../lib/output.js';
 
 export const setupCommand = new Command('setup')
   .description('Configure API key and default settings')
@@ -62,7 +62,7 @@ export const setupCommand = new Command('setup')
       await saveConfig(config);
       console.log(`\n${success('Configuration saved to .qa-use-tests.json')}`);
     } catch (err) {
-      console.log(error(`Setup failed: ${err}`));
+      console.log(error(`Setup failed: ${formatError(err)}`));
       process.exit(1);
     } finally {
       rl.close();
