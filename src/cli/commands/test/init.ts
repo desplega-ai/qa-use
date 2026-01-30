@@ -6,7 +6,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { Command } from 'commander';
 import { loadConfig } from '../../lib/config.js';
-import { error, success } from '../../lib/output.js';
+import { error, formatError, success } from '../../lib/output.js';
 
 const EXAMPLE_TEST = `# Example test definition
 name: Example Test
@@ -60,7 +60,7 @@ export const initCommand = new Command('init')
       console.log('  2. Run: qa-use test validate example');
       console.log('  3. Run: qa-use test run example');
     } catch (err) {
-      console.log(error(`Initialization failed: ${err}`));
+      console.log(error(`Initialization failed: ${formatError(err)}`));
       process.exit(1);
     }
   });

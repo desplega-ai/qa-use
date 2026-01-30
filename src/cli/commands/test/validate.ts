@@ -6,7 +6,7 @@ import { Command } from 'commander';
 import { ApiClient } from '../../../../lib/api/index.js';
 import { loadConfig } from '../../lib/config.js';
 import { loadTestWithDeps } from '../../lib/loader.js';
-import { error, printValidationErrors, success } from '../../lib/output.js';
+import { error, formatError, printValidationErrors, success } from '../../lib/output.js';
 
 export const validateCommand = new Command('validate')
   .description('Validate test definition without running')
@@ -73,7 +73,7 @@ export const validateCommand = new Command('validate')
         process.exit(1);
       }
     } catch (err) {
-      console.log(error(`Validation failed: ${err}`));
+      console.log(error(`Validation failed: ${formatError(err)}`));
       process.exit(1);
     }
   });

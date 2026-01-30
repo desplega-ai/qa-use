@@ -153,6 +153,7 @@ qa-use browser create --after-test-id <login-test-uuid> \
 | `qa-use test sync --push` | Push tests to cloud |
 | `qa-use test sync --push --force` | Push tests, overwriting conflicts |
 | `qa-use test diff <file>` | Compare local vs cloud test |
+| `qa-use test schema [path]` | View test definition schema |
 
 ## Common Mistakes
 
@@ -188,6 +189,8 @@ steps:
   - action: to_be_visible
     target: dashboard
 ```
+
+**Note:** Simple format supports: `goto`, `fill`, `click`, `hover`, `scroll`, `select_option`, `wait`, `wait_for_timeout`, and assertions. For drag operations and other advanced actions, use the extended format documented in test-format.md.
 
 See [references/test-format.md](references/test-format.md) for full specification.
 

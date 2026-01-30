@@ -10,7 +10,7 @@ import { ApiClient } from '../../../../lib/api/index.js';
 import type { TestDefinition } from '../../../types/test-definition.js';
 import { loadConfig } from '../../lib/config.js';
 import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
-import { error, info, success, warning } from '../../lib/output.js';
+import { error, formatError, info, success, warning } from '../../lib/output.js';
 
 export const syncCommand = new Command('sync')
   .description('Sync local tests with cloud')
@@ -42,7 +42,7 @@ export const syncCommand = new Command('sync')
         await pullFromCloud(client, testDir, options.dryRun, options.force);
       }
     } catch (err) {
-      console.log(error(`Sync failed: ${err}`));
+      console.log(error(`Sync failed: ${formatError(err)}`));
       process.exit(1);
     }
   });
@@ -137,7 +137,7 @@ async function pullFromCloud(
         }
       }
     } catch (err) {
-      console.log(error(`  Failed to export ${test.name}: ${err}`));
+      console.log(error(`  Failed to export ${test.name}: ${formatError(err)}`));
     }
   }
 
@@ -188,7 +188,7 @@ async function pushToCloud(
       const def = await loadTestDefinition(file);
       definitions.push({ file, def });
     } catch (err) {
-      console.log(error(`  Failed to load ${file}: ${err}`));
+      console.log(error(`  Failed to load ${file}: ${formatError(err)}`));
     }
   }
 
@@ -262,7 +262,9 @@ async function pushToCloud(
           try {
             await updateLocalVersionHash(localDef.file, imported.version_hash);
           } catch (err) {
-            console.log(warning(`  Failed to update version_hash in ${localDef.file}: ${err}`));
+            console.log(
+              warning(`  Failed to update version_hash in ${localDef.file}: ${formatError(err)}`)
+            );
           }
         }
       }

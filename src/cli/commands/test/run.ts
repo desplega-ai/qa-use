@@ -23,6 +23,7 @@ import {
   clearDownloadedFiles,
   clearStepScreenshots,
   error,
+  formatError,
   printDownloadedFilesSummary,
   printScreenshotsSummary,
   success,
@@ -217,7 +218,7 @@ export const runCommand = new Command('run')
         }
       }
     } catch (err) {
-      console.log(error(`Test execution failed: ${err}`));
+      console.log(error(`Test execution failed: ${formatError(err)}`));
       process.exit(1);
     }
   });

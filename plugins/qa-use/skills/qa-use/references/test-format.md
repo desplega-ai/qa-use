@@ -121,7 +121,6 @@ Each step has an `action` and action-specific fields:
 | `select` | `target`, `value` | Select dropdown option |
 | `hover` | `target` | Hover over element |
 | `scroll` | `target` or direction | Scroll page or element |
-| `drag` | `target`, `to` | Drag element to target |
 | `mfa_totp` | `target` (optional), `secret` | Generate TOTP and optionally fill |
 | `set_input_files` | `target`, `files` | Upload files to input |
 
@@ -143,10 +142,6 @@ Each step has an `action` and action-specific fields:
 - action: select
   target: country dropdown
   value: United States
-
-- action: drag
-  target: draggable item
-  to: drop zone
 
 - action: mfa_totp
   target: OTP input field
@@ -226,6 +221,55 @@ Use when human-readable selectors are insufficient:
 ```
 
 AI actions are more flexible but slower and less deterministic. Prefer explicit actions when possible.
+
+### Extended Step Format
+
+For actions not available in simple format (like drag operations), use the extended format:
+
+| Action | Description |
+|--------|-------------|
+| `drag_and_drop` | Drag source element to target |
+| `relative_drag_and_drop` | Drag with relative positioning |
+| `mfa_totp` | Generate and enter TOTP code |
+| `set_input_files` | Upload files |
+
+#### Drag and Drop Example
+
+```yaml
+- type: extended
+  name: Drag item to drop zone
+  action:
+    action: drag_and_drop
+    value:
+      target_locator: "#drop-zone"  # Playwright locator string
+  locator:
+    chain:
+      - method: get_by_text
+        args: ["draggable item"]
+```
+
+The `target_locator` must be a valid Playwright locator string:
+- `"#drop-zone"` - CSS ID selector
+- `".drop-area"` - CSS class selector
+- `"text=Drop here"` - Text selector
+- `"[data-testid='target']"` - Attribute selector
+
+#### TOTP Example
+
+```yaml
+- type: extended
+  name: Enter MFA code
+  action:
+    action: mfa_totp
+    value:
+      target_locator: "#otp-input"
+  locator:
+    chain:
+      - method: get_by_label
+        args: ["Enter your code"]
+```
+
+**Tip:** Use `qa-use test schema` to explore all available actions and their schemas.
 
 ## Target Descriptions
 

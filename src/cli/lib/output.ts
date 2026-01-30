@@ -88,6 +88,39 @@ export function error(message: string): string {
 }
 
 /**
+ * Format any error type to a human-readable string
+ * Handles Error instances, plain objects, and primitives
+ */
+export function formatError(err: unknown): string {
+  if (err instanceof Error) {
+    return err.message;
+  }
+  if (typeof err === 'string') {
+    return err;
+  }
+  if (err && typeof err === 'object') {
+    // Handle axios error responses
+    if ('message' in err && typeof err.message === 'string') {
+      return err.message;
+    }
+    if ('detail' in err && typeof err.detail === 'string') {
+      return err.detail;
+    }
+    // Handle arrays of errors (validation errors)
+    if (Array.isArray(err)) {
+      return err.map((e) => formatError(e)).join('\n');
+    }
+    // Fallback to JSON for other objects
+    try {
+      return JSON.stringify(err, null, 2);
+    } catch {
+      return String(err);
+    }
+  }
+  return String(err);
+}
+
+/**
  * Format warning message
  */
 export function warning(message: string): string {

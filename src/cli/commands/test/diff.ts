@@ -9,7 +9,7 @@ import { ApiClient } from '../../../../lib/api/index.js';
 import type { TestDefinition } from '../../../types/test-definition.js';
 import { loadConfig } from '../../lib/config.js';
 import { loadTestDefinition } from '../../lib/loader.js';
-import { error, info } from '../../lib/output.js';
+import { error, formatError, info } from '../../lib/output.js';
 
 // ANSI color codes
 const colors = {
@@ -206,7 +206,7 @@ export const diffCommand = new Command('diff')
         showFieldDiff(localTest, cloudTest);
       }
     } catch (err) {
-      console.log(error(`Failed to diff: ${err}`));
+      console.log(error(`Failed to diff: ${formatError(err)}`));
       process.exit(1);
     }
   });

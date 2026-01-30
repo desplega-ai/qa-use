@@ -10,6 +10,7 @@ import { initCommand } from './init.js';
 import { listCommand } from './list.js';
 import { runCommand } from './run.js';
 import { runsCommand } from './runs.js';
+import { schemaCommand } from './schema.js';
 import { syncCommand } from './sync.js';
 import { validateCommand } from './validate.js';
 
@@ -25,3 +26,4 @@ testCommand.addCommand(initCommand);
 testCommand.addCommand(exportCommand);
 testCommand.addCommand(syncCommand);
 testCommand.addCommand(diffCommand);
+testCommand.addCommand(schemaCommand);

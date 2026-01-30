@@ -7,7 +7,7 @@ import { Command } from 'commander';
 import { ApiClient } from '../../../../lib/api/index.js';
 import { loadConfig } from '../../lib/config.js';
 import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
-import { error, printTestList } from '../../lib/output.js';
+import { error, formatError, printTestList } from '../../lib/output.js';
 
 export const listCommand = new Command('list')
   .description('List test definitions')
@@ -64,14 +64,14 @@ export const listCommand = new Command('list')
               tags: def.tags,
             });
           } catch (err) {
-            console.log(error(`Failed to load ${file}: ${err}`));
+            console.log(error(`Failed to load ${file}: ${formatError(err)}`));
           }
         }
 
         printTestList(tests);
       }
     } catch (err) {
-      console.log(error(`Failed to list tests: ${err}`));
+      console.log(error(`Failed to list tests: ${formatError(err)}`));
       process.exit(1);
     }
   });

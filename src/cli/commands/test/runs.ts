@@ -5,7 +5,7 @@
 import { Command } from 'commander';
 import { ApiClient } from '../../../../lib/api/index.js';
 import { loadConfig } from '../../lib/config.js';
-import { error, warning } from '../../lib/output.js';
+import { error, formatError, warning } from '../../lib/output.js';
 
 // ANSI color codes
 const colors = {
@@ -162,7 +162,7 @@ export const runsCommand = new Command('runs')
         );
       }
     } catch (err) {
-      console.log(error(`Failed to list test runs: ${err}`));
+      console.log(error(`Failed to list test runs: ${formatError(err)}`));
       process.exit(1);
     }
   });

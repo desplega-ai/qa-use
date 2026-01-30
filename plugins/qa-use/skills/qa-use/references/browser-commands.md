@@ -265,6 +265,8 @@ qa-use browser drag e5 --target-selector ".canvas"  # Drag to CSS selector
 qa-use browser drag --text "Process node" --target e10  # Drag by text
 ```
 
+**Note:** The browser CLI drag command uses element refs from snapshots. This is different from the test YAML format which uses locator chains. See test-format.md for YAML test syntax.
+
 ### mfa-totp
 
 Generate TOTP code and optionally fill into an input field.

@@ -9,7 +9,7 @@ import { ApiClient } from '../../../../lib/api/index.js';
 import type { TestDefinition } from '../../../types/test-definition.js';
 import { loadConfig } from '../../lib/config.js';
 import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
-import { error, info } from '../../lib/output.js';
+import { error, formatError, info } from '../../lib/output.js';
 
 // ANSI color codes
 const colors = {
@@ -172,7 +172,7 @@ export const infoCommand = new Command('info')
         displayTestInfo(test, source);
       }
     } catch (err) {
-      console.log(error(`Failed to get test info: ${err}`));
+      console.log(error(`Failed to get test info: ${formatError(err)}`));
       process.exit(1);
     }
   });

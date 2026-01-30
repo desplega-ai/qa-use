@@ -9,7 +9,7 @@ import * as yaml from 'yaml';
 import { ApiClient } from '../../../../lib/api/index.js';
 import type { TestDefinition } from '../../../types/test-definition.js';
 import { loadConfig } from '../../lib/config.js';
-import { error, info, success } from '../../lib/output.js';
+import { error, formatError, info, success } from '../../lib/output.js';
 
 export const exportCommand = new Command('export')
   .description('Export a cloud test to a local file')
@@ -110,7 +110,7 @@ export const exportCommand = new Command('export')
         console.log(`  Dependencies: ${tests.length - 1} included`);
       }
     } catch (err) {
-      console.log(error(`Export failed: ${err}`));
+      console.log(error(`Export failed: ${formatError(err)}`));
       process.exit(1);
     }
   });
