@@ -18,6 +18,7 @@ export interface CreateBrowserSessionOptions {
   record_blocks?: boolean; // Enable block recording for test generation
   after_test_id?: string; // Run a test before session becomes interactive
   vars?: Record<string, string>; // Variable overrides for after_test_id test
+  agent_session_id?: string; // Link to agent session for UI grouping
 }
 
 export interface BrowserSession {

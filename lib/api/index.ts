@@ -270,6 +270,7 @@ export interface RunCliTestOptions {
   store_har?: boolean;
   ws_url?: string;
   vars?: Record<string, string>; // Variable overrides for cloud test (test_id)
+  agent_session_id?: string; // Link to agent session for UI grouping
 }
 
 export type SSECallback = (event: SSEEvent) => void;

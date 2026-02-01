@@ -6,6 +6,7 @@ import { Command } from 'commander';
 import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import type { ViewportType } from '../../../../lib/api/browser-types.js';
 import { BrowserManager } from '../../../../lib/browser/index.js';
+import { getAgentSessionId } from '../../../../lib/env/index.js';
 import { TunnelManager } from '../../../../lib/tunnel/index.js';
 import { ensureBrowsersInstalled } from '../../lib/browser.js';
 import {
@@ -130,6 +131,7 @@ async function createRemoteSession(
       ws_url: options.wsUrl,
       after_test_id: options.afterTestId,
       vars: options.var,
+      agent_session_id: getAgentSessionId(),
     });
 
     console.log(info(`Session created: ${session.id}`));
@@ -320,6 +322,7 @@ async function runTunnelMode(
       viewport,
       timeout,
       ws_url: tunneledWsUrl,
+      agent_session_id: getAgentSessionId(),
     });
 
     sessionId = session.id;

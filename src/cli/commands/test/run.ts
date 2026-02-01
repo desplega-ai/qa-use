@@ -4,6 +4,7 @@
 
 import { Command } from 'commander';
 import { ApiClient } from '../../../../lib/api/index.js';
+import { getAgentSessionId } from '../../../../lib/env/index.js';
 import {
   type BrowserTunnelSession,
   getEffectiveWsUrl,
@@ -163,6 +164,7 @@ export const runCommand = new Command('run')
             allow_fix: options.autofix || config.defaults?.allow_fix || false,
             capture_screenshots: options.screenshots || options.download || false,
             ws_url: wsUrl,
+            agent_session_id: getAgentSessionId(),
           },
           {
             verbose: options.verbose || false,

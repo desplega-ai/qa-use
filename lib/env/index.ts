@@ -154,3 +154,14 @@ export function logConfigSources(): void {
     sources.forEach((s) => console.error(s));
   }
 }
+
+/**
+ * Get agent session ID from environment if available.
+ * Used for auto-linking browser sessions and test runs to agent sessions.
+ *
+ * Unlike other env vars, this does NOT fall back to config file - it's purely
+ * a runtime value set by the test-agent container.
+ */
+export function getAgentSessionId(): string | undefined {
+  return process.env.QA_USE_AGENT_SESSION_ID || undefined;
+}
