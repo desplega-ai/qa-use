@@ -65,11 +65,6 @@ export const createCommand = new Command('create')
       process.exit(1);
     }
 
-    if (options.afterTestId && options.tunnel) {
-      console.log(error('Cannot use --after-test-id with --tunnel mode'));
-      process.exit(1);
-    }
-
     // Load configuration
     const config = await loadConfig();
     if (!config.api_key) {
@@ -316,22 +311,66 @@ async function runTunnelMode(
     console.log('');
 
     // Step 4: Create API session with tunneled ws_url
-    console.log(info('Creating API session...'));
-    const session = await client.createSession({
-      headless,
-      viewport,
-      timeout,
-      ws_url: tunneledWsUrl,
-      agent_session_id: getAgentSessionId(),
-    });
+    if (options.afterTestId) {
+      console.log(info(`Creating API session with after-test: ${options.afterTestId}...`));
+    } else {
+      console.log(info('Creating API session...'));
+    }
+
+    let session;
+    try {
+      session = await client.createSession({
+        headless,
+        viewport,
+        timeout,
+        ws_url: tunneledWsUrl,
+        after_test_id: options.afterTestId,
+        vars: options.var,
+        agent_session_id: getAgentSessionId(),
+      });
+    } catch (err) {
+      // Handle specific error cases for after_test_id
+      if (options.afterTestId && err instanceof Error) {
+        const message = err.message.toLowerCase();
+        if (message.includes('not found') || message.includes('404')) {
+          console.log(error('Test not found'));
+          await cleanup(1);
+          return;
+        }
+        if (message.includes('forbidden') || message.includes('403')) {
+          console.log(error('Test belongs to different organization'));
+          await cleanup(1);
+          return;
+        }
+      }
+      throw err;
+    }
 
     sessionId = session.id;
     console.log(info(`Session created: ${session.id}`));
 
     // Wait for session to become active if starting
     if (session.status === 'starting') {
-      console.log(info('Waiting for session to become active...'));
-      await client.waitForStatus(session.id, 'active', 60000);
+      if (options.afterTestId) {
+        console.log(info('Waiting for test to complete...'));
+      } else {
+        console.log(info('Waiting for session to become active...'));
+      }
+      // Use longer timeout for after-test scenarios (180s) vs normal (60s)
+      const waitTimeout = options.afterTestId ? 180000 : 60000;
+      const activeSession = await client.waitForStatus(session.id, 'active', waitTimeout);
+
+      if (activeSession.status === 'failed') {
+        const errorMsg = activeSession.error_message || 'Test execution failed';
+        console.log(error(`Session failed: ${errorMsg}`));
+        await cleanup(1);
+        return;
+      }
+    } else if (session.status === 'failed') {
+      const errorMsg = session.error_message || 'Test execution failed';
+      console.log(error(`Session failed: ${errorMsg}`));
+      await cleanup(1);
+      return;
     }
     console.log(success('Session is active'));
 
@@ -350,6 +389,16 @@ async function runTunnelMode(
     console.log(`Headless:       ${headless}`);
     console.log(`Timeout:        ${timeout}s`);
     console.log(`WebSocket URL:  ${tunneledWsUrl}`);
+    if (options.afterTestId) {
+      console.log(`After Test ID:  ${options.afterTestId}`);
+    }
+    if (options.var && Object.keys(options.var).length > 0) {
+      console.log(
+        `Variables:      ${Object.entries(options.var)
+          .map(([k, v]) => `${k}=${v}`)
+          .join(', ')}`
+      );
+    }
     console.log('');
     console.log(info('Use this session with other browser commands:'));
     console.log(`  qa-use browser goto https://example.com`);

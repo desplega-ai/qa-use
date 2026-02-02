@@ -130,8 +130,14 @@ export const runCommand = new Command('run')
           sessionOwned = true;
 
           if (session.status === 'starting') {
-            console.log(info('Waiting for session to become active...'));
-            const waitedSession = await client.waitForStatus(session.id, 'active', 60000);
+            if (options.afterTestId) {
+              console.log(info('Waiting for test to complete...'));
+            } else {
+              console.log(info('Waiting for session to become active...'));
+            }
+            // Use longer timeout for after-test scenarios (180s) vs normal (60s)
+            const waitTimeout = options.afterTestId ? 180000 : 60000;
+            const waitedSession = await client.waitForStatus(session.id, 'active', waitTimeout);
             // Check if session failed (e.g., after_test_id test failed)
             if (waitedSession.status === 'failed') {
               const errorMsg = waitedSession.error_message || 'Test execution failed';
