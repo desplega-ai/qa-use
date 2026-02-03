@@ -9,7 +9,7 @@ import * as yaml from 'yaml';
 import { ApiClient } from '../../../../lib/api/index.js';
 import type { TestDefinition } from '../../../types/test-definition.js';
 import { loadConfig } from '../../lib/config.js';
-import { error, formatError, info, success } from '../../lib/output.js';
+import { error, formatError, info, success, warning } from '../../lib/output.js';
 
 export const exportCommand = new Command('export')
   .description('Export a cloud test to a local file')
@@ -19,6 +19,10 @@ export const exportCommand = new Command('export')
   .option('--no-deps', 'Exclude dependency tests')
   .option('--stdout', 'Output to stdout instead of file')
   .action(async (testId, options) => {
+    // Deprecation warning
+    console.log(warning('The "export" command is deprecated. Use "qa-use test sync pull --id <test-id>" instead.'));
+    console.log('');
+
     try {
       const config = await loadConfig();
 
