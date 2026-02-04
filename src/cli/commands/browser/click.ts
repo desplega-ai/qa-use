@@ -11,6 +11,7 @@ import { error, success } from '../../lib/output.js';
 interface ClickOptions {
   sessionId?: string;
   text?: string;
+  force?: boolean;
 }
 
 /**
@@ -25,6 +26,10 @@ export const clickCommand = new Command('click')
   .argument('[ref]', 'Element ref from snapshot (e.g., "e3" or "@e3")')
   .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
   .option('-t, --text <description>', 'Semantic element description (AI-based, slower)')
+  .option(
+    '-f, --force',
+    'Force click, bypassing actionability checks (useful for covered elements)'
+  )
   .action(async (ref: string | undefined, options: ClickOptions) => {
     try {
       // Validate that either ref or --text is provided
@@ -48,11 +53,16 @@ export const clickCommand = new Command('click')
       });
 
       // Build action with either ref or text
-      const action: { type: 'click'; ref?: string; text?: string } = { type: 'click' };
+      const action: { type: 'click'; ref?: string; text?: string; force?: boolean } = {
+        type: 'click',
+      };
       if (ref) {
         action.ref = normalizeRef(ref);
       } else if (options.text) {
         action.text = options.text;
+      }
+      if (options.force) {
+        action.force = true;
       }
 
       const result = await client.executeAction(resolved.id, action);

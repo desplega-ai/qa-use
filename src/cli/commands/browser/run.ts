@@ -217,14 +217,24 @@ export const runCommand = new Command('run')
           }
         },
         click: async (args, client, sessionId) => {
-          const parsed = parseTextOption(args);
+          // Check for --force/-f flag
+          const forceIdx = args.findIndex((a) => a === '-f' || a === '--force');
+          const force = forceIdx !== -1;
+          const filteredArgs = force
+            ? [...args.slice(0, forceIdx), ...args.slice(forceIdx + 1)]
+            : args;
+
+          const parsed = parseTextOption(filteredArgs);
           if (!parsed.ref && !parsed.text) {
-            console.log(error('Usage: click <ref> or click -t "description"'));
+            console.log(error('Usage: click <ref> or click -t "description" [--force]'));
             return;
           }
-          const action: { type: 'click'; ref?: string; text?: string } = { type: 'click' };
+          const action: { type: 'click'; ref?: string; text?: string; force?: boolean } = {
+            type: 'click',
+          };
           if (parsed.ref) action.ref = normalizeRef(parsed.ref);
           if (parsed.text) action.text = parsed.text;
+          if (force) action.force = true;
           const result = await client.executeAction(sessionId, action);
           if (result.success) {
             const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
@@ -885,7 +895,7 @@ Available commands:
     reload                  Reload current page
 
   ${colors.cyan}Actions:${colors.reset}
-    click <ref>             Click element
+    click <ref> [--force]   Click element (--force bypasses actionability checks)
     fill <ref> <value>      Fill input field
     type <ref> <text>       Type text with delays
     press <key>             Press keyboard key

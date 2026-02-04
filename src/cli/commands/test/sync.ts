@@ -8,14 +8,13 @@ import { Command } from 'commander';
 import * as yaml from 'yaml';
 import { ApiClient } from '../../../../lib/api/index.js';
 import type { TestDefinition } from '../../../types/test-definition.js';
+import { toSafeFilename } from '../../../utils/strings.js';
 import { loadConfig } from '../../lib/config.js';
 import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
 import { error, formatError, info, success, warning } from '../../lib/output.js';
-import { toSafeFilename } from '../../../utils/strings.js';
 
 // Parent command
-export const syncCommand = new Command('sync')
-  .description('Sync local tests with cloud');
+export const syncCommand = new Command('sync').description('Sync local tests with cloud');
 
 // Pull subcommand
 const pullCommand = new Command('pull')
