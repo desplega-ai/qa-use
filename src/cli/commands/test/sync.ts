@@ -11,6 +11,7 @@ import type { TestDefinition } from '../../../types/test-definition.js';
 import { loadConfig } from '../../lib/config.js';
 import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
 import { error, formatError, info, success, warning } from '../../lib/output.js';
+import { toSafeFilename } from '../../../utils/strings.js';
 
 // Parent command
 export const syncCommand = new Command('sync')
@@ -170,10 +171,7 @@ async function pullFromCloud(
     }
 
     if (dryRun) {
-      const safeName = test.name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '');
+      const safeName = toSafeFilename(test.name);
       console.log(`  Would pull: ${test.name} -> ${path.join(testDir, `${safeName}.yaml`)}`);
       continue;
     }
@@ -193,10 +191,7 @@ async function pullFromCloud(
           continue;
         }
 
-        const safeName = (testDef.name || testDef.id || 'unnamed-test')
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-|-$/g, '');
+        const safeName = toSafeFilename(testDef.name || testDef.id || '');
         const outputPath = path.join(testDir, `${safeName}.yaml`);
 
         // Check if file exists
@@ -255,10 +250,7 @@ async function writeTestsFromContent(
   let skipped = 0;
 
   for (const testDef of tests) {
-    const safeName = (testDef.name || testDef.id || 'unnamed-test')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
+    const safeName = toSafeFilename(testDef.name || testDef.id || '');
     const outputPath = path.join(testDir, `${safeName}.yaml`);
 
     // Check if file exists

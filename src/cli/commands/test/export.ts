@@ -10,6 +10,7 @@ import { ApiClient } from '../../../../lib/api/index.js';
 import type { TestDefinition } from '../../../types/test-definition.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, formatError, info, success, warning } from '../../lib/output.js';
+import { toSafeFilename } from '../../../utils/strings.js';
 
 export const exportCommand = new Command('export')
   .description('Export a cloud test to a local file')
@@ -90,10 +91,7 @@ export const exportCommand = new Command('export')
       const written: string[] = [];
 
       for (const test of tests) {
-        const safeName = (test.name || test.id || 'unnamed-test')
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-|-$/g, '');
+        const safeName = toSafeFilename(test.name || test.id || '');
         const outputPath = path.join(testDir, safeName + ext);
 
         // Serialize individual test (depends_on stays as UUID)
