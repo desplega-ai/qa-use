@@ -5,19 +5,13 @@
 import { Command } from 'commander';
 import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
+import { normalizeRef } from '../../lib/browser-utils.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, info, success } from '../../lib/output.js';
 
 interface MfaTotpOptions {
   sessionId?: string;
   text?: string;
-}
-
-/**
- * Normalize ref by stripping leading @ if present
- */
-function normalizeRef(ref: string): string {
-  return ref.startsWith('@') ? ref.slice(1) : ref;
 }
 
 /**

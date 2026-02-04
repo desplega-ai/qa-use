@@ -13,6 +13,7 @@ import {
   storeSession,
   touchSession,
 } from '../../lib/browser-sessions.js';
+import { normalizeRef } from '../../lib/browser-utils.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, info, success } from '../../lib/output.js';
 
@@ -818,13 +819,6 @@ export const runCommand = new Command('run')
       process.exit(1);
     }
   });
-
-/**
- * Normalize ref by stripping leading @ if present
- */
-function normalizeRef(ref: string): string {
-  return ref.startsWith('@') ? ref.slice(1) : ref;
-}
 
 /**
  * Parse -t/--text option from args

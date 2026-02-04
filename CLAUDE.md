@@ -87,6 +87,30 @@ This is especially critical when implementing plans - run this verification step
 
 Both must support the same options and behavior.
 
+## Shared Utilities
+
+### normalizeRef Function
+
+Location: `src/cli/lib/browser-utils.ts`
+
+A shared utility function used across all 12 browser CLI commands and the REPL. Always import from this module instead of defining local copies:
+
+```typescript
+import { normalizeRef } from '../../lib/browser-utils.js';
+```
+
+**Functionality:**
+- Strips surrounding quotes (single and double): `"e31"` → `e31`, `'e31'` → `e31`
+- Strips leading @ symbol: `@e31` → `e31`
+- Handles combined cases: `"@e31"` → `e31`
+- Preserves custom selectors: `"__custom__data-testid=rf__node-1"` → `__custom__data-testid=rf__node-1`
+
+**Used in:**
+- CLI commands: click, check, uncheck, hover, select, fill, type, drag, scroll-into-view, upload, mfa-totp
+- REPL: run.ts (all 11 commands above)
+
+When adding new browser commands that accept element refs, always import and use this utility.
+
 ## E2E Testing with Browser API CLI
 
 Use this flow to manually test browser API functionality against a local backend.
