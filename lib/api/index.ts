@@ -87,6 +87,7 @@ export interface ListOptions {
   offset?: number;
   query?: string;
   self_only?: boolean;
+  app_config_id?: string;
 }
 
 export interface RunTestsOptions {
@@ -589,6 +590,7 @@ export class ApiClient {
       if (options.limit !== undefined) params.append('limit', options.limit.toString());
       if (options.offset !== undefined) params.append('offset', options.offset.toString());
       if (options.query) params.append('query', options.query);
+      if (options.app_config_id) params.append('app_config_id', options.app_config_id);
 
       if (options.self_only === undefined || options.self_only === true) {
         params.append('self_only', 'true');
