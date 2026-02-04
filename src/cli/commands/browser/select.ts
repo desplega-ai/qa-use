@@ -8,10 +8,12 @@ import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { normalizeRef } from '../../lib/browser-utils.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, success } from '../../lib/output.js';
+import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface SelectOptions {
   sessionId?: string;
   text?: string;
+  diff?: boolean;
 }
 
 export const selectCommand = new Command('select')
@@ -20,6 +22,7 @@ export const selectCommand = new Command('select')
   .argument('<value>', 'Option value to select')
   .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
   .option('-t, --text <description>', 'Semantic element description (AI-based, slower)')
+  .option('--no-diff', 'Disable snapshot diff output')
   .action(
     async (refOrValue: string, valueOrUndefined: string | undefined, options: SelectOptions) => {
       try {
@@ -61,7 +64,13 @@ export const selectCommand = new Command('select')
         });
 
         // Build action with either ref or text
-        const action: { type: 'select'; ref?: string; text?: string; value: string } = {
+        const action: {
+          type: 'select';
+          ref?: string;
+          text?: string;
+          value: string;
+          include_snapshot_diff?: boolean;
+        } = {
           type: 'select',
           value,
         };
@@ -70,6 +79,9 @@ export const selectCommand = new Command('select')
         } else if (options.text) {
           action.text = options.text;
         }
+        if (options.diff !== false) {
+          action.include_snapshot_diff = true;
+        }
 
         const result = await client.executeAction(resolved.id, action);
 
@@ -77,6 +89,12 @@ export const selectCommand = new Command('select')
           const displayValue = value.length > 50 ? `${value.slice(0, 47)}...` : value;
           const target = ref ? normalizeRef(ref) : `"${options.text}"`;
           console.log(success(`Selected "${displayValue}" in ${target}`));
+
+          if (result.snapshot_diff) {
+            console.log('');
+            console.log(formatSnapshotDiff(result.snapshot_diff));
+          }
+
           await touchSession(resolved.id);
         } else {
           const hint = result.error || 'Select failed';

@@ -8,10 +8,12 @@ import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { normalizeRef } from '../../lib/browser-utils.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, info, success } from '../../lib/output.js';
+import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface MfaTotpOptions {
   sessionId?: string;
   text?: string;
+  diff?: boolean;
 }
 
 /**
@@ -30,6 +32,7 @@ export const mfaTotpCommand = new Command('mfa-totp')
   .argument('[secret]', 'TOTP secret (if ref is provided)')
   .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
   .option('-t, --text <description>', 'Semantic element description (AI-based)')
+  .option('--no-diff', 'Disable snapshot diff output')
   .action(async (refOrSecret: string, secret: string | undefined, options: MfaTotpOptions) => {
     try {
       const config = await loadConfig();
@@ -85,6 +88,7 @@ export const mfaTotpCommand = new Command('mfa-totp')
         secret: string;
         ref?: string;
         text?: string;
+        include_snapshot_diff?: boolean;
       } = {
         type: 'mfa_totp',
         secret: actualSecret,
@@ -95,6 +99,9 @@ export const mfaTotpCommand = new Command('mfa-totp')
       }
       if (text) {
         action.text = text;
+      }
+      if (options.diff !== false) {
+        action.include_snapshot_diff = true;
       }
 
       const result = await client.executeAction(resolved.id, action);
@@ -120,6 +127,12 @@ export const mfaTotpCommand = new Command('mfa-totp')
             console.log(success('Generated TOTP code'));
           }
         }
+
+        if (result.snapshot_diff) {
+          console.log('');
+          console.log(formatSnapshotDiff(result.snapshot_diff));
+        }
+
         await touchSession(resolved.id);
       } else {
         const hint = result.error || 'MFA TOTP failed';

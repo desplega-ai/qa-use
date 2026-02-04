@@ -7,9 +7,11 @@ import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, success } from '../../lib/output.js';
+import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface PressOptions {
   sessionId?: string;
+  diff?: boolean;
 }
 
 // Common key names for reference
@@ -34,6 +36,7 @@ export const pressCommand = new Command('press')
   .description('Press a keyboard key')
   .argument('<key>', `Key to press (e.g., "Enter", "Tab", "Escape")`)
   .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
+  .option('--no-diff', 'Disable snapshot diff output')
   .action(async (key: string, options: PressOptions) => {
     try {
       // Load configuration
@@ -54,13 +57,28 @@ export const pressCommand = new Command('press')
       });
 
       // Execute press action
-      const result = await client.executeAction(resolved.id, {
+      const action: {
+        type: 'press';
+        key: string;
+        include_snapshot_diff?: boolean;
+      } = {
         type: 'press',
         key,
-      });
+      };
+      if (options.diff !== false) {
+        action.include_snapshot_diff = true;
+      }
+
+      const result = await client.executeAction(resolved.id, action);
 
       if (result.success) {
         console.log(success(`Pressed key: ${key}`));
+
+        if (result.snapshot_diff) {
+          console.log('');
+          console.log(formatSnapshotDiff(result.snapshot_diff));
+        }
+
         await touchSession(resolved.id);
       } else {
         const hint = result.error || 'Key press failed';

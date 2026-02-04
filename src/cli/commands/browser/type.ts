@@ -8,9 +8,11 @@ import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { normalizeRef } from '../../lib/browser-utils.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, success } from '../../lib/output.js';
+import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface TypeOptions {
   sessionId?: string;
+  diff?: boolean;
 }
 
 export const typeCommand = new Command('type')
@@ -18,6 +20,7 @@ export const typeCommand = new Command('type')
   .argument('<ref>', 'Element ref (e.g., "e4" or "@e4")')
   .argument('<text>', 'Text to type')
   .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
+  .option('--no-diff', 'Disable snapshot diff output')
   .action(async (ref: string, text: string, options: TypeOptions) => {
     try {
       // Load configuration
@@ -41,16 +44,32 @@ export const typeCommand = new Command('type')
       const normalizedRef = normalizeRef(ref);
 
       // Execute type action
-      const result = await client.executeAction(resolved.id, {
+      const action: {
+        type: 'type';
+        ref: string;
+        text: string;
+        include_snapshot_diff?: boolean;
+      } = {
         type: 'type',
         ref: normalizedRef,
         text,
-      });
+      };
+      if (options.diff !== false) {
+        action.include_snapshot_diff = true;
+      }
+
+      const result = await client.executeAction(resolved.id, action);
 
       if (result.success) {
         // Truncate text for display if too long
         const displayText = text.length > 50 ? `${text.slice(0, 47)}...` : text;
         console.log(success(`Typed "${displayText}" into ${normalizedRef}`));
+
+        if (result.snapshot_diff) {
+          console.log('');
+          console.log(formatSnapshotDiff(result.snapshot_diff));
+        }
+
         await touchSession(resolved.id);
       } else {
         const hint = result.error || 'Type failed';

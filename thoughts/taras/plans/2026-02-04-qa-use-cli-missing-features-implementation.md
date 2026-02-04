@@ -10,6 +10,48 @@ autonomy: autopilot
 
 This plan implements the 4 prioritized features identified in the research document.
 
+## Progress Tracking
+
+| Phase | Feature | Status | Notes |
+|-------|---------|--------|-------|
+| 1 | `evaluate` command | ✅ COMPLETE | CLI + Backend working |
+| 2 | Snapshot diff | ✅ COMPLETE | All 20 commands work; diff displays correctly |
+| 3 | Relative drag | ✅ COMPLETE | CLI + Backend working |
+| 4 | E2E Testing | ✅ COMPLETE | All tests pass against localhost:5005 |
+
+### ✅ PLAN COMPLETE: 2026-02-04
+
+**Verification:**
+- `bun run check:fix` - ✅ passes
+- `bun test` - ✅ 169 tests pass
+- E2E tests against localhost:5005 - ✅ all pass
+
+### E2E Test Results (2026-02-04)
+
+| Test | Command | Result |
+|------|---------|--------|
+| 1.1 | `evaluate "1 + 1"` | ✅ PASS - returns `2` |
+| 1.2 | `evaluate "window.location.href"` | ✅ PASS - returns URL |
+| 1.3 | `evaluate "({title: document.title, url: location.href})" --json` | ✅ PASS - returns JSON object |
+| 1.4 | `evaluate "el => el.tagName" -r e5` | ✅ PASS - returns `H1` |
+| 2.1 | `goto <url>` | ✅ PASS - shows diff: "89 elements added" |
+| 2.2 | `click e10` | ✅ PASS - shows diff: "2 elements modified" with attrs |
+| 2.3 | `click e11 --no-diff` | ✅ PASS - no diff output |
+| 2.4 | `fill e15 "eng"` | ✅ PASS - shows diff |
+| 3.1 | `drag e12 --delta-x 50` | ✅ PASS - shows diff: "2 elements modified" |
+
+### Files Modified
+- `lib/api/browser-types.ts` - Added types for evaluate, relative_drag, snapshot diff
+- `src/cli/commands/browser/evaluate.ts` - NEW: evaluate command
+- `src/cli/commands/browser/index.ts` - Registered evaluate command
+- `src/cli/commands/browser/run.ts` - REPL: evaluate, relative drag, --no-diff support
+- `src/cli/lib/snapshot-diff.ts` - NEW: Diff formatting utility
+- `src/cli/commands/browser/drag.ts` - Updated with relative drag support
+- 20 action commands updated with `--no-diff` option:
+  - click, fill, type, select, check, uncheck, hover
+  - scroll, scroll-into-view, drag, goto, back, forward, reload
+  - press, mfa-totp, upload, wait, wait-for-selector, wait-for-load
+
 ## Overview
 
 | Phase | Feature | Effort | Files Changed |

@@ -8,10 +8,12 @@ import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { normalizeRef } from '../../lib/browser-utils.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, success } from '../../lib/output.js';
+import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface UncheckOptions {
   sessionId?: string;
   text?: string;
+  diff?: boolean;
 }
 
 export const uncheckCommand = new Command('uncheck')
@@ -19,6 +21,7 @@ export const uncheckCommand = new Command('uncheck')
   .argument('[ref]', 'Element ref from snapshot (e.g., "e3" or "@e3")')
   .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
   .option('-t, --text <description>', 'Semantic element description (AI-based, slower)')
+  .option('--no-diff', 'Disable snapshot diff output')
   .action(async (ref: string | undefined, options: UncheckOptions) => {
     try {
       // Validate that either ref or --text is provided
@@ -42,11 +45,19 @@ export const uncheckCommand = new Command('uncheck')
       });
 
       // Build action with either ref or text
-      const action: { type: 'uncheck'; ref?: string; text?: string } = { type: 'uncheck' };
+      const action: {
+        type: 'uncheck';
+        ref?: string;
+        text?: string;
+        include_snapshot_diff?: boolean;
+      } = { type: 'uncheck' };
       if (ref) {
         action.ref = normalizeRef(ref);
       } else if (options.text) {
         action.text = options.text;
+      }
+      if (options.diff !== false) {
+        action.include_snapshot_diff = true;
       }
 
       const result = await client.executeAction(resolved.id, action);
@@ -54,6 +65,12 @@ export const uncheckCommand = new Command('uncheck')
       if (result.success) {
         const target = ref ? `checkbox ${normalizeRef(ref)}` : `"${options.text}"`;
         console.log(success(`Unchecked ${target}`));
+
+        if (result.snapshot_diff) {
+          console.log('');
+          console.log(formatSnapshotDiff(result.snapshot_diff));
+        }
+
         await touchSession(resolved.id);
       } else {
         console.log(error(result.error || 'Uncheck failed'));

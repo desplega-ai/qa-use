@@ -16,6 +16,7 @@ import {
 import { normalizeRef } from '../../lib/browser-utils.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, info, success } from '../../lib/output.js';
+import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface RunOptions {
   sessionId?: string;
@@ -218,28 +219,51 @@ export const runCommand = new Command('run')
           }
         },
         click: async (args, client, sessionId) => {
-          // Check for --force/-f flag
+          // Check for --force/-f flag and --no-diff flag
           const forceIdx = args.findIndex((a) => a === '-f' || a === '--force');
+          const noDiffIdx = args.indexOf('--no-diff');
           const force = forceIdx !== -1;
-          const filteredArgs = force
-            ? [...args.slice(0, forceIdx), ...args.slice(forceIdx + 1)]
-            : args;
+          const disableDiff = noDiffIdx !== -1;
+
+          // Filter out flags
+          let filteredArgs = [...args];
+          if (forceIdx !== -1) {
+            filteredArgs = filteredArgs.filter((_, i) => i !== forceIdx);
+          }
+          if (noDiffIdx !== -1) {
+            filteredArgs = filteredArgs.filter((a) => a !== '--no-diff');
+          }
 
           const parsed = parseTextOption(filteredArgs);
           if (!parsed.ref && !parsed.text) {
-            console.log(error('Usage: click <ref> or click -t "description" [--force]'));
+            console.log(
+              error('Usage: click <ref> or click -t "description" [--force] [--no-diff]')
+            );
             return;
           }
-          const action: { type: 'click'; ref?: string; text?: string; force?: boolean } = {
+          const action: {
+            type: 'click';
+            ref?: string;
+            text?: string;
+            force?: boolean;
+            include_snapshot_diff?: boolean;
+          } = {
             type: 'click',
           };
           if (parsed.ref) action.ref = normalizeRef(parsed.ref);
           if (parsed.text) action.text = parsed.text;
           if (force) action.force = true;
+          if (!disableDiff) action.include_snapshot_diff = true;
+
           const result = await client.executeAction(sessionId, action);
           if (result.success) {
             const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
             console.log(success(`Clicked ${target}`));
+
+            if (result.snapshot_diff) {
+              console.log('');
+              console.log(formatSnapshotDiff(result.snapshot_diff));
+            }
           } else {
             console.log(error(result.error || 'Click failed'));
           }
@@ -506,6 +530,66 @@ export const runCommand = new Command('run')
           const url = await client.getUrl(sessionId);
           console.log(url);
         },
+        evaluate: async (args, client, sessionId) => {
+          if (args.length === 0) {
+            console.log(error('Usage: evaluate <expression> [-r <ref>] [-t "description"]'));
+            return;
+          }
+
+          // Parse options
+          const refIdx = args.findIndex((a) => a === '-r' || a === '--ref');
+          const textIdx = args.findIndex((a) => a === '-t' || a === '--text');
+
+          let ref: string | undefined;
+          let text: string | undefined;
+          let expressionParts: string[] = [...args];
+
+          if (refIdx !== -1 && args[refIdx + 1]) {
+            ref = normalizeRef(args[refIdx + 1]);
+            expressionParts = [...args.slice(0, refIdx), ...args.slice(refIdx + 2)];
+          }
+          if (textIdx !== -1 && args[textIdx + 1]) {
+            text = args[textIdx + 1];
+            const adjustedTextIdx = expressionParts.findIndex((a) => a === '-t' || a === '--text');
+            if (adjustedTextIdx !== -1) {
+              expressionParts = [
+                ...expressionParts.slice(0, adjustedTextIdx),
+                ...expressionParts.slice(adjustedTextIdx + 2),
+              ];
+            }
+          }
+
+          const expression = expressionParts.join(' ');
+          if (!expression) {
+            console.log(error('Expression is required'));
+            return;
+          }
+
+          const action: {
+            type: 'evaluate';
+            expression: string;
+            ref?: string;
+            text?: string;
+          } = { type: 'evaluate', expression };
+
+          if (ref) action.ref = ref;
+          if (text) action.text = text;
+
+          const result = await client.executeAction(sessionId, action);
+          if (result.success) {
+            const data = result.data as { result?: unknown };
+            const value = data.result;
+            if (typeof value === 'string') {
+              console.log(value);
+            } else if (value === null || value === undefined) {
+              console.log(String(value));
+            } else {
+              console.log(JSON.stringify(value, null, 2));
+            }
+          } else {
+            console.log(error(result.error || 'Evaluation failed'));
+          }
+        },
         'get-blocks': async (_args, client, sessionId) => {
           const blocks = await client.getBlocks(sessionId);
           console.log(JSON.stringify(blocks, null, 2));
@@ -589,19 +673,75 @@ export const runCommand = new Command('run')
         },
         drag: async (args, client, sessionId) => {
           // Parse: drag <ref> --target <target-ref> or --target-selector <sel>
+          // Also support: drag <ref> --delta-x <px> --delta-y <px>
           // Also support: drag -t "text" --target <ref>
-          const parsed = parseTextOption(args);
+          const noDiffIdx = args.indexOf('--no-diff');
+          const disableDiff = noDiffIdx !== -1;
+          const filteredArgs = disableDiff ? args.filter((a) => a !== '--no-diff') : args;
+
+          const parsed = parseTextOption(filteredArgs);
           if (!parsed.ref && !parsed.text) {
-            console.log(error('Usage: drag <ref> --target <ref> or drag -t "text" --target <ref>'));
+            console.log(
+              error(
+                'Usage: drag <ref> --target <ref> OR drag <ref> --delta-x <px> --delta-y <px> [--no-diff]'
+              )
+            );
             return;
           }
 
-          // Parse target options from remaining args
+          // Check for relative drag options
+          const deltaXIdx = parsed.remaining.indexOf('--delta-x');
+          const deltaYIdx = parsed.remaining.indexOf('--delta-y');
+          const isRelativeDrag = deltaXIdx !== -1 || deltaYIdx !== -1;
+
+          if (isRelativeDrag) {
+            const deltaX = deltaXIdx !== -1 ? parseInt(parsed.remaining[deltaXIdx + 1], 10) : 0;
+            const deltaY = deltaYIdx !== -1 ? parseInt(parsed.remaining[deltaYIdx + 1], 10) : 0;
+
+            const action: {
+              type: 'relative_drag_and_drop';
+              ref?: string;
+              text?: string;
+              delta_x: number;
+              delta_y: number;
+              include_snapshot_diff?: boolean;
+            } = {
+              type: 'relative_drag_and_drop',
+              delta_x: deltaX,
+              delta_y: deltaY,
+            };
+
+            if (parsed.ref) action.ref = normalizeRef(parsed.ref);
+            if (parsed.text) action.text = parsed.text;
+            if (!disableDiff) action.include_snapshot_diff = true;
+
+            const result = await client.executeAction(sessionId, action);
+            if (result.success) {
+              const source = parsed.ref
+                ? `element ${normalizeRef(parsed.ref)}`
+                : `"${parsed.text}"`;
+              console.log(success(`Dragged ${source} by (${deltaX}, ${deltaY}) pixels`));
+
+              if (result.snapshot_diff) {
+                console.log('');
+                console.log(formatSnapshotDiff(result.snapshot_diff));
+              }
+            } else {
+              console.log(error(result.error || 'Relative drag failed'));
+            }
+            return;
+          }
+
+          // Standard drag (existing code)
           const targetIdx = parsed.remaining.indexOf('--target');
           const targetSelectorIdx = parsed.remaining.indexOf('--target-selector');
 
           if (targetIdx === -1 && targetSelectorIdx === -1) {
-            console.log(error('Either --target <ref> or --target-selector <selector> is required'));
+            console.log(
+              error(
+                'Either --target <ref>, --target-selector <selector>, or --delta-x/--delta-y is required'
+              )
+            );
             return;
           }
 
@@ -620,18 +760,25 @@ export const runCommand = new Command('run')
             text?: string;
             target_ref?: string;
             target_selector?: string;
+            include_snapshot_diff?: boolean;
           } = { type: 'drag_and_drop' };
 
           if (parsed.ref) action.ref = normalizeRef(parsed.ref);
           if (parsed.text) action.text = parsed.text;
           if (targetRef) action.target_ref = targetRef;
           if (targetSelector) action.target_selector = targetSelector;
+          if (!disableDiff) action.include_snapshot_diff = true;
 
           const result = await client.executeAction(sessionId, action);
           if (result.success) {
             const source = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
             const target = targetRef ? targetRef : `selector "${targetSelector}"`;
             console.log(success(`Dragged ${source} to ${target}`));
+
+            if (result.snapshot_diff) {
+              console.log('');
+              console.log(formatSnapshotDiff(result.snapshot_diff));
+            }
           } else {
             console.log(error(result.error || 'Drag failed'));
           }
@@ -889,20 +1036,31 @@ Available commands:
     reload                  Reload current page
 
   ${colors.cyan}Actions:${colors.reset}
-    click <ref> [--force]   Click element (--force bypasses actionability checks)
-    fill <ref> <value>      Fill input field
-    type <ref> <text>       Type text with delays
-    press <key>             Press keyboard key
-    hover <ref>             Hover over element
-    scroll <dir> [amount]   Scroll page (up/down/left/right)
-    scroll-into-view <ref>  Scroll element into view
-    select <ref> <value>    Select dropdown option
-    check <ref>             Check checkbox
-    uncheck <ref>           Uncheck checkbox
-    drag <ref> --target <ref>
+    click <ref> [--force] [--no-diff]
+                            Click element (--force bypasses actionability checks)
+    fill <ref> <value> [--no-diff]
+                            Fill input field
+    type <ref> <text> [--no-diff]
+                            Type text with delays
+    press <key> [--no-diff] Press keyboard key
+    hover <ref> [--no-diff] Hover over element
+    scroll <dir> [amount] [--no-diff]
+                            Scroll page (up/down/left/right)
+    scroll-into-view <ref> [--no-diff]
+                            Scroll element into view
+    select <ref> <value> [--no-diff]
+                            Select dropdown option
+    check <ref> [--no-diff] Check checkbox
+    uncheck <ref> [--no-diff]
+                            Uncheck checkbox
+    drag <ref> --target <ref> [--no-diff]
                             Drag element to target (--target-selector for CSS)
-    mfa-totp [ref] <secret> Generate TOTP code (optionally fill into ref)
-    upload <ref> <file>...  Upload file(s) to input
+    drag <ref> --delta-x <px> --delta-y <px> [--no-diff]
+                            Drag element by pixel offset
+    mfa-totp [ref] <secret> [--no-diff]
+                            Generate TOTP code (optionally fill into ref)
+    upload <ref> <file>... [--no-diff]
+                            Upload file(s) to input
 
   ${colors.cyan}Wait Commands:${colors.reset}
     wait <ms>               Wait for duration
@@ -915,6 +1073,7 @@ Available commands:
     screenshot [file] [--url]
                             Save screenshot or return pre-signed URL
     url                     Get current URL
+    evaluate <expr>         Execute JavaScript (use -r <ref> for element scope)
     get-blocks              Get recorded test steps (JSON)
     status                  Get session status (includes app_url)
 
@@ -935,7 +1094,8 @@ Available commands:
       fill -t "email input" user@example.com
       check -t "Accept terms checkbox"
 
-  ${colors.gray}Refs like "e3" or "@e3" identify elements in the snapshot.${colors.reset}
+  ${colors.gray}Refs like "e3" or "@e3" identify elements in the snapshot.
+  Actions show snapshot diff by default. Use --no-diff for faster execution.${colors.reset}
 `);
   return Promise.resolve();
 }

@@ -7,14 +7,17 @@ import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, success } from '../../lib/output.js';
+import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface ReloadOptions {
   sessionId?: string;
+  diff?: boolean;
 }
 
 export const reloadCommand = new Command('reload')
   .description('Reload current page')
   .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
+  .option('--no-diff', 'Disable snapshot diff output')
   .action(async (options: ReloadOptions) => {
     try {
       const config = await loadConfig();
@@ -31,12 +34,24 @@ export const reloadCommand = new Command('reload')
         client,
       });
 
-      const result = await client.executeAction(resolved.id, {
-        type: 'reload',
-      });
+      const action: {
+        type: 'reload';
+        include_snapshot_diff?: boolean;
+      } = { type: 'reload' };
+      if (options.diff !== false) {
+        action.include_snapshot_diff = true;
+      }
+
+      const result = await client.executeAction(resolved.id, action);
 
       if (result.success) {
         console.log(success('Page reloaded'));
+
+        if (result.snapshot_diff) {
+          console.log('');
+          console.log(formatSnapshotDiff(result.snapshot_diff));
+        }
+
         await touchSession(resolved.id);
       } else {
         console.log(error(result.error || 'Reload failed'));

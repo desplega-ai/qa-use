@@ -7,11 +7,13 @@ import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, success } from '../../lib/output.js';
+import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface WaitForLoadOptions {
   sessionId?: string;
   state?: 'load' | 'domcontentloaded' | 'networkidle';
   timeout?: string;
+  diff?: boolean;
 }
 
 export const waitForLoadCommand = new Command('wait-for-load')
@@ -19,6 +21,7 @@ export const waitForLoadCommand = new Command('wait-for-load')
   .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
   .option('--state <state>', 'Load state to wait for (load|domcontentloaded|networkidle)', 'load')
   .option('--timeout <ms>', 'Timeout in milliseconds', '30000')
+  .option('--no-diff', 'Disable snapshot diff output')
   .action(async (options: WaitForLoadOptions) => {
     try {
       const config = await loadConfig();
@@ -41,13 +44,28 @@ export const waitForLoadCommand = new Command('wait-for-load')
         process.exit(1);
       }
 
-      const result = await client.executeAction(resolved.id, {
+      const action: {
+        type: 'wait_for_load';
+        state: 'load' | 'domcontentloaded' | 'networkidle';
+        include_snapshot_diff?: boolean;
+      } = {
         type: 'wait_for_load',
         state,
-      });
+      };
+      if (options.diff !== false) {
+        action.include_snapshot_diff = true;
+      }
+
+      const result = await client.executeAction(resolved.id, action);
 
       if (result.success) {
         console.log(success(`Page reached ${state} state`));
+
+        if (result.snapshot_diff) {
+          console.log('');
+          console.log(formatSnapshotDiff(result.snapshot_diff));
+        }
+
         await touchSession(resolved.id);
       } else {
         console.log(error(result.error || 'Wait for load failed'));

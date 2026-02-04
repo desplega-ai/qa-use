@@ -8,9 +8,11 @@ import type { ScrollDirection } from '../../../../lib/api/browser-types.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, success } from '../../lib/output.js';
+import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface ScrollOptions {
   sessionId?: string;
+  diff?: boolean;
 }
 
 const VALID_DIRECTIONS: ScrollDirection[] = ['up', 'down', 'left', 'right'];
@@ -20,6 +22,7 @@ export const scrollCommand = new Command('scroll')
   .argument('<direction>', 'Scroll direction: up, down, left, or right')
   .argument('[amount]', 'Scroll amount in pixels (default: 500)', '500')
   .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
+  .option('--no-diff', 'Disable snapshot diff output')
   .action(async (direction: string, amountStr: string, options: ScrollOptions) => {
     try {
       // Load configuration
@@ -56,14 +59,30 @@ export const scrollCommand = new Command('scroll')
       });
 
       // Execute scroll action
-      const result = await client.executeAction(resolved.id, {
+      const action: {
+        type: 'scroll';
+        direction: ScrollDirection;
+        amount: number;
+        include_snapshot_diff?: boolean;
+      } = {
         type: 'scroll',
         direction: normalizedDirection,
         amount,
-      });
+      };
+      if (options.diff !== false) {
+        action.include_snapshot_diff = true;
+      }
+
+      const result = await client.executeAction(resolved.id, action);
 
       if (result.success) {
         console.log(success(`Scrolled ${normalizedDirection} ${amount}px`));
+
+        if (result.snapshot_diff) {
+          console.log('');
+          console.log(formatSnapshotDiff(result.snapshot_diff));
+        }
+
         await touchSession(resolved.id);
       } else {
         console.log(error(result.error || 'Scroll failed'));

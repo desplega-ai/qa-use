@@ -7,15 +7,18 @@ import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, success } from '../../lib/output.js';
+import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface GotoOptions {
   sessionId?: string;
+  diff?: boolean;
 }
 
 export const gotoCommand = new Command('goto')
   .description('Navigate to a URL')
   .argument('<url>', 'URL to navigate to')
   .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
+  .option('--no-diff', 'Disable snapshot diff output')
   .action(async (url: string, options: GotoOptions) => {
     try {
       // Load configuration
@@ -42,13 +45,28 @@ export const gotoCommand = new Command('goto')
       });
 
       // Execute goto action
-      const result = await client.executeAction(resolved.id, {
+      const action: {
+        type: 'goto';
+        url: string;
+        include_snapshot_diff?: boolean;
+      } = {
         type: 'goto',
         url,
-      });
+      };
+      if (options.diff !== false) {
+        action.include_snapshot_diff = true;
+      }
+
+      const result = await client.executeAction(resolved.id, action);
 
       if (result.success) {
         console.log(success(`Navigated to ${url}`));
+
+        if (result.snapshot_diff) {
+          console.log('');
+          console.log(formatSnapshotDiff(result.snapshot_diff));
+        }
+
         // Update session timestamp
         await touchSession(resolved.id);
       } else {

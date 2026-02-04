@@ -66,7 +66,9 @@ export type BrowserActionType =
   | 'screenshot'
   | 'drag_and_drop'
   | 'mfa_totp'
-  | 'set_input_files';
+  | 'set_input_files'
+  | 'evaluate'
+  | 'relative_drag_and_drop';
 
 export type ScrollDirection = 'up' | 'down' | 'left' | 'right';
 
@@ -212,6 +214,42 @@ export interface SetInputFilesAction {
   files: string[];
 }
 
+export interface EvaluateAction {
+  type: 'evaluate';
+  expression: string;
+  ref?: string; // Optional element ref for element-scoped evaluation
+  text?: string; // Optional semantic text for element-scoped evaluation
+}
+
+export interface RelativeDragAndDropAction {
+  type: 'relative_drag_and_drop';
+  ref?: string;
+  text?: string;
+  delta_x: number;
+  delta_y: number;
+}
+
+// Snapshot diff types (returned from actions with include_snapshot_diff)
+export interface SnapshotDiffChange {
+  ref: string;
+  change_type: 'added' | 'removed' | 'modified';
+  role: string;
+  name: string;
+  parent_ref?: string; // For added elements
+  attribute_changes?: {
+    added: string[];
+    removed: string[];
+  }; // For modified elements
+}
+
+export interface SnapshotDiff {
+  changes: SnapshotDiffChange[];
+  summary: string;
+  refs_added: string[];
+  refs_removed: string[];
+  refs_modified: string[];
+}
+
 export type BrowserAction =
   | GotoAction
   | BackAction
@@ -235,7 +273,9 @@ export type BrowserAction =
   | ScreenshotAction
   | DragAndDropAction
   | MfaTotpAction
-  | SetInputFilesAction;
+  | SetInputFilesAction
+  | EvaluateAction
+  | RelativeDragAndDropAction;
 
 // ==========================================
 // API Response Types
@@ -249,6 +289,7 @@ export interface ActionResult {
   action_id?: string; // Unique action identifier
   url_before?: string; // URL before action executed
   url_after?: string; // URL after action executed
+  snapshot_diff?: SnapshotDiff; // Present when include_snapshot_diff was true
 }
 
 export interface SnapshotFilterStats {

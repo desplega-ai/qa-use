@@ -8,10 +8,12 @@ import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { normalizeRef } from '../../lib/browser-utils.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, success } from '../../lib/output.js';
+import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface FillOptions {
   sessionId?: string;
   text?: string;
+  diff?: boolean;
 }
 
 export const fillCommand = new Command('fill')
@@ -20,6 +22,7 @@ export const fillCommand = new Command('fill')
   .argument('<value>', 'Value to fill into the field')
   .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
   .option('-t, --text <description>', 'Semantic element description (AI-based, slower)')
+  .option('--no-diff', 'Disable snapshot diff output')
   .action(
     async (refOrValue: string, valueOrUndefined: string | undefined, options: FillOptions) => {
       try {
@@ -61,7 +64,13 @@ export const fillCommand = new Command('fill')
         });
 
         // Build action with either ref or text
-        const action: { type: 'fill'; ref?: string; text?: string; value: string } = {
+        const action: {
+          type: 'fill';
+          ref?: string;
+          text?: string;
+          value: string;
+          include_snapshot_diff?: boolean;
+        } = {
           type: 'fill',
           value,
         };
@@ -70,6 +79,9 @@ export const fillCommand = new Command('fill')
         } else if (options.text) {
           action.text = options.text;
         }
+        if (options.diff !== false) {
+          action.include_snapshot_diff = true;
+        }
 
         const result = await client.executeAction(resolved.id, action);
 
@@ -77,6 +89,12 @@ export const fillCommand = new Command('fill')
           const displayValue = value.length > 50 ? `${value.slice(0, 47)}...` : value;
           const target = ref ? normalizeRef(ref) : `"${options.text}"`;
           console.log(success(`Filled ${target} with "${displayValue}"`));
+
+          if (result.snapshot_diff) {
+            console.log('');
+            console.log(formatSnapshotDiff(result.snapshot_diff));
+          }
+
           await touchSession(resolved.id);
         } else {
           const hint = result.error || 'Fill failed';

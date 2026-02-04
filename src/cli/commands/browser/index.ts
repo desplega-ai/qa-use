@@ -13,6 +13,7 @@ import { closeCommand } from './close.js';
 // Session management commands
 import { createCommand } from './create.js';
 import { dragCommand } from './drag.js';
+import { evaluateCommand } from './evaluate.js';
 import { fillCommand } from './fill.js';
 import { forwardCommand } from './forward.js';
 import { generateTestCommand } from './generate-test.js';
@@ -80,6 +81,7 @@ browserCommand.addCommand(urlCommand);
 browserCommand.addCommand(getBlocksCommand);
 browserCommand.addCommand(logsCommand);
 browserCommand.addCommand(generateTestCommand);
+browserCommand.addCommand(evaluateCommand);
 
 // Register advanced commands
 browserCommand.addCommand(streamCommand);
