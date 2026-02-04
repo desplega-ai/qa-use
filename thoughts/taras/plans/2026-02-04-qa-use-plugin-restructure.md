@@ -3,6 +3,9 @@ date: 2026-02-04
 topic: "QA-Use Plugin Structure Restructure Implementation"
 tags: ["implementation", "plugin", "documentation", "KISS"]
 research: "thoughts/taras/research/2026-02-04-qa-use-plugin-structure.md"
+updated: 2026-02-04
+status: "ready-for-implementation"
+notes: "Reviewed and updated for recent CLI changes (evaluate command, sync subcommands). Deprecation phase removed per Taras feedback - going directly to v3.0.0 breaking change."
 ---
 
 # QA-Use Plugin Structure Restructure Implementation Plan
@@ -59,6 +62,15 @@ Restructure the qa-use plugin to reduce cognitive load by cutting plugin command
 - **SKILL.md structure**: 248 lines, command-reference heavy, missing workflow patterns
 - **test-update is simple**: `plugins/qa-use/commands/test-update.md:1-31` shows minimal AI editing logic (31 lines)
 - **record command structure**: `plugins/qa-use/commands/record.md:1-47` has start/stop pattern, can be extended
+- **Recent CLI changes** (commits 32b12f5, 81ec8ca):
+  - New `evaluate` command: Execute JavaScript in browser context (`src/cli/commands/browser/evaluate.ts`)
+  - Sync refactored to subcommands: `sync pull` / `sync push` (not flags `--pull` / `--push`)
+  - **New snapshot-diff feature** (`src/cli/lib/snapshot-diff.ts`): Automatically shows DOM changes after each action
+    - Displays summary: "X elements added, Y elements modified, Z elements removed"
+    - Shows added elements with `+` (green), modified with `~` (yellow), removed with `-` (red)
+    - For modified elements, shows specific attribute changes (e.g., "+attrs: checked, active")
+    - Makes debugging and understanding action effects much easier
+    - Example: After clicking checkbox, shows "1 element modified" with "+attrs: checked"
 
 ## Quick Verification Reference
 
@@ -253,6 +265,15 @@ qa-use browser close
 
 **Critical:** Always run `snapshot` before interacting. Never guess element refs.
 
+**Snapshot Diff Feature:**
+After each action (goto, click, fill, etc.), the browser automatically shows DOM changes:
+- **Summary**: "5 elements added, 1 element modified"
+- **Added elements**: `+ [e54] generic "Thanks for agreeing!"` (green)
+- **Modified elements**: `~ [e18] checkbox "I agree..."` with `+attrs: checked, active` (yellow)
+- **Removed elements**: `- [e99] button "Submit"` (red)
+
+This helps you understand what changed after each action without manually inspecting the DOM.
+
 ### 2. Understanding Blocks
 
 **What are blocks?**
@@ -353,19 +374,29 @@ qa-use test diff login.yaml
 
 ## Essential Commands
 
+**IMPORTANT**: Include these recent additions when documenting commands:
+- **New command**: `qa-use browser evaluate <expression>` - Execute JavaScript in browser context (added in commit 32b12f5)
+- **Updated syntax**: Use `qa-use test sync pull` / `sync push` (subcommands, not `--pull` / `--push` flags)
+- **Snapshot-diff feature**: Document that all browser actions automatically show DOM changes (see Pattern 5 for examples)
+
 [Continue with detailed command reference, maintaining dual-path pattern...]
 
 ### Browser Session Management
 
-[Document all browser commands with CLI examples]
+[Document all browser commands with CLI examples, including new `evaluate` command]
 
 ### Element Interaction
 
 [Document all interaction commands]
 
+### Inspection & Snapshot Diff
+
+[Document snapshot command and explain automatic snapshot-diff output after every action]
+[Show examples of the diff format: "+ [ref] type 'text'" for added, "~ [ref]" for modified, "- [ref]" for removed]
+
 ### Test Operations
 
-[Document test commands including validate, info, runs]
+[Document test commands including validate, info, runs - use subcommand syntax for sync]
 
 ### Logs & Debugging
 
@@ -458,6 +489,38 @@ qa-use test run login
 /qa-use:record edit login
 ```
 (AI-assisted editing with validation)
+
+### Pattern 5: Understanding DOM Changes with Snapshot Diff
+
+**CLI Workflow:**
+```bash
+# Create session and navigate
+qa-use browser create --tunnel --no-headless
+qa-use browser goto https://evals.desplega.ai/checkboxes
+
+# Output shows initial elements:
+# Changes: 45 elements added
+# + [e18] checkbox "I agree to the terms and conditions"
+# + [e19] generic "I agree to the terms and conditions"
+
+# Click checkbox
+qa-use browser click e18
+
+# Snapshot diff automatically shows:
+# Changes: 5 elements added, 1 element modified
+# + [e54] generic "Thanks for agreeing!"
+# + [e55] link "Terms and Conditions"
+# ~ [e18] checkbox "I agree to the terms and conditions"
+#     +attrs: active, checked
+```
+
+**Why this matters:**
+- Instantly see what changed after each action
+- Identify new elements that appeared (e.g., success messages, modals)
+- Track attribute changes (checked, disabled, aria-expanded)
+- Debug failed assertions by understanding actual DOM state changes
+
+**No Plugin Shortcut** - Automatic feature in all browser commands
 
 ## CI/CD Integration
 
@@ -653,6 +716,9 @@ npx @desplega.ai/qa-use browser <command>
 - Moved Localhost Testing to Advanced Topics
 - Added Session Persistence, Block Limitations, WebSocket Sessions
 - Removed command proliferation - 5 deprecated commands now appear as CLI examples only
+- **Included new `evaluate` command** for JavaScript execution in browser
+- **Updated sync syntax** to use subcommands (sync pull/push) instead of flags
+- **Documented snapshot-diff feature** that shows DOM changes after each action (Pattern 5)
 
 ### Success Criteria:
 

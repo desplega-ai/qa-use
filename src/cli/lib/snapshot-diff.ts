@@ -13,6 +13,8 @@ const colors = {
   gray: '\x1b[90m',
 };
 
+const MAX_CHANGES_SHOWN = 25;
+
 export function formatSnapshotDiff(diff: SnapshotDiff): string {
   const lines: string[] = [];
 
@@ -20,9 +22,21 @@ export function formatSnapshotDiff(diff: SnapshotDiff): string {
   lines.push(`${colors.cyan}Changes:${colors.reset} ${diff.summary}`);
   lines.push('');
 
-  // Format each change
-  for (const change of diff.changes) {
+  // Format changes (limited to MAX_CHANGES_SHOWN)
+  const totalChanges = diff.changes.length;
+  const changesToShow = diff.changes.slice(0, MAX_CHANGES_SHOWN);
+
+  for (const change of changesToShow) {
     lines.push(formatChange(change));
+  }
+
+  // Add truncation note if there are more changes
+  if (totalChanges > MAX_CHANGES_SHOWN) {
+    const remaining = totalChanges - MAX_CHANGES_SHOWN;
+    lines.push('');
+    lines.push(
+      `${colors.gray}... and ${remaining} more change${remaining === 1 ? '' : 's'}. Run 'snapshot' to see full page state.${colors.reset}`
+    );
   }
 
   return lines.join('\n');
