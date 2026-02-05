@@ -1,7 +1,7 @@
 {
   "name": "qa-use",
-  "version": "2.7.0",
-  "description": "CLI-integrated plugin for E2E testing and browser automation with qa-use. Provides slash commands, skills, and specialized agents for test authoring, execution, debugging, and AI-first feature verification.",
+  "version": "3.0.0",
+  "description": "Simplified CLI-integrated plugin for E2E testing with 6 essential commands. Provides AI-first feature verification, browser automation, and test management. All CLI operations documented in SKILL.md for harness compatibility.",
   "author": {
     "name": "desplega.ai",
     "email": "contact@desplega.ai",
@@ -19,6 +19,7 @@
     "desplega.ai",
     "browser",
     "automation",
-    "feature-verification"
+    "feature-verification",
+    "KISS"
   ]
 }

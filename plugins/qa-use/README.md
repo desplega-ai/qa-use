@@ -41,6 +41,30 @@ qa-use install-deps
    /qa-use:test-run example
    ```
 
+## How qa-use Works
+
+### The Blocks Concept
+
+qa-use uses **blocks** to bridge interactive exploration and automated testing:
+
+1. **Automatic Recording**: Every browser interaction (click, fill, goto, scroll) is recorded as a "block"
+2. **Session Storage**: Blocks are stored server-side with your browser session
+3. **Test Generation**: Blocks can be converted into test YAML with `qa-use browser generate-test`
+4. **AI Understanding**: Blocks enable AI agents to analyze your intent and suggest improvements
+
+**Example:**
+```bash
+qa-use browser create --tunnel --no-headless
+qa-use browser goto https://example.com
+qa-use browser snapshot        # Get element refs
+qa-use browser click e1        # Recorded as block
+qa-use browser fill e5 "text"  # Recorded as block
+qa-use browser get-blocks      # See recorded blocks
+qa-use browser generate-test -n "my_test"  # Convert to YAML
+```
+
+See [Understanding Blocks](skills/qa-use/SKILL.md#2-understanding-blocks) in SKILL.md for details.
+
 ## AI-First Workflow
 
 The primary way to use this plugin is the **verify → explore → record → test** loop:
@@ -62,14 +86,12 @@ The primary way to use this plugin is the **verify → explore → record → te
 |---------|-------------|
 | `/qa-use:verify <description>` | Verify a feature works (THE main command) |
 | `/qa-use:explore <url or goal>` | Explore a web page autonomously |
-| `/qa-use:record [start\|stop] [name]` | Record browser actions into test YAML |
+| `/qa-use:record [start\|stop\|edit] [name]` | Record browser actions or edit existing tests |
+| `/qa-use:verify-pr` | Verify PR changes automatically |
 | `/qa-use:test-init` | Initialize test directory |
 | `/qa-use:test-run [name] [flags]` | Run E2E tests |
-| `/qa-use:test-info <name> [--id <uuid>]` | Show test details (steps, tags, description) |
-| `/qa-use:test-validate [name]` | Validate test syntax |
-| `/qa-use:test-sync [--pull\|--push]` | Sync with cloud |
-| `/qa-use:test-diff <file>` | Compare local vs cloud test |
-| `/qa-use:test-update [name]` | AI-assisted test editing |
+
+**Note:** Commands like `test-validate`, `test-sync`, `test-diff`, `test-info`, and `test-runs` are available via CLI. See [SKILL.md](skills/qa-use/SKILL.md) for complete CLI documentation.
 
 ### Common Flags for test-run
 
@@ -80,7 +102,7 @@ The primary way to use this plugin is the **verify → explore → record → te
 - `--download` - Download assets to `/tmp/qa-use/downloads/`
 - `--var key=value` - Override variables
 
-> **Important:** When testing localhost URLs, you MUST use `--tunnel`. The cloud cannot access your local machine directly!
+> **Important:** Testing localhost? Use `--tunnel` flag! See [Testing Localhost Apps](#testing-localhost-apps) section above.
 
 ## Skill
 
@@ -145,6 +167,48 @@ qa-use browser screenshot
 qa-use browser logs console             # View console logs
 qa-use browser logs network             # View network logs
 ```
+
+## Testing Localhost Apps
+
+The cloud cannot access `localhost` URLs directly. qa-use provides **tunnel mode** to test local applications:
+
+### Quick Decision Tree
+
+```
+Testing localhost (http://localhost:3000)?
+  ├─ YES → Add --tunnel flag
+  │   qa-use browser create --tunnel [--no-headless]
+  │   qa-use test run my_test --tunnel
+  │
+  └─ NO (Public URL) → Use default (no flag)
+      qa-use browser create
+      qa-use test run my_test
+```
+
+### How Tunnel Mode Works
+
+When you use `--tunnel`:
+1. Playwright browser starts on **your machine** (not in cloud)
+2. A localtunnel is created to proxy API requests
+3. The browser stays running for your test session
+4. Use `--no-headless` to see the browser window
+
+### Examples
+
+```bash
+# Interactive session with local app
+qa-use browser create --tunnel --no-headless
+qa-use browser goto http://localhost:3000
+
+# Run test against localhost
+qa-use test run login --tunnel --headful
+
+# Record test from localhost
+/qa-use:record start local_test
+# (tunnel mode auto-detected)
+```
+
+See [Localhost Testing](skills/qa-use/SKILL.md#localhost-testing-tunnel-mode) in SKILL.md for troubleshooting.
 
 ## Configuration
 
