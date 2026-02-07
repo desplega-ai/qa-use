@@ -65,6 +65,8 @@ export type BrowserActionType =
   | 'snapshot'
   | 'screenshot'
   | 'drag_and_drop'
+  | 'focus'
+  | 'blur'
   | 'mfa_totp'
   | 'set_input_files'
   | 'evaluate'
@@ -119,10 +121,24 @@ export interface HoverAction {
   text?: string; // AI-based semantic element selection (alternative to ref)
 }
 
+export interface FocusAction {
+  type: 'focus';
+  ref?: string;
+  text?: string; // AI-based semantic element selection (alternative to ref)
+}
+
+export interface BlurAction {
+  type: 'blur';
+  ref?: string;
+  text?: string; // AI-based semantic element selection (alternative to ref)
+}
+
 export interface ScrollAction {
   type: 'scroll';
   direction: ScrollDirection;
   amount?: number; // pixels, default 500
+  ref?: string; // element-scoped scroll
+  text?: string; // AI-resolved element
 }
 
 export interface SelectAction {
@@ -260,6 +276,8 @@ export type BrowserAction =
   | TypeAction
   | PressAction
   | HoverAction
+  | FocusAction
+  | BlurAction
   | ScrollAction
   | ScrollIntoViewAction
   | SelectAction

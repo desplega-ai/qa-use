@@ -5,7 +5,7 @@
  * Run 'pnpm generate:types' to regenerate
  *
  * Source: http://localhost:5005/vibe-qa/cli/schema
- * Generated: 2026-01-30T16:52:48.310Z
+ * Generated: 2026-02-07T10:31:58.156Z
  */
 
 export type Name = string;
@@ -58,6 +58,7 @@ export type Action1 =
       | 'scroll_into_view_if_needed'
       | 'drag_and_drop'
       | 'relative_drag_and_drop'
+      | 'focus'
       | 'blur'
       | 'highlight'
       | 'wheel'

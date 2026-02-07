@@ -6,12 +6,15 @@ import { Command } from 'commander';
 import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import type { ScrollDirection } from '../../../../lib/api/browser-types.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
+import { normalizeRef } from '../../lib/browser-utils.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, success } from '../../lib/output.js';
 import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface ScrollOptions {
   sessionId?: string;
+  ref?: string;
+  text?: string;
   diff?: boolean;
 }
 
@@ -22,6 +25,8 @@ export const scrollCommand = new Command('scroll')
   .argument('<direction>', 'Scroll direction: up, down, left, or right')
   .argument('[amount]', 'Scroll amount in pixels (default: 500)', '500')
   .option('-s, --session-id <id>', 'Session ID (auto-resolved if only one session)')
+  .option('--ref <ref>', 'Element reference for scoped scrolling')
+  .option('-t, --text <description>', 'Element text description (AI-resolved)')
   .option('--no-diff', 'Disable snapshot diff output')
   .action(async (direction: string, amountStr: string, options: ScrollOptions) => {
     try {
@@ -63,12 +68,19 @@ export const scrollCommand = new Command('scroll')
         type: 'scroll';
         direction: ScrollDirection;
         amount: number;
+        ref?: string;
+        text?: string;
         include_snapshot_diff?: boolean;
       } = {
         type: 'scroll',
         direction: normalizedDirection,
         amount,
       };
+      if (options.ref) {
+        action.ref = normalizeRef(options.ref);
+      } else if (options.text) {
+        action.text = options.text;
+      }
       if (options.diff !== false) {
         action.include_snapshot_diff = true;
       }

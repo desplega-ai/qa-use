@@ -333,20 +333,84 @@ export const runCommand = new Command('run')
             console.log(error(result.error || 'Hover failed'));
           }
         },
-        scroll: async (args, client, sessionId) => {
-          if (args.length === 0) {
-            console.log(error('Usage: scroll <direction> [amount]'));
+        focus: async (args, client, sessionId) => {
+          const parsed = parseTextOption(args);
+          if (!parsed.ref && !parsed.text) {
+            console.log(error('Usage: focus <ref> or focus -t "description"'));
             return;
           }
-          const direction = args[0].toLowerCase() as ScrollDirection;
-          const amount = args[1] ? parseInt(args[1], 10) : 500;
-          const result = await client.executeAction(sessionId, {
-            type: 'scroll',
-            direction,
-            amount,
-          });
+          const action: { type: 'focus'; ref?: string; text?: string } = { type: 'focus' };
+          if (parsed.ref) action.ref = normalizeRef(parsed.ref);
+          if (parsed.text) action.text = parsed.text;
+          const result = await client.executeAction(sessionId, action);
           if (result.success) {
-            console.log(success(`Scrolled ${direction} ${amount}px`));
+            const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
+            console.log(success(`Focused ${target}`));
+          } else {
+            console.log(error(result.error || 'Focus failed'));
+          }
+        },
+        blur: async (args, client, sessionId) => {
+          const parsed = parseTextOption(args);
+          if (!parsed.ref && !parsed.text) {
+            console.log(error('Usage: blur <ref> or blur -t "description"'));
+            return;
+          }
+          const action: { type: 'blur'; ref?: string; text?: string } = { type: 'blur' };
+          if (parsed.ref) action.ref = normalizeRef(parsed.ref);
+          if (parsed.text) action.text = parsed.text;
+          const result = await client.executeAction(sessionId, action);
+          if (result.success) {
+            const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
+            console.log(success(`Blurred ${target}`));
+          } else {
+            console.log(error(result.error || 'Blur failed'));
+          }
+        },
+        scroll: async (args, client, sessionId) => {
+          if (args.length === 0) {
+            console.log(error('Usage: scroll <direction> [amount] [--ref <ref>] [-t "text"]'));
+            return;
+          }
+          // Parse --ref/-r and -t/--text options from args
+          const refIdx = args.findIndex((a) => a === '-r' || a === '--ref');
+          const textIdx = args.findIndex((a) => a === '-t' || a === '--text');
+
+          let ref: string | undefined;
+          let text: string | undefined;
+          let filteredArgs = [...args];
+
+          if (refIdx !== -1 && args[refIdx + 1]) {
+            ref = normalizeRef(args[refIdx + 1]);
+            filteredArgs = [...args.slice(0, refIdx), ...args.slice(refIdx + 2)];
+          }
+          if (textIdx !== -1 && args[textIdx + 1]) {
+            text = args[textIdx + 1];
+            const adjustedIdx = filteredArgs.findIndex((a) => a === '-t' || a === '--text');
+            if (adjustedIdx !== -1) {
+              filteredArgs = [
+                ...filteredArgs.slice(0, adjustedIdx),
+                ...filteredArgs.slice(adjustedIdx + 2),
+              ];
+            }
+          }
+
+          const direction = filteredArgs[0]?.toLowerCase() as ScrollDirection;
+          const amount = filteredArgs[1] ? parseInt(filteredArgs[1], 10) : 500;
+          const action: {
+            type: 'scroll';
+            direction: ScrollDirection;
+            amount: number;
+            ref?: string;
+            text?: string;
+          } = { type: 'scroll', direction, amount };
+          if (ref) action.ref = ref;
+          if (text) action.text = text;
+
+          const result = await client.executeAction(sessionId, action);
+          if (result.success) {
+            const scope = ref ? ` (element ${ref})` : text ? ` (${text})` : '';
+            console.log(success(`Scrolled ${direction} ${amount}px${scope}`));
           } else {
             console.log(error(result.error || 'Scroll failed'));
           }
@@ -1044,8 +1108,10 @@ Available commands:
                             Type text with delays
     press <key> [--no-diff] Press keyboard key
     hover <ref> [--no-diff] Hover over element
-    scroll <dir> [amount] [--no-diff]
-                            Scroll page (up/down/left/right)
+    focus <ref> [--no-diff] Focus element
+    blur <ref> [--no-diff]  Blur (unfocus) element
+    scroll <dir> [amount] [--ref <ref>] [-t "text"] [--no-diff]
+                            Scroll page or element (up/down/left/right)
     scroll-into-view <ref> [--no-diff]
                             Scroll element into view
     select <ref> <value> [--no-diff]

@@ -7,6 +7,7 @@
 
 import { Command } from 'commander';
 import { backCommand } from './back.js';
+import { blurCommand } from './blur.js';
 import { checkCommand } from './check.js';
 import { clickCommand } from './click.js';
 import { closeCommand } from './close.js';
@@ -15,6 +16,7 @@ import { createCommand } from './create.js';
 import { dragCommand } from './drag.js';
 import { evaluateCommand } from './evaluate.js';
 import { fillCommand } from './fill.js';
+import { focusCommand } from './focus.js';
 import { forwardCommand } from './forward.js';
 import { generateTestCommand } from './generate-test.js';
 import { getBlocksCommand } from './get-blocks.js';
@@ -62,6 +64,8 @@ browserCommand.addCommand(fillCommand);
 browserCommand.addCommand(typeCommand);
 browserCommand.addCommand(pressCommand);
 browserCommand.addCommand(hoverCommand);
+browserCommand.addCommand(focusCommand);
+browserCommand.addCommand(blurCommand);
 browserCommand.addCommand(scrollCommand);
 browserCommand.addCommand(scrollIntoViewCommand);
 browserCommand.addCommand(selectCommand);
