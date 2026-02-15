@@ -50,16 +50,18 @@ qa-use browser close
 ```
 (Wraps create + goto + snapshot with autonomous exploration)
 
-**Critical:** Always run `snapshot` before interacting. Never guess element refs.
+**Critical:** Always run `snapshot` before your **first** interaction on a page. Never guess element refs.
 
-**Snapshot Diff Feature:**
+**Snapshot Diff Feature (use it to avoid unnecessary snapshots):**
 After each action (goto, click, fill, etc.), the browser automatically shows DOM changes:
 - **Summary**: "5 elements added, 1 element modified"
 - **Added elements**: `+ [e54] generic "Thanks for agreeing!"` (green)
 - **Modified elements**: `~ [e18] checkbox "I agree..."` with `+attrs: checked, active` (yellow)
 - **Removed elements**: `- [e99] button "Submit"` (red)
 
-This helps you understand what changed after each action without manually inspecting the DOM.
+**When you can skip a full `snapshot`:** If the diff output from your last action already shows the element ref you need to interact with next, use it directly — no need for an intermediate `snapshot`. For example, if clicking a button shows `+ [e54] button "Submit"` in the diff, you can `click e54` immediately.
+
+**When you still need a full `snapshot`:** Run `snapshot` when you need to find elements that weren't in the diff (e.g., pre-existing elements you haven't interacted with yet), or when the diff was truncated (shows "... and N more changes").
 
 ### 2. Understanding Blocks
 
@@ -210,7 +212,7 @@ Sessions auto-persist in `~/.qa-use.json`. One active session = no `-s` flag nee
 
 | Command | Description |
 |---------|-------------|
-| `qa-use browser snapshot` | Get ARIA tree with element refs (shows snapshot diff after actions) |
+| `qa-use browser snapshot` | Get full ARIA tree with element refs (use only when diff output is insufficient) |
 | `qa-use browser url` | Get current URL |
 | `qa-use browser screenshot` | Save screenshot.png |
 | `qa-use browser screenshot file.png` | Save to custom path |
@@ -218,9 +220,11 @@ Sessions auto-persist in `~/.qa-use.json`. One active session = no `-s` flag nee
 | `qa-use browser evaluate <expression>` | Execute JavaScript in browser context |
 
 The snapshot-diff feature automatically displays DOM changes after each browser action:
-- **Added elements**: Shown with `+` prefix and green color
+- **Added elements**: Shown with `+` prefix and green color — these refs are immediately usable
 - **Modified elements**: Shown with `~` prefix and yellow color, including attribute changes (`+attrs: checked`)
-- **Removed elements**: Shown with `-` prefix and red color
+- **Removed elements**: Shown with `-` prefix and red color — do NOT use these refs
+
+Use diff output to interact with newly appeared elements directly, without running a full `snapshot` first.
 
 ### Test Operations
 
@@ -381,7 +385,7 @@ qa-use test run login
 ```
 (AI-assisted editing with validation)
 
-### Pattern 5: Understanding DOM Changes with Snapshot Diff
+### Pattern 5: Using Snapshot Diff to Avoid Unnecessary Snapshots
 
 **CLI Workflow:**
 ```bash
@@ -389,27 +393,34 @@ qa-use test run login
 qa-use browser create --tunnel --no-headless
 qa-use browser goto https://evals.desplega.ai/checkboxes
 
-# Output shows initial elements:
+# goto shows diff — initial page load shows all elements:
 # Changes: 45 elements added
 # + [e18] checkbox "I agree to the terms and conditions"
 # + [e19] generic "I agree to the terms and conditions"
 
-# Click checkbox
+# ✅ Use ref from diff directly — no snapshot needed!
 qa-use browser click e18
 
-# Snapshot diff automatically shows:
+# Diff shows what changed:
 # Changes: 5 elements added, 1 element modified
 # + [e54] generic "Thanks for agreeing!"
 # + [e55] link "Terms and Conditions"
 # ~ [e18] checkbox "I agree to the terms and conditions"
 #     +attrs: active, checked
+
+# ✅ Can click e55 directly from diff output — no snapshot needed!
+qa-use browser click e55
+
+# ❌ Need to find an element NOT in the diff? Now run snapshot:
+qa-use browser snapshot
 ```
 
-**Why this matters:**
-- Instantly see what changed after each action
-- Identify new elements that appeared (e.g., success messages, modals)
-- Track attribute changes (checked, disabled, aria-expanded)
-- Debug failed assertions by understanding actual DOM state changes
+**Key principle:** Use diff output as your primary source of element refs after actions. Only fall back to `snapshot` when you need to find elements that weren't in the diff.
+
+**Benefits:**
+- Fewer API calls = faster automation
+- Diff refs are always fresh (just returned from the server)
+- Instantly see what changed (new elements, attribute changes, removals)
 
 **No Plugin Shortcut** - Automatic feature in all browser commands
 
@@ -588,7 +599,8 @@ See [references/test-format.md](references/test-format.md) for complete specific
 | `browser navigate <url>` | `browser goto <url>` |
 | `browser destroy` | `browser close` |
 | `browser close <session-id>` | `browser close` |
-| Guessing element refs | Always `snapshot` first |
+| Guessing element refs | Use refs from diff output or `snapshot` |
+| Running `snapshot` after every action | Use diff output; only `snapshot` when needed |
 | Testing localhost without `--tunnel` | Use `--tunnel` flag |
 | `test sync --pull` | `test sync pull` (subcommand, not flag) |
 | `test sync --push` | `test sync push` (subcommand, not flag) |

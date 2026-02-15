@@ -44,12 +44,12 @@ Execute multi-step browsing tasks by cycling through snapshot → analyze → ac
    - Run: `qa-use browser goto <start_url>`
 
 3. **Loop until goal achieved or max_steps**
-   a. **Snapshot**: Run `qa-use browser snapshot --interactive --max-depth 5`
-      - Use filtering to reduce token usage while preserving interactive elements
-      - Increase max_depth if needed elements aren't visible
+   a. **Get page state**:
+      - **First iteration or after navigation**: Run `qa-use browser snapshot --interactive --max-depth 5`
+      - **After an action with diff output**: Use the diff output directly if it contains the refs you need. Only run `snapshot` if you need to find elements not shown in the diff.
    b. **Analyze**: Am I at the goal? What actions could get me closer?
    c. **Execute**: Run best action (click, scroll, fill)
-   d. **Check**: Did the action succeed? Am I closer to goal?
+   d. **Check diff**: Review the snapshot diff output. Did the action succeed? Are target elements visible in the diff? If yes, proceed without a full snapshot.
 
 4. **Return structured findings**
 
@@ -132,8 +132,10 @@ If page fails to load:
 ## Constraints
 
 - ALWAYS create session first if none exists
-- ALWAYS run snapshot before each action
-- NEVER click without verifying ref exists in latest snapshot
+- ALWAYS run `snapshot` before your first interaction on a new page
+- After actions, use the diff output to find refs — only run `snapshot` again if the diff doesn't contain the element you need
+- NEVER click a ref that was shown as removed (`-`) in a diff
+- NEVER guess refs — they must come from either a snapshot or a diff
 - Report honestly when stuck (login required, CAPTCHA, etc.)
 - Close session when task complete (unless parent skill will continue using it)
 - Maximum 10 steps per navigation goal by default

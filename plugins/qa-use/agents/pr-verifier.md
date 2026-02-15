@@ -100,16 +100,20 @@ qa-use browser goto <base_url><route>
 
 Wait for page load.
 
-#### 3.2 Get Snapshot and Verify
+#### 3.2 Get Page State and Verify
+
+After `goto`, the snapshot diff output already shows page elements. Use diff refs directly when possible:
 
 ```bash
+# goto already returns diff — use those refs first
+# Only run snapshot if you need elements not shown in the diff:
 qa-use browser snapshot --interactive
 ```
 
 Based on the feature description and diff context:
-1. Identify key interactive elements
+1. Identify key interactive elements from diff output (or snapshot if needed)
 2. Perform verification actions (click, fill, scroll)
-3. Check for expected behavior
+3. Use diff output from each action to check for expected behavior — avoid redundant snapshots
 4. Document findings
 
 #### 3.3 Capture Screenshot (When Meaningful)

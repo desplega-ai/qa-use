@@ -161,7 +161,7 @@ qa-use browser snapshot --scope "#main-content"
 
 Use the `[ref=eN]` values in interaction commands.
 
-**Critical workflow:** Always run `snapshot` before interacting to get valid refs. Refs are session-specific and change between page loads.
+**Critical workflow:** Run `snapshot` before your first interaction on a new page. After that, use the snapshot diff output from actions to get fresh refs — only run `snapshot` again when you need elements not shown in the diff. Refs are session-specific and change between page loads.
 
 ## Interactions
 
