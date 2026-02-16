@@ -8,7 +8,7 @@ import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { normalizeRef } from '../../lib/browser-utils.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, success } from '../../lib/output.js';
-import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
+import { formatDownloads, formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface ClickOptions {
   sessionId?: string;
@@ -82,6 +82,11 @@ export const clickCommand = new Command('click')
         if (result.snapshot_diff) {
           console.log('');
           console.log(formatSnapshotDiff(result.snapshot_diff));
+        }
+
+        if (result.downloads?.length) {
+          console.log('');
+          console.log(formatDownloads(result.downloads));
         }
 
         await touchSession(resolved.id);

@@ -7,7 +7,7 @@ import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { loadConfig } from '../../lib/config.js';
 import { error, success } from '../../lib/output.js';
-import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
+import { formatDownloads, formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface WaitForLoadOptions {
   sessionId?: string;
@@ -64,6 +64,11 @@ export const waitForLoadCommand = new Command('wait-for-load')
         if (result.snapshot_diff) {
           console.log('');
           console.log(formatSnapshotDiff(result.snapshot_diff));
+        }
+
+        if (result.downloads?.length) {
+          console.log('');
+          console.log(formatDownloads(result.downloads));
         }
 
         await touchSession(resolved.id);

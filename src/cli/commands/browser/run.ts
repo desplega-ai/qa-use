@@ -5,7 +5,7 @@
 import * as readline from 'node:readline';
 import { Command } from 'commander';
 import { BrowserApiClient } from '../../../../lib/api/browser.js';
-import type { ScrollDirection } from '../../../../lib/api/browser-types.js';
+import type { FileUploadData, ScrollDirection } from '../../../../lib/api/browser-types.js';
 import {
   createStoredSession,
   removeStoredSession,
@@ -15,8 +15,9 @@ import {
 } from '../../lib/browser-sessions.js';
 import { normalizeRef } from '../../lib/browser-utils.js';
 import { loadConfig } from '../../lib/config.js';
+import { getMimeType } from '../../lib/mime-types.js';
 import { error, info, success } from '../../lib/output.js';
-import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
+import { formatDownloads, formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface RunOptions {
   sessionId?: string;
@@ -190,6 +191,11 @@ export const runCommand = new Command('run')
           const result = await client.executeAction(sessionId, { type: 'goto', url });
           if (result.success) {
             console.log(success(`Navigated to ${url}`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Navigation failed'));
           }
@@ -198,6 +204,11 @@ export const runCommand = new Command('run')
           const result = await client.executeAction(sessionId, { type: 'back' });
           if (result.success) {
             console.log(success('Navigated back'));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Back failed'));
           }
@@ -206,6 +217,11 @@ export const runCommand = new Command('run')
           const result = await client.executeAction(sessionId, { type: 'forward' });
           if (result.success) {
             console.log(success('Navigated forward'));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Forward failed'));
           }
@@ -214,6 +230,11 @@ export const runCommand = new Command('run')
           const result = await client.executeAction(sessionId, { type: 'reload' });
           if (result.success) {
             console.log(success('Page reloaded'));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Reload failed'));
           }
@@ -264,6 +285,11 @@ export const runCommand = new Command('run')
               console.log('');
               console.log(formatSnapshotDiff(result.snapshot_diff));
             }
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Click failed'));
           }
@@ -285,6 +311,11 @@ export const runCommand = new Command('run')
           if (result.success) {
             const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
             console.log(success(`Filled ${target}`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Fill failed'));
           }
@@ -299,6 +330,11 @@ export const runCommand = new Command('run')
           const result = await client.executeAction(sessionId, { type: 'type', ref, text });
           if (result.success) {
             console.log(success(`Typed into ${ref}`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Type failed'));
           }
@@ -312,6 +348,11 @@ export const runCommand = new Command('run')
           const result = await client.executeAction(sessionId, { type: 'press', key });
           if (result.success) {
             console.log(success(`Pressed ${key}`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Press failed'));
           }
@@ -329,6 +370,11 @@ export const runCommand = new Command('run')
           if (result.success) {
             const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
             console.log(success(`Hovering ${target}`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Hover failed'));
           }
@@ -346,6 +392,11 @@ export const runCommand = new Command('run')
           if (result.success) {
             const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
             console.log(success(`Focused ${target}`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Focus failed'));
           }
@@ -363,6 +414,11 @@ export const runCommand = new Command('run')
           if (result.success) {
             const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
             console.log(success(`Blurred ${target}`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Blur failed'));
           }
@@ -411,6 +467,11 @@ export const runCommand = new Command('run')
           if (result.success) {
             const scope = ref ? ` (element ${ref})` : text ? ` (${text})` : '';
             console.log(success(`Scrolled ${direction} ${amount}px${scope}`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Scroll failed'));
           }
@@ -432,6 +493,11 @@ export const runCommand = new Command('run')
           if (result.success) {
             const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
             console.log(success(`Scrolled ${target} into view`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Scroll into view failed'));
           }
@@ -453,6 +519,11 @@ export const runCommand = new Command('run')
           if (result.success) {
             const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
             console.log(success(`Selected "${value}" in ${target}`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Select failed'));
           }
@@ -470,6 +541,11 @@ export const runCommand = new Command('run')
           if (result.success) {
             const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
             console.log(success(`Checked ${target}`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Check failed'));
           }
@@ -487,6 +563,11 @@ export const runCommand = new Command('run')
           if (result.success) {
             const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
             console.log(success(`Unchecked ${target}`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Uncheck failed'));
           }
@@ -500,6 +581,11 @@ export const runCommand = new Command('run')
           const result = await client.executeAction(sessionId, { type: 'wait', duration_ms });
           if (result.success) {
             console.log(success(`Waited ${duration_ms}ms`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Wait failed'));
           }
@@ -526,6 +612,11 @@ export const runCommand = new Command('run')
           });
           if (result.success) {
             console.log(success(`Selector "${selector}" is ${state}`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Wait for selector failed'));
           }
@@ -544,6 +635,11 @@ export const runCommand = new Command('run')
           });
           if (result.success) {
             console.log(success(`Page reached ${state} state`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Wait for load failed'));
           }
@@ -790,6 +886,11 @@ export const runCommand = new Command('run')
                 console.log('');
                 console.log(formatSnapshotDiff(result.snapshot_diff));
               }
+
+              if (result.downloads?.length) {
+                console.log('');
+                console.log(formatDownloads(result.downloads));
+              }
             } else {
               console.log(error(result.error || 'Relative drag failed'));
             }
@@ -842,6 +943,11 @@ export const runCommand = new Command('run')
             if (result.snapshot_diff) {
               console.log('');
               console.log(formatSnapshotDiff(result.snapshot_diff));
+            }
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
             }
           } else {
             console.log(error(result.error || 'Drag failed'));
@@ -912,6 +1018,11 @@ export const runCommand = new Command('run')
                 console.log(success('Generated TOTP code'));
               }
             }
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'MFA TOTP failed'));
           }
@@ -943,25 +1054,29 @@ export const runCommand = new Command('run')
             return;
           }
 
-          // Resolve file paths
-          const path = await import('node:path');
-          const fs = await import('node:fs');
-          const resolvedFiles: string[] = [];
+          // Resolve file paths and encode as base64
+          const pathMod = await import('node:path');
+          const fsMod = await import('node:fs');
+          const encodedFiles: FileUploadData[] = [];
           for (const filePath of files) {
-            const resolved = path.resolve(filePath);
-            if (!fs.existsSync(resolved)) {
+            const resolved = pathMod.resolve(filePath);
+            if (!fsMod.existsSync(resolved)) {
               console.log(error(`File not found: ${filePath}`));
               return;
             }
-            resolvedFiles.push(resolved);
+            encodedFiles.push({
+              name: pathMod.basename(resolved),
+              mimeType: getMimeType(resolved),
+              content: fsMod.readFileSync(resolved).toString('base64'),
+            });
           }
 
           const action: {
             type: 'set_input_files';
             ref?: string;
             text?: string;
-            files: string[];
-          } = { type: 'set_input_files', files: resolvedFiles };
+            files: FileUploadData[];
+          } = { type: 'set_input_files', files: encodedFiles };
 
           if (ref) action.ref = ref;
           if (parsed.text) action.text = parsed.text;
@@ -969,10 +1084,100 @@ export const runCommand = new Command('run')
           const result = await client.executeAction(sessionId, action);
           if (result.success) {
             const target = ref ? `element ${ref}` : `"${parsed.text}"`;
-            const fileNames = resolvedFiles.map((f) => path.basename(f)).join(', ');
+            const fileNames = encodedFiles.map((f) => f.name).join(', ');
             console.log(success(`Uploaded ${fileNames} to ${target}`));
+
+            if (result.downloads?.length) {
+              console.log('');
+              console.log(formatDownloads(result.downloads));
+            }
           } else {
             console.log(error(result.error || 'Upload failed'));
+          }
+        },
+        downloads: async (args, client, sessionId) => {
+          const jsonMode = args.includes('--json');
+          const saveIdx = args.indexOf('--save');
+          const saveDir = saveIdx !== -1 ? args[saveIdx + 1] : undefined;
+
+          try {
+            // Try action endpoint first (works for active sessions),
+            // fall back to GET endpoint (works for closed sessions)
+            let downloads: import('../../../../lib/api/browser-types.js').DownloadInfo[];
+            let total: number;
+            try {
+              const actionResult = await client.executeAction(sessionId, {
+                type: 'downloads' as const,
+              });
+              const data = actionResult.data as
+                | {
+                    downloads?: import('../../../../lib/api/browser-types.js').DownloadInfo[];
+                    count?: number;
+                  }
+                | undefined;
+              downloads = data?.downloads || [];
+              total = data?.count || downloads.length;
+            } catch {
+              const result = await client.getDownloads(sessionId);
+              downloads = result.downloads;
+              total = result.total;
+            }
+
+            if (jsonMode) {
+              console.log(JSON.stringify({ downloads, total }, null, 2));
+              return;
+            }
+
+            if (downloads.length === 0) {
+              console.log('No downloads.');
+              return;
+            }
+
+            if (saveDir) {
+              const pathMod = await import('node:path');
+              const fsMod = await import('node:fs');
+              const { downloadFile } = await import('../../lib/download.js');
+              const resolved = pathMod.resolve(saveDir);
+              fsMod.mkdirSync(resolved, { recursive: true });
+
+              console.log(`Downloads (${total}):`);
+              for (let i = 0; i < downloads.length; i++) {
+                const dl = downloads[i];
+                const destPath = pathMod.join(resolved, dl.filename);
+                try {
+                  await downloadFile(dl.url, destPath);
+                  const size =
+                    dl.size < 1024
+                      ? `${dl.size} B`
+                      : dl.size < 1024 * 1024
+                        ? `${(dl.size / 1024).toFixed(1)} KB`
+                        : `${(dl.size / (1024 * 1024)).toFixed(1)} MB`;
+                  console.log(`  ${i + 1}. ${dl.filename}  ${size}  → ${destPath}`);
+                } catch (dlErr) {
+                  console.log(
+                    error(
+                      `  ${i + 1}. ${dl.filename}  Failed: ${dlErr instanceof Error ? dlErr.message : 'download error'}`
+                    )
+                  );
+                }
+              }
+              console.log('');
+              console.log(success(`Saved to ${resolved}`));
+            } else {
+              console.log(`Downloads (${total}):`);
+              for (let i = 0; i < downloads.length; i++) {
+                const dl = downloads[i];
+                const size =
+                  dl.size < 1024
+                    ? `${dl.size} B`
+                    : dl.size < 1024 * 1024
+                      ? `${(dl.size / 1024).toFixed(1)} KB`
+                      : `${(dl.size / (1024 * 1024)).toFixed(1)} MB`;
+                console.log(`  ${i + 1}. ${dl.filename}  ${size}  ${dl.url}`);
+              }
+            }
+          } catch (err) {
+            console.log(error(err instanceof Error ? err.message : 'Failed to get downloads'));
           }
         },
       };
@@ -1142,6 +1347,8 @@ Available commands:
     evaluate <expr>         Execute JavaScript (use -r <ref> for element scope)
     get-blocks              Get recorded test steps (JSON)
     status                  Get session status (includes app_url)
+    downloads [--json] [--save <dir>]
+                            List or save downloaded files
 
   ${colors.cyan}Logs:${colors.reset}
     logs-console            Get console logs [--level <level>] [--limit <n>]

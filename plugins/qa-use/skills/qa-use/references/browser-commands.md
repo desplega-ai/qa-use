@@ -312,7 +312,28 @@ qa-use browser upload e8 /tmp/file1.pdf /tmp/file2.pdf        # Multiple files
 qa-use browser upload --text "Upload attachment" /tmp/doc.pdf # By text
 ```
 
-**Note:** File paths must exist locally. The command validates files before sending.
+**Upload encoding:** Files are read locally and sent as base64-encoded data. This works in both remote and tunnel modes — no need for the browser to have direct access to the file system.
+
+## Downloads
+
+### downloads
+
+List or save files downloaded during the browser session.
+
+```bash
+qa-use browser downloads                    # List downloads
+qa-use browser downloads --json             # Output as JSON
+qa-use browser downloads --save /tmp/dl     # Save files to directory
+qa-use browser downloads -s <id>            # Downloads from specific/closed session
+```
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output raw JSON with URLs and metadata |
+| `--save <dir>` | Download files to local directory |
+| `-s, --session-id <id>` | Specify session (default: auto-resolved) |
+
+**Download detection:** When any browser action triggers a file download (e.g., clicking a download link), the action response automatically includes download info (filename, size, presigned URL). The `downloads` command retrieves the full list.
 
 ## Inspection
 

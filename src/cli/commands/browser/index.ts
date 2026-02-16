@@ -13,6 +13,7 @@ import { clickCommand } from './click.js';
 import { closeCommand } from './close.js';
 // Session management commands
 import { createCommand } from './create.js';
+import { downloadsCommand } from './downloads.js';
 import { dragCommand } from './drag.js';
 import { evaluateCommand } from './evaluate.js';
 import { fillCommand } from './fill.js';
@@ -84,6 +85,7 @@ browserCommand.addCommand(screenshotCommand);
 browserCommand.addCommand(urlCommand);
 browserCommand.addCommand(getBlocksCommand);
 browserCommand.addCommand(logsCommand);
+browserCommand.addCommand(downloadsCommand);
 browserCommand.addCommand(generateTestCommand);
 browserCommand.addCommand(evaluateCommand);
 

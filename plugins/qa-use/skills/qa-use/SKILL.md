@@ -206,7 +206,7 @@ Sessions auto-persist in `~/.qa-use.json`. One active session = no `-s` flag nee
 | `qa-use browser scroll-into-view <ref>` | Scroll element into view |
 | `qa-use browser drag <ref> --target <ref>` | Drag element to target |
 | `qa-use browser mfa-totp [ref] <secret>` | Generate TOTP code (optionally fill) |
-| `qa-use browser upload <ref> <file>...` | Upload file(s) to input |
+| `qa-use browser upload <ref> <file>...` | Upload file(s) to input (base64-encoded, works remote & tunnel) |
 
 ### Inspection & Snapshot Diff
 
@@ -223,6 +223,8 @@ The snapshot-diff feature automatically displays DOM changes after each browser 
 - **Added elements**: Shown with `+` prefix and green color — these refs are immediately usable
 - **Modified elements**: Shown with `~` prefix and yellow color, including attribute changes (`+attrs: checked`)
 - **Removed elements**: Shown with `-` prefix and red color — do NOT use these refs
+
+**Downloads:** When an action triggers a file download (e.g., clicking a download link), the response includes download info: filename, size, and a presigned URL. Use `qa-use browser downloads` to list all downloads or `--save <dir>` to save them locally.
 
 Use diff output to interact with newly appeared elements directly, without running a full `snapshot` first.
 
@@ -260,6 +262,9 @@ Use diff output to interact with newly appeared elements directly, without runni
 | `qa-use browser logs console -s <id>` | View logs from specific/closed session |
 | `qa-use browser logs network` | View network request logs |
 | `qa-use browser logs network -s <id>` | View network logs from specific session |
+| `qa-use browser downloads` | List downloaded files from session |
+| `qa-use browser downloads --save <dir>` | Save downloaded files to local directory |
+| `qa-use browser downloads --json` | Output download info as JSON |
 
 ### Test Generation
 

@@ -2,7 +2,11 @@
  * Snapshot diff formatting utilities
  */
 
-import type { SnapshotDiff, SnapshotDiffChange } from '../../../lib/api/browser-types.js';
+import type {
+  DownloadInfo,
+  SnapshotDiff,
+  SnapshotDiffChange,
+} from '../../../lib/api/browser-types.js';
 
 const colors = {
   reset: '\x1b[0m',
@@ -73,4 +77,28 @@ function formatChange(change: SnapshotDiffChange): string {
     default:
       return `  ${refStr} ${roleStr} "${change.name}"`;
   }
+}
+
+/**
+ * Format human-readable file size
+ */
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Format download info from action results
+ */
+export function formatDownloads(downloads: DownloadInfo[]): string {
+  const lines: string[] = [];
+  lines.push(`${colors.cyan}Downloads:${colors.reset}`);
+
+  for (const dl of downloads) {
+    const size = formatSize(dl.size);
+    lines.push(`  ${dl.filename}  ${colors.gray}${size}${colors.reset}  ${dl.url}`);
+  }
+
+  return lines.join('\n');
 }

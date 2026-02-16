@@ -70,7 +70,8 @@ export type BrowserActionType =
   | 'mfa_totp'
   | 'set_input_files'
   | 'evaluate'
-  | 'relative_drag_and_drop';
+  | 'relative_drag_and_drop'
+  | 'downloads';
 
 export type ScrollDirection = 'up' | 'down' | 'left' | 'right';
 
@@ -208,6 +209,10 @@ export interface ScreenshotAction {
   type: 'screenshot';
 }
 
+export interface DownloadsAction {
+  type: 'downloads';
+}
+
 export interface DragAndDropAction {
   type: 'drag_and_drop';
   ref?: string;
@@ -223,11 +228,17 @@ export interface MfaTotpAction {
   text?: string;
 }
 
+export interface FileUploadData {
+  name: string;
+  mimeType: string;
+  content: string; // base64-encoded file contents
+}
+
 export interface SetInputFilesAction {
   type: 'set_input_files';
   ref?: string;
   text?: string;
-  files: string[];
+  files: (string | FileUploadData)[];
 }
 
 export interface EvaluateAction {
@@ -293,11 +304,19 @@ export type BrowserAction =
   | MfaTotpAction
   | SetInputFilesAction
   | EvaluateAction
-  | RelativeDragAndDropAction;
+  | RelativeDragAndDropAction
+  | DownloadsAction;
 
 // ==========================================
 // API Response Types
 // ==========================================
+
+export interface DownloadInfo {
+  filename: string;
+  url: string;
+  mime_type: string | null;
+  size: number;
+}
 
 export interface ActionResult {
   success: boolean;
@@ -308,6 +327,7 @@ export interface ActionResult {
   url_before?: string; // URL before action executed
   url_after?: string; // URL after action executed
   snapshot_diff?: SnapshotDiff; // Present when include_snapshot_diff was true
+  downloads?: DownloadInfo[] | null; // Present when action triggers file download(s)
 }
 
 export interface SnapshotFilterStats {

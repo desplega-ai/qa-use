@@ -15,6 +15,7 @@ import type {
   ConsoleLogsOptions,
   ConsoleLogsResult,
   CreateBrowserSessionOptions,
+  DownloadInfo,
   GenerateTestOptions,
   GenerateTestResult,
   NetworkLogsOptions,
@@ -279,6 +280,24 @@ export class BrowserApiClient {
   }
 
   // ==========================================
+  // Downloads
+  // ==========================================
+
+  /**
+   * Get downloads from a session
+   * @param sessionId - The session ID
+   * @returns Download info entries and total count
+   */
+  async getDownloads(sessionId: string): Promise<{ downloads: DownloadInfo[]; total: number }> {
+    try {
+      const response = await this.client.get(`/sessions/${sessionId}/downloads`);
+      return response.data as { downloads: DownloadInfo[]; total: number };
+    } catch (error) {
+      throw this.handleError(error, 'get downloads');
+    }
+  }
+
+  // ==========================================
   // Logs
   // ==========================================
 
@@ -391,6 +410,7 @@ export type {
   ConsoleLogsOptions,
   ConsoleLogsResult,
   CreateBrowserSessionOptions,
+  DownloadInfo,
   GenerateTestOptions,
   GenerateTestResult,
   NetworkLogEntry,

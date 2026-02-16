@@ -6,11 +6,13 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Command } from 'commander';
 import { BrowserApiClient } from '../../../../lib/api/browser.js';
+import type { FileUploadData } from '../../../../lib/api/browser-types.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { normalizeRef } from '../../lib/browser-utils.js';
 import { loadConfig } from '../../lib/config.js';
+import { getMimeType } from '../../lib/mime-types.js';
 import { error, success } from '../../lib/output.js';
-import { formatSnapshotDiff } from '../../lib/snapshot-diff.js';
+import { formatDownloads, formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
 interface UploadOptions {
   sessionId?: string;
@@ -49,15 +51,19 @@ export const uploadCommand = new Command('upload')
         process.exit(1);
       }
 
-      // Resolve and validate file paths
-      const resolvedFiles: string[] = [];
+      // Resolve, validate, and encode file paths as base64
+      const encodedFiles: FileUploadData[] = [];
       for (const filePath of actualFiles) {
         const resolved = path.resolve(filePath);
         if (!fs.existsSync(resolved)) {
           console.log(error(`File not found: ${filePath}`));
           process.exit(1);
         }
-        resolvedFiles.push(resolved);
+        encodedFiles.push({
+          name: path.basename(resolved),
+          mimeType: getMimeType(resolved),
+          content: fs.readFileSync(resolved).toString('base64'),
+        });
       }
 
       const config = await loadConfig();
@@ -74,16 +80,16 @@ export const uploadCommand = new Command('upload')
         client,
       });
 
-      // Build action
+      // Build action with base64-encoded files
       const action: {
         type: 'set_input_files';
         ref?: string;
         text?: string;
-        files: string[];
+        files: FileUploadData[];
         include_snapshot_diff?: boolean;
       } = {
         type: 'set_input_files',
-        files: resolvedFiles,
+        files: encodedFiles,
       };
 
       if (actualRef) {
@@ -100,12 +106,17 @@ export const uploadCommand = new Command('upload')
 
       if (result.success) {
         const target = actualRef ? `element ${normalizeRef(actualRef)}` : `"${options.text}"`;
-        const fileNames = resolvedFiles.map((f) => path.basename(f)).join(', ');
+        const fileNames = encodedFiles.map((f) => f.name).join(', ');
         console.log(success(`Uploaded ${fileNames} to ${target}`));
 
         if (result.snapshot_diff) {
           console.log('');
           console.log(formatSnapshotDiff(result.snapshot_diff));
+        }
+
+        if (result.downloads?.length) {
+          console.log('');
+          console.log(formatDownloads(result.downloads));
         }
 
         await touchSession(resolved.id);
