@@ -72,7 +72,7 @@ export class BrowserApiClient {
     try {
       const response = await this.client.post('/sessions', {
         headless: options.headless ?? true,
-        viewport: options.viewport ?? 'desktop',
+        viewport_type: options.viewport ?? 'desktop',
         timeout: options.timeout ?? 300,
         ...(options.ws_url && { ws_url: options.ws_url }),
         ...(options.record_blocks !== undefined && { record_blocks: options.record_blocks }),

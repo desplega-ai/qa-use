@@ -73,7 +73,7 @@ describe('BrowserApiClient', () => {
 
       expect(mockAxiosInstance.post).toHaveBeenCalledWith('/sessions', {
         headless: true,
-        viewport: 'desktop',
+        viewport_type: 'desktop',
         timeout: 300,
       });
       expect(session.id).toBe('session-123');
@@ -96,7 +96,7 @@ describe('BrowserApiClient', () => {
 
       expect(mockAxiosInstance.post).toHaveBeenCalledWith('/sessions', {
         headless: false,
-        viewport: 'mobile',
+        viewport_type: 'mobile',
         timeout: 600,
       });
       expect(session.id).toBe('session-456');
@@ -119,7 +119,7 @@ describe('BrowserApiClient', () => {
 
       expect(mockAxiosInstance.post).toHaveBeenCalledWith('/sessions', {
         headless: true,
-        viewport: 'desktop',
+        viewport_type: 'desktop',
         timeout: 300,
         ws_url: 'wss://tunnel.example.com/devtools/browser/abc123',
       });
@@ -136,7 +136,7 @@ describe('BrowserApiClient', () => {
 
       await client.createSession({
         headless: true,
-        viewport: 'desktop',
+        viewport_type: 'desktop',
       });
 
       const callArgs = mockAxiosInstance.post.mock.calls[0];
@@ -567,7 +567,7 @@ describe('BrowserApiClient', () => {
 
       expect(mockAxiosInstance.post).toHaveBeenCalledWith('/sessions', {
         headless: true,
-        viewport: 'desktop',
+        viewport_type: 'desktop',
         timeout: 300,
         record_blocks: true,
       });
