@@ -52,13 +52,10 @@ async function findConfigFile(): Promise<string | null> {
 /**
  * Load CLI configuration from .qa-use-tests.json
  *
- * Searches for config file in:
- * 1. Current directory
- * 2. Home directory
- *
- * Environment variables override config file values:
- * - QA_USE_API_KEY
- * - QA_USE_API_URL
+ * Priority order (highest to lowest):
+ * 1. Project config file (.qa-use-tests.json in cwd or home)
+ * 2. Environment variables (QA_USE_API_KEY, QA_USE_API_URL, etc.)
+ * 3. Built-in defaults
  */
 export async function loadConfig(): Promise<CliConfig> {
   const configPath = await findConfigFile();
@@ -84,7 +81,7 @@ export async function loadConfig(): Promise<CliConfig> {
     }
   }
 
-  // Apply env block from config (after file merge, before env override)
+  // Apply env block from config (after file merge, before env fallback)
   if (config.env) {
     for (const [key, value] of Object.entries(config.env)) {
       if (!process.env[key]) {
@@ -94,16 +91,16 @@ export async function loadConfig(): Promise<CliConfig> {
     }
   }
 
-  // Environment variables override config file
-  if (process.env.QA_USE_API_KEY) {
+  // Environment variables are fallbacks — only used when config file doesn't set the value
+  if (!config.api_key && process.env.QA_USE_API_KEY) {
     config.api_key = process.env.QA_USE_API_KEY;
   }
 
-  if (process.env.QA_USE_API_URL) {
+  if (!config.api_url && process.env.QA_USE_API_URL) {
     config.api_url = process.env.QA_USE_API_URL;
   }
 
-  if (process.env.QA_USE_DEFAULT_APP_CONFIG_ID) {
+  if (!config.default_app_config_id && process.env.QA_USE_DEFAULT_APP_CONFIG_ID) {
     config.default_app_config_id = process.env.QA_USE_DEFAULT_APP_CONFIG_ID;
   }
 
