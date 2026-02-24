@@ -152,6 +152,9 @@ export const runCommand = new Command('run')
         clearDownloadedFiles();
 
         // Run the test with SSE streaming
+        const varOverrides =
+          Object.keys(options.var).length > 0 ? options.var : undefined;
+
         const result = await runTest(
           client,
           {
@@ -164,6 +167,7 @@ export const runCommand = new Command('run')
             allow_fix: options.autofix || config.defaults?.allow_fix || false,
             capture_screenshots: options.screenshots || options.download || false,
             ws_url: wsUrl,
+            vars: varOverrides,
             agent_session_id: getAgentSessionId(),
           },
           {
