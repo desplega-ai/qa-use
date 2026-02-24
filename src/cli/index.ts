@@ -13,6 +13,12 @@ import { mcpCommand } from './commands/mcp.js';
 import { setupCommand } from './commands/setup.js';
 import { testCommand } from './commands/test/index.js';
 import { updateCommand } from './commands/update.js';
+import {
+  checkForUpdateAsync,
+  getUpdateHintForHelp,
+  shouldSkipCheck,
+  showUpdateHintIfAvailable,
+} from './lib/update-check.js';
 
 // Get version from package.json
 const require = createRequire(import.meta.url);
@@ -30,6 +36,15 @@ program.addCommand(mcpCommand);
 program.addCommand(browserCommand);
 program.addCommand(installDepsCommand);
 program.addCommand(updateCommand);
+
+// Auto-update hint (reads from cache, fires async fetch — never blocks)
+if (!shouldSkipCheck(process.argv)) {
+  showUpdateHintIfAvailable(version);
+  checkForUpdateAsync();
+}
+
+// Show update notice in --help output
+program.addHelpText('after', () => getUpdateHintForHelp(version));
 
 // Parse command line arguments
 program.parse();

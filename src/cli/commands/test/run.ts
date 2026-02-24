@@ -152,8 +152,7 @@ export const runCommand = new Command('run')
         clearDownloadedFiles();
 
         // Run the test with SSE streaming
-        const varOverrides =
-          Object.keys(options.var).length > 0 ? options.var : undefined;
+        const varOverrides = Object.keys(options.var).length > 0 ? options.var : undefined;
 
         const result = await runTest(
           client,
