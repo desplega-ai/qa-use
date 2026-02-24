@@ -4,12 +4,13 @@
  * Handles both global npm installs and local linked/dev installs.
  */
 
-import { execSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { Command } from 'commander';
 import { error, info, success, warning } from '../lib/output.js';
+import { fetchLatestVersion } from '../lib/update-check.js';
 
 // Get current version from package.json
 const require = createRequire(import.meta.url);
@@ -96,18 +97,10 @@ function runCommand(command: string, cwd?: string): boolean {
 }
 
 /**
- * Get latest version from npm registry
+ * Get latest version from npm registry (uses fetch instead of execSync)
  */
-function getLatestNpmVersion(): string | null {
-  try {
-    const result = execSync('npm view @desplega.ai/qa-use version', {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    return result.trim();
-  } catch {
-    return null;
-  }
+async function getLatestNpmVersion(): Promise<string | null> {
+  return fetchLatestVersion();
 }
 
 /**
@@ -158,11 +151,11 @@ function updateDevInstall(projectRoot: string, pull: boolean): void {
 /**
  * Handle global npm install update
  */
-function updateGlobalInstall(checkOnly: boolean): void {
+async function updateGlobalInstall(checkOnly: boolean): Promise<void> {
   console.log(info('Global npm install detected'));
   console.log(`Current version: ${currentVersion}\n`);
 
-  const latestVersion = getLatestNpmVersion();
+  const latestVersion = await getLatestNpmVersion();
   if (!latestVersion) {
     console.log(error('Failed to fetch latest version from npm'));
     process.exit(1);
@@ -214,6 +207,6 @@ export const updateCommand = new Command('update')
         console.log(warning('--pull is only applicable for dev installs'));
         console.log('');
       }
-      updateGlobalInstall(options.check ?? false);
+      await updateGlobalInstall(options.check ?? false);
     }
   });
