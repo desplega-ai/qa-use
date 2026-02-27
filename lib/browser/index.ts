@@ -19,7 +19,6 @@ export interface BrowserSession {
 
 export interface BrowserOptions {
   headless?: boolean;
-  devtools?: boolean;
   args?: string[];
   userDataDir?: string;
   isolated?: boolean;
@@ -51,7 +50,6 @@ export class BrowserManager {
     try {
       const browserServer = await chromium.launchServer({
         headless: options.headless ?? true,
-        devtools: options.devtools ?? false,
         args: [...defaultArgs, ...(options.args || [])],
         handleSIGINT: false,
         handleSIGTERM: false,
