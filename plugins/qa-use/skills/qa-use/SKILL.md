@@ -254,6 +254,22 @@ Use diff output to interact with newly appeared elements directly, without runni
 | `qa-use test diff <file>` | Compare local vs cloud test |
 | `qa-use test schema [path]` | View test definition schema |
 
+### API Operations (Dynamic OpenAPI)
+
+`qa-use api` dynamically discovers operations from `/api/v1/openapi.json` and caches metadata locally for offline fallback.
+
+| Command | Description |
+|---------|-------------|
+| `qa-use api ls` | List available `/api/v1/*` routes from OpenAPI |
+| `qa-use api ls --refresh` | Force refresh OpenAPI cache |
+| `qa-use api ls --offline` | Use cached OpenAPI metadata only |
+| `qa-use api /api/v1/tests` | Call endpoint (method inferred when possible) |
+| `qa-use api -X GET /api/v1/test-runs -f limit=5` | GET with query fields |
+| `qa-use api -X POST /api/v1/tests-actions/run --input body.json` | POST with JSON body file |
+| `qa-use api -X GET /api/v1/test-runs/<id>` | Fetch detail endpoint by ID |
+
+**No Plugin Shortcut** - Use CLI commands directly.
+
 ### Logs & Debugging
 
 | Command | Description |
