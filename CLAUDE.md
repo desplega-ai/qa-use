@@ -150,3 +150,29 @@ bun run cli browser logs network -s <session-id>
 ```
 
 **Test site:** https://evals.desplega.ai/ has various UI components (buttons, checkboxes, forms, etc.) for testing browser interactions.
+
+## E2E Testing with API CLI (Dynamic OpenAPI)
+
+Use this flow to validate API behavior through the dynamic `qa-use api` command.
+
+**Note:** `.qa-use-tests.json` is pre-configured with localhost:5005 and API key, so these commands run without extra env setup.
+
+```bash
+# Discover available API routes from OpenAPI
+bun run cli api ls --refresh
+
+# GET usage with query fields
+bun run cli api -X GET /api/v1/tests -f limit=3
+bun run cli api -X GET /api/v1/test-runs -f limit=3
+
+# Fetch resource details
+bun run cli api -X GET /api/v1/test-runs/<run-id>
+
+# Trigger test execution actions
+bun run cli api -X POST /api/v1/tests-actions/run --input /tmp/run-tests-body.json
+
+# Verify cached OpenAPI fallback mode
+bun run cli api ls --offline
+```
+
+For action endpoints (`tests-actions/*`, `test-suites-actions/*`), always follow the POST with GET status checks to confirm run progression.

@@ -93,6 +93,25 @@ The primary way to use this plugin is the **verify → explore → record → te
 
 **Note:** Commands like `test-validate`, `test-sync`, `test-diff`, `test-info`, and `test-runs` are available via CLI. See [SKILL.md](skills/qa-use/SKILL.md) for complete CLI documentation.
 
+### Dynamic API CLI
+
+The plugin also supports direct API workflows through the qa-use CLI (no slash command required):
+
+```bash
+# Discover available endpoints from live/cached OpenAPI
+qa-use api ls --refresh
+
+# Call endpoints dynamically (method inferred when possible)
+qa-use api /api/v1/tests
+qa-use api -X GET /api/v1/test-runs -f limit=5
+
+# Trigger actions
+qa-use api -X POST /api/v1/tests-actions/run --input /tmp/run-tests-body.json
+
+# Use cached OpenAPI metadata only
+qa-use api ls --offline
+```
+
 ### Common Flags for test-run
 
 - `--tunnel` - Start local browser with tunnel (required for localhost URLs!)
