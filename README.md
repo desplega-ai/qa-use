@@ -96,6 +96,27 @@ qa-use browser run                     # Interactive REPL mode
 
 Run `qa-use browser --help` for the full list of 29 browser commands.
 
+### API Commands
+
+Dynamic API access powered by live OpenAPI (`/api/v1/openapi.json`) with local cache fallback.
+
+```bash
+qa-use api ls                             # List endpoints from live/cached OpenAPI
+qa-use api /api/v1/tests                  # Call endpoint (method inferred)
+qa-use api -X POST /api/v1/tests-actions/run --input body.json
+qa-use api ls --refresh                   # Force refresh OpenAPI cache
+qa-use api ls --offline                   # Use cached OpenAPI only
+```
+
+| Command | Description |
+|---------|-------------|
+| `qa-use api ls` | List `/api/v1/*` endpoints from OpenAPI |
+| `qa-use api <path>` | Send API request to endpoint |
+| `qa-use api ... --refresh` | Force OpenAPI spec refresh |
+| `qa-use api ... --offline` | Use cached spec without network |
+
+If live spec fetch fails, qa-use falls back to the last cached spec and prints a stale-cache warning.
+
 ### Setup Commands
 
 | Command | Description |

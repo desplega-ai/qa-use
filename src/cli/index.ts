@@ -6,6 +6,7 @@
 
 import { createRequire } from 'node:module';
 import { Command } from 'commander';
+import { apiCommand } from './commands/api/index.js';
 import { browserCommand } from './commands/browser/index.js';
 import { infoCommand } from './commands/info.js';
 import { installDepsCommand } from './commands/install-deps.js';
@@ -36,6 +37,7 @@ program.addCommand(mcpCommand);
 program.addCommand(browserCommand);
 program.addCommand(installDepsCommand);
 program.addCommand(updateCommand);
+program.addCommand(apiCommand);
 
 // Auto-update hint (reads from cache, fires async fetch — never blocks)
 if (!shouldSkipCheck(process.argv)) {
