@@ -128,7 +128,7 @@ program.addCommand(myCommand);
 
 ### External API Surfaces
 
-#### A. External API v1 — `/api/v1/` (14 endpoints)
+#### A. External API v1 — `/api/v1/` (14 endpoints) ⭐ Primary Target
 
 **File:** `be/api/external_v1.py`
 **Auth:** Bearer API key, scope `admin` or `api`
@@ -150,43 +150,7 @@ program.addCommand(myCommand);
 | POST | `/api/v1/test-suites-actions/run` | Run a test suite |
 | POST | `/api/v1/tests-actions/promote` | Promote tests to different app config |
 
-#### B. Browser Protocol API v1 — `/browsers/v1/` (16 endpoints)
-
-**File:** `be/api/browser_v1.py`
-**Auth:** Bearer API key, scope `admin` or `api`
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/browsers/v1/docs.md` | Markdown API documentation (public) |
-| POST | `/browsers/v1/sessions` | Create browser session |
-| GET | `/browsers/v1/sessions` | List sessions |
-| GET | `/browsers/v1/sessions/{id}` | Get session detail |
-| DELETE | `/browsers/v1/sessions/{id}` | Close/delete session |
-| POST | `/browsers/v1/sessions/{id}/action` | Execute browser action |
-| GET | `/browsers/v1/sessions/{id}/snapshot` | Get accessibility tree |
-| GET | `/browsers/v1/sessions/{id}/screenshot` | Capture screenshot |
-| GET | `/browsers/v1/sessions/{id}/url` | Get current URL |
-| GET | `/browsers/v1/sessions/{id}/blocks` | Get recorded blocks |
-| POST | `/browsers/v1/sessions/{id}/generate-test` | Generate test from blocks |
-| GET | `/browsers/v1/sessions/{id}/logs/console` | Console logs |
-| GET | `/browsers/v1/sessions/{id}/logs/network` | Network logs (HAR) |
-| GET | `/browsers/v1/sessions/{id}/downloads` | Downloaded files |
-| GET | `/browsers/v1/sessions/{id}/uploads` | Uploaded files |
-| WS | `/browsers/v1/sessions/{id}/stream` | Real-time event stream |
-
-#### C. Playwright Reporter API — `/pw-reporter/` (6 endpoints)
-
-**File:** `be/api/pw_reporter.py`
-**Auth:** Bearer API key, scope `admin` or `pw_reporter`
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/pw-reporter/health` | Health check (public) |
-| POST | `/pw-reporter/batch` | Receive test result batch |
-| WS | `/pw-reporter/ws` | Real-time test result streaming |
-| POST | `/pw-reporter/upload` | Upload test artifact |
-| POST | `/pw-reporter/upload/chunk` | Chunked upload for large artifacts |
-| POST | `/pw-reporter/reconstruct-har/{test_run_id}` | Reconstruct HAR from chunks |
+> **Note:** The Browser Protocol API (`/browsers/v1/`, 16 endpoints) and Playwright Reporter API (`/pw-reporter/`, 6 endpoints) also exist but are already fully covered by dedicated CLI commands (`qa-use browser *`) and the Playwright reporter integration respectively. The `qa-use api` subcommand should focus on the External API v1 surface above.
 
 ### Authentication
 
@@ -213,6 +177,17 @@ docs_url = "/docs" if config.ENV == "development" else None
 redoc_url = "/redoc" if config.ENV == "development" else None
 openapi_url = "/openapi.json" if config.ENV == "development" else None
 ```
+
+#### Recommendation: Create `/api/v1/openapi.json`
+
+**Yes, we should expose an OpenAPI endpoint in production.** A dedicated `/api/v1/openapi.json` (scoped to external routes only) would be valuable for:
+
+- **`qa-use api ls` discoverability** — dynamically list available endpoints with descriptions, parameters, and response schemas instead of maintaining a static route table
+- **AI agent integration** — agents can auto-discover and call endpoints without hardcoded knowledge
+- **Third-party tooling** — users can import the spec into Postman, Insomnia, or generate client SDKs
+- **Self-documenting API** — the spec stays in sync with the actual implementation automatically
+
+**Implementation approach**: Rather than exposing the full internal OpenAPI spec, create a filtered `/api/v1/openapi.json` endpoint that only includes external-facing routes (`/api/v1/*`). This avoids leaking internal endpoints while providing full discoverability for the external API. This is a 1-line router addition in `be/api/external_v1.py` using FastAPI's `app.openapi()` with path filtering.
 
 ---
 
@@ -417,8 +392,43 @@ program.addCommand(apiCommand);
 
 ## Open Questions
 
-1. **`jq` implementation**: Should `--jq` use a WASM-compiled jq, shell out to system `jq`, or use a JS-native jq implementation (e.g., `jq-web`, `jmespath`)?
-2. **Pagination**: Desplega's APIs don't seem to use Link headers — confirm pagination pattern before implementing `--paginate`
-3. **SSE/WebSocket endpoints**: Should `qa-use api` handle SSE streaming endpoints (like `/vibe-qa/cli/run`)? Or leave those to dedicated commands?
-4. **OpenAPI in production**: Is there a security concern with exposing the full OpenAPI spec publicly? Consider a scoped spec that only exposes external routes.
-5. **Rate limiting**: Does the desplega API have rate limits that the `api` command should surface or handle?
+1. **Pagination**: The desplega API uses query-param pagination (`?page=N&page_size=M`) rather than Link headers. For `--paginate` to work nicely, we need:
+   - Detect pagination params in response (look for `total`, `page`, `page_size` fields)
+   - Auto-follow by incrementing `page` until all results are fetched
+   - Support `--slurp` to merge paginated arrays into a single output
+   - Respect existing `page_size` defaults (typically 20) unless overridden by the user
+
+2. **Output format — JSONL**: Instead of pretty-printed JSON, the default output could be **JSONL** (one JSON object per line). This is ideal for:
+   - Piping to `jq` directly (no need for built-in `--jq` — assume the user has `jq` installed)
+   - Streaming large result sets without buffering
+   - Easy grep/awk processing in shell scripts
+   - Example: `qa-use api /api/v1/tests | jq '.[] | .name'`
+   - For single objects, print compact JSON on one line. For arrays, print each element on its own line.
+   - Add `--pretty` flag for human-readable formatted JSON when needed.
+
+3. **OpenAPI in production**: Covered above — recommend creating a scoped `/api/v1/openapi.json` endpoint that only exposes external routes. This enables dynamic `api ls` and AI agent discoverability without leaking internal endpoints.
+
+## Useful Command Combos (for `--help` output)
+
+```bash
+# List all tests
+qa-use api /api/v1/tests | jq '.[].name'
+
+# Get a specific test run
+qa-use api /api/v1/test-runs/UUID
+
+# Run tests by ID
+qa-use api -X POST /api/v1/tests-actions/run -f test_ids='["id1","id2"]'
+
+# List app configs
+qa-use api /api/v1/app-configs | jq '.[] | {id, name}'
+
+# Run a test suite
+qa-use api -X POST /api/v1/test-suites-actions/run -f test_suite_id=UUID
+
+# Check test suite run status
+qa-use api /api/v1/test-suite-runs/UUID | jq '.status'
+
+# Promote tests to another app config
+qa-use api -X POST /api/v1/tests-actions/promote -f test_ids='["id1"]' -f target_app_config_id=UUID
+```
