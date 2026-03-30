@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-blue: #1600EA;
+  --color-brand-cyan: #B7F9F7;
+  --color-brand-yellow: #EBFF94;
+  --color-brand-black: #000000;
+  --color-brand-white: #FFFFFF;
+  --color-surface-code: #111111;
+  --color-surface-card: rgba(255, 255, 255, 0.06);
+  --color-border-subtle: rgba(255, 255, 255, 0.1);
+  --color-text-muted: rgba(255, 255, 255, 0.5);
+
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-brand-black);
+  color: var(--color-brand-white);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--color-brand-yellow);
+  color: var(--color-brand-black);
+}
+
+/* Code block syntax colors */
+.token-comment { color: rgba(255, 255, 255, 0.35); }
+.token-command { color: var(--color-brand-yellow); }
+.token-flag { color: var(--color-brand-cyan); }
+.token-string { color: #a8e4a0; }
+.token-key { color: var(--color-brand-cyan); }
+.token-value { color: var(--color-brand-yellow); }
+.token-action { color: #a8e4a0; }
