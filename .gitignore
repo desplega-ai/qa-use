@@ -17,3 +17,7 @@ coverage/
 
 .qa-use.json
 .qa-use-tests.json
+
+# Landing
+landing/.next/
+landing/node_modules/
