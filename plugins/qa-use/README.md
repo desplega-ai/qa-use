@@ -15,15 +15,19 @@ claude /mcp add qa-use -- npx @desplega.ai/qa-use mcp
 - Node.js 20+
 - API key from [desplega.ai](https://desplega.ai)
 
-After installation, run `qa-use info` to verify your setup:
+After installation, configure and verify your setup:
 
 ```bash
+# Headless setup (for agents and CI)
+qa-use setup --api-key <your-key>
+
+# Or interactive setup
+qa-use setup
+
+# Verify configuration
 qa-use info
-```
 
-If browsers are missing, run:
-
-```bash
+# Install browser if missing
 qa-use install-deps
 ```
 
@@ -91,7 +95,7 @@ The primary way to use this plugin is the **verify → explore → record → te
 | `/qa-use:test-init` | Initialize test directory |
 | `/qa-use:test-run [name] [flags]` | Run E2E tests |
 
-**Note:** Commands like `test-validate`, `test-sync`, `test-diff`, `test-info`, and `test-runs` are available via CLI. See [SKILL.md](skills/qa-use/SKILL.md) for complete CLI documentation.
+**Note:** Commands like `test-validate`, `test-sync`, `test-diff`, `test-info`, and `test-runs` are available via CLI. Run `qa-use docs` for complete CLI documentation, or see [SKILL.md](skills/qa-use/SKILL.md).
 
 ### Dynamic API CLI
 
@@ -131,7 +135,15 @@ The plugin provides a single unified skill:
 |-------|-------------|
 | **qa-use** | E2E testing and browser automation |
 
-See [skills/qa-use/SKILL.md](skills/qa-use/SKILL.md) for complete documentation.
+See [skills/qa-use/SKILL.md](skills/qa-use/SKILL.md) for complete documentation, or access it from the CLI:
+
+```bash
+qa-use docs                      # Main documentation
+qa-use docs --list               # List all topics
+qa-use docs browser-commands     # Browser commands reference
+qa-use docs test-format          # Test YAML specification
+qa-use docs templates            # List test templates
+```
 
 ### References
 
@@ -249,7 +261,13 @@ Create `.qa-use-tests.json` in your project root:
 }
 ```
 
-Use `qa-use setup` for interactive configuration.
+Configure via CLI:
+
+```bash
+qa-use setup --api-key <key>                   # Headless (agents/CI)
+qa-use setup --api-key <key> --test-dir ./e2e  # Custom test dir
+qa-use setup                                   # Interactive
+```
 
 ## Test Format
 

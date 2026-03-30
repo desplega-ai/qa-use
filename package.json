@@ -1,6 +1,6 @@
 {
   "name": "@desplega.ai/qa-use",
-  "version": "2.8.7",
+  "version": "2.9.0",
   "packageManager": "bun@^1.3.4",
   "description": "QA automation tool for browser testing with MCP server support",
   "type": "module",
@@ -37,10 +37,12 @@
     "test:unit": "node scripts/test-unit.js",
     "test:integration": "node scripts/test-integration.js",
     "test:coverage": "bun test --coverage --preload ./test-setup.ts",
+    "generate:docs": "tsx scripts/generate-docs.ts",
     "generate:readme": "node scripts/generate-readme-tools.js",
     "generate:types": "tsx scripts/generate-types.ts",
+    "check:docs": "tsx scripts/generate-docs.ts && git diff --exit-code src/cli/generated/docs-content.ts || (echo '❌ Docs content is stale — run bun run generate:docs and commit the result' && exit 1)",
     "release": "bun scripts/release.ts",
-    "prepublishOnly": "bun run build && bun lint && bun typecheck",
+    "prepublishOnly": "bun run generate:docs && bun run check:docs && bun run build && bun lint && bun typecheck",
     "cc:validate": "claude plugin validate ."
   },
   "keywords": [
