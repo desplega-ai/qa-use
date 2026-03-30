@@ -27,7 +27,7 @@ export function GettingStarted() {
                 { type: "blank" },
                 {
                   type: "comment",
-                  text: "# Configure your API key (get one at app.desplega.sh)",
+                  text: "# Configure your API key (get one at app.desplega.ai)",
                 },
                 { type: "command", prompt: "$", text: "qa-use setup" },
               ]}

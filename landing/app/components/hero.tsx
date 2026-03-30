@@ -30,7 +30,7 @@ export function Hero() {
             Get Started
           </a>
           <a
-            href="https://app.desplega.sh"
+            href="https://app.desplega.ai"
             className="inline-flex items-center gap-1.5 border border-brand-yellow px-5 py-2.5 text-sm font-medium uppercase tracking-wider text-brand-yellow transition-colors hover:bg-brand-yellow hover:text-brand-black"
           >
             Get API Key

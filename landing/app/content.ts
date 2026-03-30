@@ -9,7 +9,7 @@ Built by [desplega labs](https://desplega.sh) — a [desplega.ai](https://desple
 Automate browsers with 37 CLI commands. Define and run E2E tests with YAML.
 Works with Claude, Cursor, and any MCP client.
 
-- **Get API Key**: https://app.desplega.sh
+- **Get API Key**: https://app.desplega.ai
 - **GitHub**: https://github.com/desplega-ai/qa-use
 - **npm**: https://www.npmjs.com/package/@desplega.ai/qa-use
 - **Website**: https://qa-use.dev
@@ -32,7 +32,7 @@ Works with Claude, Cursor, and any MCP client.
 # Install
 npm install -g @desplega.ai/qa-use
 
-# Setup (get your API key at app.desplega.sh)
+# Setup (get your API key at app.desplega.ai)
 qa-use setup
 \`\`\`
 
@@ -114,7 +114,7 @@ A desplega.ai product (https://desplega.ai)
 Automate browsers with 37 CLI commands. Define and run E2E tests with YAML.
 Works with Claude, Cursor, and any MCP client.
 
-Get API Key: https://app.desplega.sh
+Get API Key: https://app.desplega.ai
 GitHub:      https://github.com/desplega-ai/qa-use
 npm:         https://www.npmjs.com/package/@desplega.ai/qa-use
 Website:     https://qa-use.dev
@@ -136,7 +136,7 @@ GETTING STARTED
 # Install
 $ npm install -g @desplega.ai/qa-use
 
-# Setup (get your API key at app.desplega.sh)
+# Setup (get your API key at app.desplega.ai)
 $ qa-use setup
 
 AUTOMATE A BROWSER
