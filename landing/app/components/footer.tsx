@@ -63,6 +63,15 @@ export function Footer() {
               <ul className="space-y-2">
                 <li>
                   <a
+                    href="https://app.desplega.sh"
+                    className="inline-flex items-center gap-1 text-sm text-brand-white transition-colors hover:text-brand-yellow"
+                  >
+                    Get API Key
+                    <ArrowUpRight className="h-3 w-3 text-text-muted" />
+                  </a>
+                </li>
+                <li>
+                  <a
                     href="https://desplega.ai"
                     className="inline-flex items-center gap-1 text-sm text-brand-white transition-colors hover:text-brand-yellow"
                   >

@@ -33,7 +33,7 @@ body {
 
 /* Code block syntax colors */
 .token-comment { color: rgba(255, 255, 255, 0.35); }
-.token-command { color: var(--color-brand-yellow); }
+.token-command { color: var(--color-brand-yellow); user-select: none; }
 .token-flag { color: var(--color-brand-cyan); }
 .token-string { color: #a8e4a0; }
 .token-key { color: var(--color-brand-cyan); }

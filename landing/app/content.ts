@@ -2,23 +2,27 @@ const year = new Date().getFullYear();
 
 export const markdownContent = `# qa-use
 
-> AI-first browser testing for your CI/CD pipeline
+> AI-powered browser automation and E2E testing
 
 Built by [desplega labs](https://desplega.sh) — a [desplega.ai](https://desplega.ai) product.
 
-Create, run, and manage E2E tests with YAML definitions.
-Works with Claude, VS Code Copilot, Cursor, and any MCP client.
+Automate browsers with 37 CLI commands. Define and run E2E tests with YAML.
+Works with Claude, Cursor, and any MCP client.
 
+- **Get API Key**: https://app.desplega.sh
 - **GitHub**: https://github.com/desplega-ai/qa-use
 - **npm**: https://www.npmjs.com/package/@desplega.ai/qa-use
 - **Website**: https://qa-use.dev
 
-## Features
+## Browser Automation
 
-- **AI-First Testing** — Verify features with natural language. Auto-generate tests from PRs.
-- **YAML-Based Tests** — Human-readable, version-controllable. 40+ actions, AI assertions.
-- **MCP Server** — Works with Claude, Copilot, Cursor, Gemini CLI, and any MCP client.
-- **Browser CLI** — 29+ interactive commands. REPL mode for debugging.
+- **37 CLI Commands** — Navigate, click, fill, type, hover, drag, screenshot, and more.
+- **REPL Mode** — Interactive browser sessions for exploration and debugging.
+- **Dual Targeting** — Target by accessibility refs or natural language descriptions.
+
+## E2E Testing
+
+- **YAML Test Definitions** — Human-readable, version-controllable. 40+ actions, AI assertions.
 - **Cloud Execution** — Sync tests to desplega.ai. Run in CI/CD with GitHub Actions.
 - **Self-Healing** — AI auto-fixes broken selectors. Tests adapt as your UI evolves.
 
@@ -28,43 +32,72 @@ Works with Claude, VS Code Copilot, Cursor, and any MCP client.
 # Install
 npm install -g @desplega.ai/qa-use
 
-# Setup
+# Setup (get your API key at app.desplega.sh)
 qa-use setup
-
-# Initialize tests
-qa-use test init
 \`\`\`
 
-### Write your first test
+### Automate a browser
+
+\`\`\`bash
+qa-use browser create --no-headless
+qa-use browser goto https://myapp.com
+qa-use browser snapshot
+qa-use browser click "Sign In"
+qa-use browser fill e12 "user@example.com"
+qa-use browser screenshot /tmp/shot.png
+qa-use browser close
+\`\`\`
+
+### Write a test
 
 \`\`\`yaml
 # qa-tests/login.yaml
 name: Login Test
+variables:
+  base_url: http://localhost:3000
+  email: test@example.com
+  password: secret123
 steps:
   - action: goto
-    url: /login
+    url: \$base_url/login
   - action: fill
     target: email input
-    value: test@example.com
+    value: \$email
+  - action: fill
+    target: password input
+    value: \$password
   - action: click
-    target: login button
+    target: sign in button
   - action: to_be_visible
     target: dashboard
 \`\`\`
 
 \`\`\`bash
-# Run it
-qa-use test run login
+# Run against your local app (tunnel mode)
+qa-use test run login --tunnel
 \`\`\`
 
 ## MCP Integration
 
 \`\`\`bash
-# Claude Code
-claude mcp add desplega-qa -- npx @desplega.ai/qa-use mcp
+# Add from the marketplace
+claude plugin marketplace add desplega-ai/qa-use
 
-# Standalone
+# Then install the plugin
+claude plugin install qa-use@desplega.ai
+
+# Add as MCP server
+claude mcp add desplega-qa -- npx @desplega.ai/qa-use mcp
+\`\`\`
+
+### Any other AI assistant
+
+\`\`\`bash
+# Run the MCP server
 npx @desplega.ai/qa-use mcp
+
+# Install the skill
+npx skills add https://github.com/desplega-ai/qa-use --skill qa-use
 \`\`\`
 
 ---
@@ -72,62 +105,95 @@ npx @desplega.ai/qa-use mcp
 MIT License · © ${year} desplega labs · MADE BY BUILDERS FOR BUILDERS
 `;
 
-export const plainTextContent = `qa-use — AI-first browser testing for your CI/CD pipeline
-==========================================================
+export const plainTextContent = `qa-use — AI-powered browser automation and E2E testing
+======================================================
 
 Built by desplega labs (https://desplega.sh)
 A desplega.ai product (https://desplega.ai)
 
-Create, run, and manage E2E tests with YAML definitions.
-Works with Claude, VS Code Copilot, Cursor, and any MCP client.
+Automate browsers with 37 CLI commands. Define and run E2E tests with YAML.
+Works with Claude, Cursor, and any MCP client.
 
-GitHub:  https://github.com/desplega-ai/qa-use
-npm:     https://www.npmjs.com/package/@desplega.ai/qa-use
-Website: https://qa-use.dev
+Get API Key: https://app.desplega.sh
+GitHub:      https://github.com/desplega-ai/qa-use
+npm:         https://www.npmjs.com/package/@desplega.ai/qa-use
+Website:     https://qa-use.dev
 
-FEATURES
---------
-- AI-First Testing    Verify features with natural language. Auto-generate tests from PRs.
-- YAML-Based Tests    Human-readable, version-controllable. 40+ actions, AI assertions.
-- MCP Server          Works with Claude, Copilot, Cursor, Gemini CLI, and any MCP client.
-- Browser CLI         29+ interactive commands. REPL mode for debugging.
-- Cloud Execution     Sync tests to desplega.ai. Run in CI/CD with GitHub Actions.
-- Self-Healing        AI auto-fixes broken selectors. Tests adapt as your UI evolves.
+BROWSER AUTOMATION
+------------------
+- 37 CLI Commands    Navigate, click, fill, type, hover, drag, screenshot, and more.
+- REPL Mode          Interactive browser sessions for exploration and debugging.
+- Dual Targeting     Target by accessibility refs or natural language descriptions.
+
+E2E TESTING
+-----------
+- YAML Test Definitions   Human-readable, version-controllable. 40+ actions, AI assertions.
+- Cloud Execution         Sync tests to desplega.ai. Run in CI/CD with GitHub Actions.
+- Self-Healing            AI auto-fixes broken selectors. Tests adapt as your UI evolves.
 
 GETTING STARTED
 ---------------
 # Install
 $ npm install -g @desplega.ai/qa-use
 
-# Setup
+# Setup (get your API key at app.desplega.sh)
 $ qa-use setup
 
-# Initialize tests
-$ qa-use test init
+AUTOMATE A BROWSER
+------------------
+$ qa-use browser create --no-headless
+$ qa-use browser goto https://myapp.com
+$ qa-use browser snapshot
+$ qa-use browser click "Sign In"
+$ qa-use browser fill e12 "user@example.com"
+$ qa-use browser screenshot /tmp/shot.png
+$ qa-use browser close
 
-# Create a test (qa-tests/login.yaml)
+WRITE A TEST
+------------
+# qa-tests/login.yaml
 name: Login Test
+variables:
+  base_url: http://localhost:3000
+  email: test@example.com
+  password: secret123
 steps:
   - action: goto
-    url: /login
+    url: \$base_url/login
   - action: fill
     target: email input
-    value: test@example.com
+    value: \$email
+  - action: fill
+    target: password input
+    value: \$password
   - action: click
-    target: login button
+    target: sign in button
   - action: to_be_visible
     target: dashboard
 
-# Run it
-$ qa-use test run login
+# Run against your local app (tunnel mode)
+$ qa-use test run login --tunnel
 
 MCP INTEGRATION
 ---------------
-# Claude Code
+CLAUDE
+------
+# Add from the marketplace
+$ claude plugin marketplace add desplega-ai/qa-use
+
+# Then install the plugin
+$ claude plugin install qa-use@desplega.ai
+
+# Add as MCP server
 $ claude mcp add desplega-qa -- npx @desplega.ai/qa-use mcp
 
-# Standalone
+ANY OTHER AI ASSISTANT
+----------------------
+# Run the MCP server
 $ npx @desplega.ai/qa-use mcp
+
+# Install the skill
+$ npx skills add https://github.com/desplega-ai/qa-use --skill qa-use
 
 ---
 MIT License · © ${year} desplega labs

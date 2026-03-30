@@ -222,8 +222,11 @@ jobs:
 Use the qa-use plugin with Claude Code to automatically verify PRs:
 
 ```bash
-# Install the qa-use plugin
-claude plugin install @desplega.ai/qa-use
+# Add from the marketplace
+claude plugin marketplace add desplega-ai/qa-use
+
+# Then install the plugin
+claude plugin install qa-use@desplega.ai
 
 # Verify a feature works
 /qa-use:verify "the login form accepts valid credentials"
@@ -239,8 +242,14 @@ See [SETUP.md](./SETUP.md) for advanced CI workflows including AI-assisted test 
 qa-use includes a Claude Code plugin for AI-assisted testing workflows:
 
 ```bash
-# Install the plugin
-claude plugin install @desplega.ai/qa-use
+# Add from the marketplace
+claude plugin marketplace add desplega-ai/qa-use
+
+# Then install the plugin
+claude plugin install qa-use@desplega.ai
+
+# Install the skill
+npx skills add https://github.com/desplega-ai/qa-use --skill qa-use
 ```
 
 **Available skills:**

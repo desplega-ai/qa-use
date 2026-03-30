@@ -1,23 +1,26 @@
-const features = [
+const browserFeatures = [
   {
-    title: "AI-First Testing",
+    title: "37 CLI Commands",
     description:
-      "Verify features with natural language. Auto-generate tests from PRs. Let AI explore your app and find what breaks.",
+      "Navigate, click, fill, type, hover, drag, screenshot, and more. Full Playwright power from the terminal.",
   },
   {
-    title: "YAML-Based Tests",
+    title: "REPL Mode",
     description:
-      "Human-readable, version-controllable test definitions. 40+ actions, AI assertions, variable interpolation.",
+      "Interactive browser sessions for exploration and debugging. Auto-snapshot diffs after every action.",
   },
   {
-    title: "MCP Server",
+    title: "Dual Targeting",
     description:
-      "Works with Claude, VS Code Copilot, Cursor, Gemini CLI, and any MCP-compatible AI client out of the box.",
+      "Target elements by accessibility refs (fast) or natural language descriptions (AI-powered semantic selection).",
   },
+];
+
+const testingFeatures = [
   {
-    title: "Browser CLI",
+    title: "YAML Test Definitions",
     description:
-      "29+ interactive commands for manual testing and debugging. REPL mode for rapid exploration.",
+      "Human-readable, version-controllable. 40+ actions, AI assertions, variable interpolation.",
   },
   {
     title: "Cloud Execution",
@@ -31,28 +34,48 @@ const features = [
   },
 ];
 
+function FeatureGrid({
+  label,
+  features,
+}: {
+  label: string;
+  features: { title: string; description: string }[];
+}) {
+  return (
+    <div>
+      <h3 className="mb-4 font-mono text-base tracking-wide text-brand-cyan">
+        ## {label}
+      </h3>
+      <div className="grid gap-px border border-border-subtle md:grid-cols-2 lg:grid-cols-3">
+        {features.map((feature) => (
+          <div
+            key={feature.title}
+            className="border border-border-subtle p-8 transition-colors hover:border-brand-yellow/30"
+          >
+            <h4 className="mb-3 font-mono text-lg font-medium text-brand-white">
+              {feature.title}
+            </h4>
+            <p className="text-sm leading-relaxed text-text-muted">
+              {feature.description}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Features() {
   return (
     <section className="px-6 py-24 md:py-36">
       <div className="mx-auto max-w-5xl">
-        <h2 className="mb-4 font-mono text-sm tracking-wide text-brand-cyan">
-          Features
+        <h2 className="mb-12 font-mono text-lg tracking-wide text-brand-cyan">
+          # Features
         </h2>
 
-        <div className="grid gap-px border border-border-subtle md:grid-cols-2 lg:grid-cols-3">
-          {features.map((feature) => (
-            <div
-              key={feature.title}
-              className="border border-border-subtle p-8 transition-colors hover:border-brand-yellow/30"
-            >
-              <h3 className="mb-3 text-lg font-medium text-brand-white">
-                {feature.title}
-              </h3>
-              <p className="text-sm leading-relaxed text-text-muted">
-                {feature.description}
-              </p>
-            </div>
-          ))}
+        <div className="space-y-16">
+          <FeatureGrid label="Browser Automation" features={browserFeatures} />
+          <FeatureGrid label="E2E Testing" features={testingFeatures} />
         </div>
       </div>
     </section>

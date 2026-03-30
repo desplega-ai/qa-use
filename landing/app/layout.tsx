@@ -13,12 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "qa-use — AI-first browser testing for your CI/CD pipeline",
+  title: "qa-use — AI-powered browser automation and E2E testing",
   description:
-    "Create, run, and manage E2E tests with YAML definitions. Works with Claude, VS Code Copilot, Cursor, and any MCP client. Built by desplega labs.",
+    "Automate browsers with 37 CLI commands. Define and run E2E tests with YAML. Works with Claude, Cursor, and any MCP client. Built by desplega labs.",
   metadataBase: new URL("https://qa-use.dev"),
   keywords: [
     "qa-use",
+    "browser automation",
     "browser testing",
     "E2E testing",
     "end-to-end testing",
@@ -35,9 +36,9 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "desplega labs", url: "https://desplega.sh" }],
   openGraph: {
-    title: "qa-use — AI-first browser testing",
+    title: "qa-use — Browser automation and E2E testing",
     description:
-      "Create, run, and manage E2E tests with YAML definitions. Works with Claude, VS Code Copilot, Cursor, and any MCP client.",
+      "Automate browsers with 37 CLI commands. Define and run E2E tests with YAML. Works with Claude, Cursor, and any MCP client.",
     url: "https://qa-use.dev",
     siteName: "qa-use",
     type: "website",
@@ -45,9 +46,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "qa-use — AI-first browser testing",
+    title: "qa-use — Browser automation and E2E testing",
     description:
-      "E2E tests with YAML. Works with Claude, Copilot, Cursor, and any MCP client.",
+      "Automate browsers with 37 CLI commands. E2E tests with YAML. Works with Claude, Cursor, and any MCP client.",
   },
   robots: {
     index: true,
@@ -74,7 +75,7 @@ export default function RootLayout({
               "@type": "SoftwareApplication",
               name: "qa-use",
               description:
-                "AI-first browser testing CLI for E2E test management using YAML definitions and MCP server integration.",
+                "AI-powered browser automation and E2E testing CLI. 37 browser commands, YAML test definitions, and MCP server integration.",
               url: "https://qa-use.dev",
               applicationCategory: "DeveloperApplication",
               operatingSystem: "macOS, Linux, Windows",
