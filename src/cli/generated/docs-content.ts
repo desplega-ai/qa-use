@@ -24,6 +24,33 @@ Plugin commands (slash commands like \`/qa-use:verify\`) are **convenience short
 - **CLI Workflow**: Step-by-step CLI commands (works for ALL harnesses)
 - **Plugin Shortcut**: Optional slash command (convenience)
 
+## Setup & Configuration
+
+Before using any qa-use commands, verify configuration is in place:
+
+\`\`\`bash
+# Check current configuration (no-op if already configured)
+qa-use setup
+
+# Configure with API key (validates against server)
+qa-use setup --api-key <key>
+
+# View full configuration details
+qa-use info
+\`\`\`
+
+**Environment Variables (alternative to config file):**
+
+| Variable | Description |
+|----------|-------------|
+| \`QA_USE_API_KEY\` | API key for authentication |
+| \`QA_USE_REGION\` | Region: \`us\` (default) or \`auto\` |
+| \`QA_USE_API_URL\` | Override API base URL |
+
+**Config file:** \`.qa-use-tests.json\` in the project directory or \`~/.qa-use.json\` in the home directory. Environment variables take precedence.
+
+**If you encounter "API key not configured", 401, or auth errors:** Run \`qa-use setup\` to check config state. NEVER fabricate or guess API keys.
+
 ## Core Workflow
 
 ### 1. Browser Control & Session Lifecycle
@@ -577,13 +604,17 @@ qa-use browser goto https://example.com --ws-url ws://localhost:12345/browser/ab
 
 ## Deep-Dive References
 
-| Document | Description |
-|----------|-------------|
-| [browser-commands.md](references/browser-commands.md) | Complete browser CLI reference with all flags |
-| [test-format.md](references/test-format.md) | Full test YAML specification |
-| [localhost-testing.md](references/localhost-testing.md) | Tunnel setup for local development |
-| [failure-debugging.md](references/failure-debugging.md) | Failure classification and diagnostics |
-| [ci.md](references/ci.md) | CI/CD integration patterns and examples |
+Access any reference at runtime via the CLI: \`qa-use docs <topic>\`
+
+| Topic | CLI Command | Description |
+|-------|-------------|-------------|
+| [browser-commands.md](references/browser-commands.md) | \`qa-use docs browser-commands\` | Complete browser CLI reference with all flags |
+| [test-format.md](references/test-format.md) | \`qa-use docs test-format\` | Full test YAML specification |
+| [localhost-testing.md](references/localhost-testing.md) | \`qa-use docs localhost-testing\` | Tunnel setup for local development |
+| [failure-debugging.md](references/failure-debugging.md) | \`qa-use docs failure-debugging\` | Failure classification and diagnostics |
+| [ci.md](references/ci.md) | \`qa-use docs ci\` | CI/CD integration patterns and examples |
+
+Use \`qa-use docs --list\` to discover all available topics and templates.
 
 ## Templates
 
@@ -632,6 +663,38 @@ See [references/test-format.md](references/test-format.md) for complete specific
 | Testing localhost without \`--tunnel\` | Use \`--tunnel\` flag |
 | \`test sync --pull\` | \`test sync pull\` (subcommand, not flag) |
 | \`test sync --push\` | \`test sync push\` (subcommand, not flag) |
+
+## Troubleshooting
+
+When stuck or encountering unexpected errors, use the built-in documentation:
+
+\`\`\`bash
+# Check configuration state
+qa-use setup
+
+# Browse main documentation
+qa-use docs
+
+# List all available topics
+qa-use docs --list
+
+# Access specific topic
+qa-use docs <topic>
+\`\`\`
+
+| Situation | Command |
+|-----------|---------|
+| Auth / API key errors | \`qa-use setup\` then \`qa-use docs\` |
+| Unknown browser command | \`qa-use docs browser-commands\` |
+| Test failures | \`qa-use docs failure-debugging\` |
+| Localhost / tunnel issues | \`qa-use docs localhost-testing\` |
+| Test YAML syntax | \`qa-use docs test-format\` |
+| CI/CD setup | \`qa-use docs ci\` |
+
+**Key rules:**
+- ALWAYS consult \`qa-use docs\` before improvising workarounds
+- NEVER fabricate API keys, tokens, URLs, or credentials
+- If \`qa-use setup\` shows no config, report it — don't guess
 
 ## npx Alternative
 
@@ -1141,6 +1204,10 @@ qa-use browser click e3
 
 # Watch the browser respond in real-time
 \`\`\`
+
+---
+
+> **Runtime access:** \`qa-use docs browser-commands\` | All topics: \`qa-use docs --list\`
 `,
   },
   ci: {
@@ -1485,6 +1552,10 @@ After verification, session artifacts are available:
 | "No login test found" | Either upload a login test or the command will proceed without auth |
 | "Session creation failed" | Check if \`QA_USE_API_KEY\` is valid and not expired |
 | "gh: command not found" | \`gh\` should be pre-installed; ensure checkout step runs first |
+
+---
+
+> **Runtime access:** \`qa-use docs ci\` | All topics: \`qa-use docs --list\`
 `,
   },
   'failure-debugging': {
@@ -1723,6 +1794,10 @@ git diff qa-tests/my-test.yaml
 - Major workflow changes
 - Missing features
 - Authentication issues
+
+---
+
+> **Runtime access:** \`qa-use docs failure-debugging\` | All topics: \`qa-use docs --list\`
 `,
   },
   'localhost-testing': {
@@ -1915,6 +1990,10 @@ qa-use browser goto http://localhost:3000
 4. **Save WebSocket URL** - Copy it from tunnel output for reuse in \`--ws-url\`
 
 5. **Clean up sessions** - Run \`qa-use browser close\` when done to free resources
+
+---
+
+> **Runtime access:** \`qa-use docs localhost-testing\` | All topics: \`qa-use docs --list\`
 `,
   },
   'test-format': {
@@ -2290,6 +2369,10 @@ Configure the test directory in \`.qa-use-tests.json\`:
   "test_directory": "./qa-tests"
 }
 \`\`\`
+
+---
+
+> **Runtime access:** \`qa-use docs test-format\` | All topics: \`qa-use docs --list\`
 `,
   },
 };

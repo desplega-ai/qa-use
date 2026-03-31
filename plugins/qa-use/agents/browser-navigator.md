@@ -36,14 +36,19 @@ Execute multi-step browsing tasks by cycling through snapshot → analyze → ac
 
 ## Methodology
 
-1. **Ensure browser session exists**
+1. **Check prerequisites**
+   - Run: `qa-use setup` (no args) — if configured, prints current config and exits
+   - If NOT configured: report "qa-use is not configured. Run `qa-use setup --api-key <key>` to configure." and stop
+   - NEVER fabricate or guess API keys
+
+2. **Ensure browser session exists**
    - Check for active session: `qa-use browser list`
    - If none exists, create one with the start URL: `qa-use browser create --viewport desktop <start_url>`
 
-2. **Navigate to start_url** (only if reusing an existing session)
+3. **Navigate to start_url** (only if reusing an existing session)
    - Run: `qa-use browser goto <start_url>`
 
-3. **Loop until goal achieved or max_steps**
+4. **Loop until goal achieved or max_steps**
    a. **Get page state**:
       - **First iteration or after navigation**: Run `qa-use browser snapshot --interactive --max-depth 5`
       - **After an action with diff output**: Use the diff output directly if it contains the refs you need. Only run `snapshot` if you need to find elements not shown in the diff.
@@ -51,7 +56,7 @@ Execute multi-step browsing tasks by cycling through snapshot → analyze → ac
    c. **Execute**: Run best action (click, scroll, fill)
    d. **Check diff**: Review the snapshot diff output. Did the action succeed? Are target elements visible in the diff? If yes, proceed without a full snapshot.
 
-4. **Return structured findings**
+5. **Return structured findings**
 
 ## Output Format
 
@@ -123,11 +128,36 @@ If CAPTCHA is encountered:
 - Provide: screenshot if available
 - DO NOT attempt to solve or bypass CAPTCHA
 
+### Configuration / Auth Errors
+If any command fails with "API key not configured", "401", or "unauthorized":
+- Run: `qa-use setup` to check current configuration state
+- Run: `qa-use docs` to review environment variable documentation
+- Report the error clearly — do NOT attempt to fix by guessing credentials
+- NEVER fabricate API keys, tokens, or passwords
+
 ### Page Load Failures
 If page fails to load:
 - Retry once after brief wait
 - Report: "Page failed to load: <error>"
 - Suggest checking network/URL
+
+## Self-Help & Troubleshooting
+
+When stuck or encountering unexpected errors, use the built-in documentation before guessing:
+
+| Situation | Command | What it provides |
+|-----------|---------|------------------|
+| Configuration issues | `qa-use setup` | Shows current config state (API key, test dir) |
+| Environment variables | `qa-use docs` | Main docs with env var reference (QA_USE_API_KEY, etc.) |
+| Unknown browser command | `qa-use docs browser-commands` | Complete browser CLI reference with all flags |
+| Localhost/tunnel problems | `qa-use docs localhost-testing` | Tunnel setup and troubleshooting |
+| Test failures | `qa-use docs failure-debugging` | Failure classification and diagnostics |
+| Discover all topics | `qa-use docs --list` | Lists all available documentation topics |
+
+**Key rules:**
+- ALWAYS consult `qa-use docs` before improvising workarounds
+- NEVER hallucinate API keys, tokens, URLs, or credentials
+- If `qa-use setup` shows no config, report it and stop — don't try to fix it yourself
 
 ## Constraints
 

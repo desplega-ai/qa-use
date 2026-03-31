@@ -151,6 +151,13 @@ Remove redundant steps:
 - SAVE tests to `qa-tests/` directory by default
 - FOLLOW existing test format in the project (check for `qa-tests/*.yaml` examples)
 
+## Troubleshooting
+
+If commands fail with configuration or auth errors ("API key not configured", 401, unauthorized):
+- Run `qa-use setup` to verify current configuration state
+- Run `qa-use docs` for environment variable and setup documentation
+- NEVER guess or fabricate API keys, tokens, or credentials
+
 ## Example Session
 
 ```

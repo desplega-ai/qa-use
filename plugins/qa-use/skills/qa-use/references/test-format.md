@@ -369,3 +369,7 @@ Configure the test directory in `.qa-use-tests.json`:
   "test_directory": "./qa-tests"
 }
 ```
+
+---
+
+> **Runtime access:** `qa-use docs test-format` | All topics: `qa-use docs --list`

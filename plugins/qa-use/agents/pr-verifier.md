@@ -216,6 +216,7 @@ When complete, output:
 
 | Scenario | Action |
 |----------|--------|
+| Config/auth error (401, "API key not configured") | Run `qa-use setup` to check config, `qa-use docs` for env vars. Never guess keys. |
 | No login test found | Proceed without auth, note in report |
 | Session creation fails | Report error and exit |
 | Navigation blocked | Note blocker, continue to next feature |

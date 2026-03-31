@@ -186,3 +186,7 @@ qa-use browser goto http://localhost:3000
 4. **Save WebSocket URL** - Copy it from tunnel output for reuse in `--ws-url`
 
 5. **Clean up sessions** - Run `qa-use browser close` when done to free resources
+
+---
+
+> **Runtime access:** `qa-use docs localhost-testing` | All topics: `qa-use docs --list`

@@ -60,6 +60,13 @@ Or use an AI action:
 - `value: fill the email field with $email`
 ```
 
+## Reference Documentation
+
+When analyzing failures, consult built-in docs for additional context:
+- `qa-use docs failure-debugging` — failure classification (CODE BUG vs TEST BUG vs ENVIRONMENT) and diagnostic steps
+- `qa-use docs browser-commands` — complete browser CLI reference
+- `qa-use docs --list` — discover all available documentation topics
+
 ## Constraints
 
 - ALWAYS provide specific, actionable recommendations

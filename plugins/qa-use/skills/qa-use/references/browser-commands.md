@@ -495,3 +495,7 @@ qa-use browser click e3
 
 # Watch the browser respond in real-time
 ```
+
+---
+
+> **Runtime access:** `qa-use docs browser-commands` | All topics: `qa-use docs --list`

@@ -232,3 +232,7 @@ git diff qa-tests/my-test.yaml
 - Major workflow changes
 - Missing features
 - Authentication issues
+
+---
+
+> **Runtime access:** `qa-use docs failure-debugging` | All topics: `qa-use docs --list`

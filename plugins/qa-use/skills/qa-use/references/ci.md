@@ -338,3 +338,7 @@ After verification, session artifacts are available:
 | "No login test found" | Either upload a login test or the command will proceed without auth |
 | "Session creation failed" | Check if `QA_USE_API_KEY` is valid and not expired |
 | "gh: command not found" | `gh` should be pre-installed; ensure checkout step runs first |
+
+---
+
+> **Runtime access:** `qa-use docs ci` | All topics: `qa-use docs --list`
