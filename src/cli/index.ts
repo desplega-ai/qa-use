@@ -76,8 +76,7 @@ Command Groups:
 
 Common Workflows:
   # Verify a feature in the browser
-  qa-use browser create --no-headless
-  qa-use browser goto https://your-app.com
+  qa-use browser create --no-headless https://your-app.com
   qa-use browser snapshot
   qa-use browser click <ref>
   qa-use browser close

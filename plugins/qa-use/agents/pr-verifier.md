@@ -72,10 +72,10 @@ Store: `LOGIN_TEST_ID` (first match, or empty if none)
 ```bash
 # With login test (preferred)
 qa-use browser create --after-test-id <LOGIN_TEST_ID> --viewport desktop \
-  --var base_url=<base_url>
+  --var base_url=<base_url> <base_url>
 
 # Without login test (fallback)
-qa-use browser create --viewport desktop
+qa-use browser create --viewport desktop <base_url>
 ```
 
 Store: `SESSION_ID`

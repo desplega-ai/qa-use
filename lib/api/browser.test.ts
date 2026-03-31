@@ -411,17 +411,18 @@ describe('BrowserApiClient', () => {
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3);
     });
 
-    it('should throw error if session is closed', async () => {
+    it('should return session if status is closed', async () => {
       const closedSession = {
         id: 'session-123',
         status: 'closed',
         created_at: '2026-01-23T10:00:00Z',
+        error_message: 'Connection failed',
       };
       mockAxiosInstance.get.mockResolvedValueOnce({ data: closedSession });
 
-      await expect(client.waitForStatus('session-123', 'active', 5000, 100)).rejects.toThrow(
-        'closed'
-      );
+      const result = await client.waitForStatus('session-123', 'active', 5000, 100);
+      expect(result.status).toBe('closed');
+      expect(result.error_message).toBe('Connection failed');
     });
   });
 
@@ -585,6 +586,64 @@ describe('BrowserApiClient', () => {
 
       const callArgs = mockAxiosInstance.post.mock.calls[0];
       expect(callArgs[1]).not.toHaveProperty('record_blocks');
+    });
+  });
+
+  describe('createSession with start_url', () => {
+    it('should create session with start_url', async () => {
+      const mockSession = {
+        id: 'session-url',
+        status: 'starting',
+        created_at: '2026-01-24T10:00:00Z',
+      };
+      mockAxiosInstance.post.mockResolvedValueOnce({ data: mockSession });
+
+      await client.createSession({
+        start_url: 'https://example.com/dashboard',
+      });
+
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/sessions', {
+        headless: true,
+        viewport_type: 'desktop',
+        timeout: 300,
+        start_url: 'https://example.com/dashboard',
+      });
+    });
+
+    it('should not include start_url when not provided', async () => {
+      const mockSession = {
+        id: 'session-no-url',
+        status: 'starting',
+        created_at: '2026-01-24T10:00:00Z',
+      };
+      mockAxiosInstance.post.mockResolvedValueOnce({ data: mockSession });
+
+      await client.createSession({});
+
+      const callArgs = mockAxiosInstance.post.mock.calls[0];
+      expect(callArgs[1]).not.toHaveProperty('start_url');
+    });
+
+    it('should combine start_url with after_test_id', async () => {
+      const mockSession = {
+        id: 'session-combo',
+        status: 'starting',
+        created_at: '2026-01-24T10:00:00Z',
+      };
+      mockAxiosInstance.post.mockResolvedValueOnce({ data: mockSession });
+
+      await client.createSession({
+        after_test_id: 'test-uuid-123',
+        start_url: 'https://example.com/dashboard',
+      });
+
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/sessions', {
+        headless: true,
+        viewport_type: 'desktop',
+        timeout: 300,
+        after_test_id: 'test-uuid-123',
+        start_url: 'https://example.com/dashboard',
+      });
     });
   });
 });

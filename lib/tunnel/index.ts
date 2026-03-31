@@ -144,11 +144,21 @@ export class TunnelManager {
     if (!this.session) return false;
 
     try {
+      // Strip credentials from URL — fetch() rejects URLs with embedded credentials
+      const url = new URL(this.session.publicUrl);
+      const headers: Record<string, string> = {};
+      if (url.username || url.password) {
+        headers.Authorization = `Basic ${Buffer.from(`${url.username}:${url.password}`).toString('base64')}`;
+        url.username = '';
+        url.password = '';
+      }
+
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
 
-      const response = await fetch(this.session.publicUrl, {
+      const response = await fetch(url.toString(), {
         method: 'HEAD',
+        headers,
         signal: controller.signal,
       });
 

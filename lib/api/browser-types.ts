@@ -19,6 +19,7 @@ export interface CreateBrowserSessionOptions {
   after_test_id?: string; // Run a test before session becomes interactive
   vars?: Record<string, string>; // Variable overrides for after_test_id test
   agent_session_id?: string; // Link to agent session for UI grouping
+  start_url?: string; // URL to navigate to after session is ready
 }
 
 export interface BrowserSession {

@@ -36,12 +36,14 @@ interface StartAutomatedSessionParams {
   task: string;
   dependencyId?: string;
   headless?: boolean;
+  startUrl?: string;
 }
 
 interface StartDevSessionParams {
   url?: string;
   task: string;
   headless?: boolean;
+  startUrl?: string;
 }
 
 interface MonitorSessionParams {
@@ -728,6 +730,10 @@ ${status === 'idle' ? '⏸️ **Paused**: Session is idle, may need intervention
                   description:
                     'Run browser in headless mode (default: false for better visibility)',
                 },
+                startUrl: {
+                  type: 'string',
+                  description: 'URL to navigate to after session is ready (overrides default page)',
+                },
               },
               required: ['task'],
             },
@@ -753,6 +759,10 @@ ${status === 'idle' ? '⏸️ **Paused**: Session is idle, may need intervention
                   type: 'boolean',
                   description:
                     'Run browser in headless mode (default: false for development visibility)',
+                },
+                startUrl: {
+                  type: 'string',
+                  description: 'URL to navigate to after session is ready',
                 },
               },
               required: ['task'],
@@ -1259,7 +1269,7 @@ ${status === 'idle' ? '⏸️ **Paused**: Session is idle, may need intervention
     params: StartAutomatedSessionParams
   ): Promise<CallToolResult> {
     try {
-      const { url, task, dependencyId, headless = false } = params;
+      const { url, task, dependencyId, headless = false, startUrl } = params;
 
       // Ensure API key is set
       const initResult = await this.ensureInitialized();
@@ -1281,6 +1291,7 @@ ${status === 'idle' ? '⏸️ **Paused**: Session is idle, may need intervention
           task,
           wsUrl,
           dependencyId,
+          startUrl,
           devMode: false, // Automated session
         });
 
@@ -1338,7 +1349,7 @@ ${status === 'idle' ? '⏸️ **Paused**: Session is idle, may need intervention
 
   private async handleStartDevSession(params: StartDevSessionParams): Promise<CallToolResult> {
     try {
-      const { url, task, headless = false } = params;
+      const { url, task, headless = false, startUrl } = params;
 
       // Ensure API key is set
       const initResult = await this.ensureInitialized();
@@ -1360,6 +1371,7 @@ ${status === 'idle' ? '⏸️ **Paused**: Session is idle, may need intervention
           url,
           task,
           wsUrl,
+          startUrl,
           devMode: true, // Development session
         });
 
@@ -2571,12 +2583,12 @@ Search and list all sessions (automated tests and development sessions) with pag
 
 ### start_automated_session
 Start an automated E2E test session for QA flows. Returns sessionId for monitoring.
-- **Parameters**: task (required), url, dependencyId, headless (optional)
+- **Parameters**: task (required), url, dependencyId, headless, startUrl (optional)
 - **Usage**: Run automated tests that execute without user interaction
 
 ### start_dev_session
 Start an interactive development session for debugging and exploration.
-- **Parameters**: task (required), url, headless (optional)
+- **Parameters**: task (required), url, headless, startUrl (optional)
 - **Usage**: Manual testing and debugging with browser control
 
 ### monitor_session

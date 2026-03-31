@@ -179,6 +179,7 @@ The plugin wraps the `qa-use browser` CLI:
 
 ```bash
 # Session management
+qa-use browser create https://example.com         # Create and navigate to URL
 qa-use browser create --viewport desktop
 qa-use browser create --tunnel          # For localhost
 qa-use browser list

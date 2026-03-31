@@ -69,6 +69,7 @@ export interface CreateSessionOptions {
   dependencyId?: string;
   devMode?: boolean;
   region?: string;
+  startUrl?: string;
 }
 
 export interface CreateSessionResponse {
@@ -444,6 +445,7 @@ export class ApiClient {
         task: options.task,
         ws_url: options.wsUrl,
         dep_id: options.dependencyId,
+        start_url: options.startUrl,
         source: 'mcp',
         autopilot: true,
         use_storage_path: false,

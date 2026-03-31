@@ -120,11 +120,8 @@ Use this flow to manually test browser API functionality against a local backend
 ```bash
 # No env setup required - .qa-use-tests.json handles it
 
-# Create a browser session (--no-headless to see the browser)
-bun run cli browser create --no-headless
-
-# Navigate to test site
-bun run cli browser goto https://evals.desplega.ai/
+# Create a browser session and navigate to test site (--no-headless to see the browser)
+bun run cli browser create --no-headless https://evals.desplega.ai/
 
 # Get page snapshot (shows ARIA tree with element refs)
 bun run cli browser snapshot

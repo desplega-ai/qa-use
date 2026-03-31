@@ -26,6 +26,7 @@ interface CreateOptions {
   subdomain?: string;
   afterTestId?: string;
   var?: Record<string, string>;
+  startUrl?: string;
 }
 
 function collectVars(value: string, previous: Record<string, string>) {
@@ -35,6 +36,7 @@ function collectVars(value: string, previous: Record<string, string>) {
 
 export const createCommand = new Command('create')
   .description('Create a new browser session')
+  .argument('[url]', 'URL to navigate to after session is ready')
   .option('--headless', 'Run browser in headless mode (default: true for remote, false for tunnel)')
   .option('--no-headless', 'Run browser with visible UI')
   .option(
@@ -53,7 +55,9 @@ export const createCommand = new Command('create')
     collectVars,
     {}
   )
-  .action(async (options: CreateOptions) => {
+  .action(async (startUrl: string | undefined, options: CreateOptions) => {
+    options.startUrl = startUrl;
+
     // Validate mutually exclusive options
     if (options.tunnel && options.wsUrl) {
       console.log(error('Cannot use both --tunnel and --ws-url'));
@@ -127,6 +131,7 @@ async function createRemoteSession(
       after_test_id: options.afterTestId,
       vars: options.var,
       agent_session_id: getAgentSessionId(),
+      start_url: options.startUrl,
     });
 
     console.log(info(`Session created: ${session.id}`));
@@ -136,11 +141,17 @@ async function createRemoteSession(
     if (session.status === 'starting') {
       console.log(info('Waiting for session to become active...'));
       const activeSession = await client.waitForStatus(session.id, 'active', 60000);
+
+      if (activeSession.status === 'failed' || activeSession.status === 'closed') {
+        const errorMsg = activeSession.error_message || 'Unknown reason';
+        console.log(error(`Session ${activeSession.status}: ${errorMsg}`));
+        process.exit(1);
+      }
+
       console.log(success(`Session ${activeSession.id} is now active`));
-    } else if (session.status === 'failed') {
-      // Test execution failed - display error and exit
-      const errorMsg = session.error_message || 'Test execution failed';
-      console.log(error(`Session failed: ${errorMsg}`));
+    } else if (session.status === 'failed' || session.status === 'closed') {
+      const errorMsg = session.error_message || 'Unknown reason';
+      console.log(error(`Session ${session.status}: ${errorMsg}`));
       process.exit(1);
     } else if (session.status === 'active') {
       console.log(success(`Session ${session.id} is active`));
@@ -158,6 +169,9 @@ async function createRemoteSession(
     console.log(`Timeout: ${timeout}s`);
     if (options.wsUrl) {
       console.log(`WebSocket URL: ${options.wsUrl}`);
+    }
+    if (options.startUrl) {
+      console.log(`Start URL: ${options.startUrl}`);
     }
     if (options.afterTestId) {
       console.log(`After Test ID: ${options.afterTestId}`);
@@ -310,6 +324,23 @@ async function runTunnelMode(
     console.log(info(`Tunneled WebSocket: ${tunneledWsUrl}`));
     console.log('');
 
+    // Step 3.5: Verify tunnel is healthy before creating API session (with warmup retries)
+    console.log(info('Verifying tunnel is ready...'));
+    let tunnelReady = false;
+    for (let attempt = 0; attempt < 15; attempt++) {
+      if (await tunnel.checkHealth()) {
+        tunnelReady = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    if (!tunnelReady) {
+      console.log(error('Tunnel health check failed — tunnel is not proxying connections'));
+      await cleanup(1);
+      return;
+    }
+    console.log(success('Tunnel is ready'));
+
     // Step 4: Create API session with tunneled ws_url
     if (options.afterTestId) {
       console.log(info(`Creating API session with after-test: ${options.afterTestId}...`));
@@ -320,13 +351,13 @@ async function runTunnelMode(
     let session;
     try {
       session = await client.createSession({
-        headless,
         viewport,
         timeout,
         ws_url: tunneledWsUrl,
         after_test_id: options.afterTestId,
         vars: options.var,
         agent_session_id: getAgentSessionId(),
+        start_url: options.startUrl,
       });
     } catch (err) {
       // Handle specific error cases for after_test_id
@@ -360,15 +391,15 @@ async function runTunnelMode(
       const waitTimeout = options.afterTestId ? 180000 : 60000;
       const activeSession = await client.waitForStatus(session.id, 'active', waitTimeout);
 
-      if (activeSession.status === 'failed') {
-        const errorMsg = activeSession.error_message || 'Test execution failed';
-        console.log(error(`Session failed: ${errorMsg}`));
+      if (activeSession.status === 'failed' || activeSession.status === 'closed') {
+        const errorMsg = activeSession.error_message || 'Unknown reason';
+        console.log(error(`Session ${activeSession.status}: ${errorMsg}`));
         await cleanup(1);
         return;
       }
-    } else if (session.status === 'failed') {
-      const errorMsg = session.error_message || 'Test execution failed';
-      console.log(error(`Session failed: ${errorMsg}`));
+    } else if (session.status === 'failed' || session.status === 'closed') {
+      const errorMsg = session.error_message || 'Unknown reason';
+      console.log(error(`Session ${session.status}: ${errorMsg}`));
       await cleanup(1);
       return;
     }
@@ -389,6 +420,9 @@ async function runTunnelMode(
     console.log(`Headless:       ${headless}`);
     console.log(`Timeout:        ${timeout}s`);
     console.log(`WebSocket URL:  ${tunneledWsUrl}`);
+    if (options.startUrl) {
+      console.log(`Start URL:      ${options.startUrl}`);
+    }
     if (options.afterTestId) {
       console.log(`After Test ID:  ${options.afterTestId}`);
     }

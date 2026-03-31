@@ -1,6 +1,6 @@
 {
   "name": "qa-use",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "description": "Simplified CLI-integrated plugin for E2E testing with essential slash commands plus dynamic API CLI workflows (`qa-use api`). Provides AI-first feature verification, browser automation, and test management. All CLI operations documented in SKILL.md and accessible via `qa-use docs` for harness compatibility.",
   "author": {
     "name": "desplega.ai",

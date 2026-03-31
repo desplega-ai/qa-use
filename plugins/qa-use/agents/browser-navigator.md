@@ -38,9 +38,9 @@ Execute multi-step browsing tasks by cycling through snapshot → analyze → ac
 
 1. **Ensure browser session exists**
    - Check for active session: `qa-use browser list`
-   - If none exists, create one: `qa-use browser create --viewport desktop`
+   - If none exists, create one with the start URL: `qa-use browser create --viewport desktop <start_url>`
 
-2. **Navigate to start_url**
+2. **Navigate to start_url** (only if reusing an existing session)
    - Run: `qa-use browser goto <start_url>`
 
 3. **Loop until goal achieved or max_steps**

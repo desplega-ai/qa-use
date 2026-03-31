@@ -79,6 +79,7 @@ export class BrowserApiClient {
         ...(options.after_test_id && { after_test_id: options.after_test_id }),
         ...(options.vars && Object.keys(options.vars).length > 0 && { vars: options.vars }),
         ...(options.agent_session_id && { agent_session_id: options.agent_session_id }),
+        ...(options.start_url && { start_url: options.start_url }),
       });
 
       return response.data as BrowserSession;
@@ -145,9 +146,9 @@ export class BrowserApiClient {
         return session;
       }
 
-      // If session is closed, throw error
+      // If session is closed, return it so callers can inspect error_message
       if (session.status === 'closed') {
-        throw new Error(`Session ${sessionId} is closed`);
+        return session;
       }
 
       // If session failed (e.g., after_test_id test failed), return session for error handling

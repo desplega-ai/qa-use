@@ -168,6 +168,7 @@ qa-use test diff login.yaml
 | Command | Description |
 |---------|-------------|
 | `qa-use browser create` | Create remote browser session |
+| `qa-use browser create <url>` | Create session and navigate to URL |
 | `qa-use browser create --tunnel` | Create local browser with API tunnel |
 | `qa-use browser create --no-headless` | Show browser window (tunnel mode only) |
 | `qa-use browser create --viewport <size>` | Set viewport: `desktop`, `tablet`, `mobile` |

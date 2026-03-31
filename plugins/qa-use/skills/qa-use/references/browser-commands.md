@@ -9,11 +9,12 @@ Complete reference for `qa-use browser` CLI commands.
 Create a new browser session.
 
 ```bash
-qa-use browser create [options]
+qa-use browser create [url] [options]
 ```
 
-| Flag | Description |
+| Argument / Flag | Description |
 |------|-------------|
+| `[url]` | URL to navigate to after session is ready |
 | `--viewport <size>` | Viewport size: `desktop` (1280x720), `tablet` (768x1024), `mobile` (375x667) |
 | `--tunnel` | Run local browser with API tunnel (for localhost testing) |
 | `--headless` | Run in headless mode (default with `--tunnel`) |
@@ -24,11 +25,13 @@ qa-use browser create [options]
 **Examples:**
 ```bash
 qa-use browser create                        # Remote browser, default viewport
+qa-use browser create https://example.com    # Remote browser, navigate to URL
 qa-use browser create --viewport mobile      # Remote browser, mobile viewport
 qa-use browser create --tunnel               # Local headless browser with tunnel
 qa-use browser create --tunnel --no-headless # Local visible browser for debugging
 qa-use browser create --ws-url wss://...     # Connect to existing browser
 qa-use browser create --after-test-id <uuid> # Start session after running a test
+qa-use browser create --after-test-id <uuid> https://example.com/dashboard  # After login, go to dashboard
 ```
 
 **Starting after login (--after-test-id):**
