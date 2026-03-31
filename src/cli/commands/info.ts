@@ -2,11 +2,11 @@
  * qa-use info - Show current configuration and app config details
  */
 
+import { homedir } from 'node:os';
 import { Command } from 'commander';
 import type { AppConfig } from '../../../lib/api/index.js';
 import { ApiClient } from '../../../lib/api/index.js';
 import { BrowserManager } from '../../../lib/browser/index.js';
-import { homedir } from 'node:os';
 import { getEnvWithSource } from '../../../lib/env/index.js';
 import { configExists, findConfigFile, loadConfig } from '../lib/config.js';
 import { error, success, warning } from '../lib/output.js';

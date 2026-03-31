@@ -111,7 +111,37 @@ import { normalizeRef } from '../../lib/browser-utils.js';
 
 When adding new browser commands that accept element refs, always import and use this utility.
 
-## E2E Testing with Browser API CLI
+## E2E Regression Test (`scripts/e2e.ts`)
+
+**IMPORTANT:** After adding or modifying CLI features (browser commands, test runner, etc.), run the e2e regression script to verify nothing is broken:
+
+```bash
+bun run scripts/e2e.ts                  # default: uses "bun run cli"
+bun run scripts/e2e.ts --cmd qa-use     # use installed qa-use binary
+```
+
+**Requirements:**
+- `.qa-use-tests.json` must exist in the project root (with valid `api_key` and `api_url`)
+- The backend pointed to by `api_url` must be running
+- Test site: https://evals.desplega.ai/
+
+**What it tests (3 sections):**
+1. **Browser Commands** — create session, snapshot, url, screenshot, click (--text), back, status, close, logs
+2. **Table Filtering** — navigate to Table Demo, fill filter input by ref, assert filtered snapshot contains expected data and excludes filtered-out data
+3. **Test Runner** — runs `qa-tests/e2e.yaml` via `test run`, asserts it passes
+
+**Extending with new features:**
+- When adding a new browser command, add a step in Section 1 that exercises it
+- When adding a new interaction pattern (e.g., drag, select, check), add a dedicated section or extend Section 2
+- The test YAML (`qa-tests/e2e.yaml`) should stay simple — it tests the test runner path, not complex scenarios
+- Keep assertions meaningful: check output content, not just exit codes
+
+**Test YAML (`qa-tests/e2e.yaml`):**
+- Uses `base_url` variable override to target evals.desplega.ai
+- Clicks "Table Demo" and asserts "John Doe" is visible
+- This is the only test definition in `qa-tests/` — keep it focused on the evals site
+
+## E2E Testing with Browser API CLI (Manual)
 
 Use this flow to manually test browser API functionality against a local backend.
 
