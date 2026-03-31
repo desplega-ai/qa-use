@@ -6,8 +6,9 @@ import { Command } from 'commander';
 import type { AppConfig } from '../../../lib/api/index.js';
 import { ApiClient } from '../../../lib/api/index.js';
 import { BrowserManager } from '../../../lib/browser/index.js';
+import { homedir } from 'node:os';
 import { getEnvWithSource } from '../../../lib/env/index.js';
-import { configExists, loadConfig } from '../lib/config.js';
+import { configExists, findConfigFile, loadConfig } from '../lib/config.js';
 import { error, success, warning } from '../lib/output.js';
 
 /**
@@ -39,14 +40,15 @@ export const infoCommand = new Command('info')
     // Determine API key source
     const apiKeyEnvResult = getEnvWithSource('QA_USE_API_KEY');
     const apiKey = config.api_key || apiKeyEnvResult.value;
+    const configPath = await findConfigFile();
     let apiKeySource = '';
     if (apiKey) {
-      if (apiKeyEnvResult.value && apiKeyEnvResult.source === 'env') {
+      if (config.api_key && configPath) {
+        apiKeySource = ` (from ${configPath.replace(homedir(), '~')})`;
+      } else if (apiKeyEnvResult.value && apiKeyEnvResult.source === 'env') {
         apiKeySource = ' (from environment variable)';
       } else if (apiKeyEnvResult.source === 'config') {
         apiKeySource = ' (from ~/.qa-use.json)';
-      } else if (config.api_key) {
-        apiKeySource = ' (from config file)';
       }
     }
 

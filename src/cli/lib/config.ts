@@ -25,7 +25,7 @@ const CONFIG_FILENAME = '.qa-use-tests.json';
 /**
  * Search for config file in current directory and home directory
  */
-async function findConfigFile(): Promise<string | null> {
+export async function findConfigFile(): Promise<string | null> {
   // Check current directory
   const cwd = process.cwd();
   const localConfig = path.join(cwd, CONFIG_FILENAME);
