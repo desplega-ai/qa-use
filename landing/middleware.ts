@@ -33,6 +33,6 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Match all paths except Next.js internals, static assets, and SEO files
-    "/((?!_next/|favicon\\.ico|sitemap\\.xml|robots\\.txt).*)",
+    "/((?!_next/|favicon\\.ico|sitemap\\.xml|robots\\.txt|cli-schema\\.json).*)",
   ],
 };
