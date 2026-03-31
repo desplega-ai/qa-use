@@ -47,7 +47,7 @@ qa-use info
 | \`QA_USE_REGION\` | Region: \`us\` (default) or \`auto\` |
 | \`QA_USE_API_URL\` | Override API base URL |
 
-**Config file:** \`.qa-use-tests.json\` in the project directory or \`~/.qa-use.json\` in the home directory. Environment variables take precedence.
+**Config file:** \`.qa-use.json\` in the project directory or \`~/.qa-use.json\` in the home directory. Precedence: env vars > project \`.qa-use.json\` > \`~/.qa-use.json\`.
 
 **If you encounter "API key not configured", 401, or auth errors:** Run \`qa-use setup\` to check config state. NEVER fabricate or guess API keys.
 
@@ -1704,7 +1704,7 @@ curl https://your-app.com/health
 qa-use browser logs network -s <session-id>
 
 # 3. Verify credentials haven't expired
-# Check .qa-use-tests.json or environment variables
+# Check .qa-use.json or environment variables
 \`\`\`
 
 ### Suggested Actions
@@ -2024,7 +2024,7 @@ steps:
 | Field | Description |
 |-------|-------------|
 | \`name\` | Human-readable test name |
-| \`app_config\` | App configuration ID from desplega.ai (or use default from \`.qa-use-tests.json\`) |
+| \`app_config\` | App configuration ID from desplega.ai (or use default from \`.qa-use.json\`) |
 | \`steps\` | Array of test steps |
 
 ## Optional Fields
@@ -2362,7 +2362,7 @@ qa-tests/
     └── seed-data.yaml
 \`\`\`
 
-Configure the test directory in \`.qa-use-tests.json\`:
+Configure the test directory in \`.qa-use.json\`:
 
 \`\`\`json
 {
@@ -2435,7 +2435,7 @@ name: Basic Test
 description: Navigate to a page and verify an element is visible
 
 # Replace with your app config ID from desplega.ai
-# Or set default_app_config_id in .qa-use-tests.json
+# Or set default_app_config_id in .qa-use.json
 app_config: $APP_CONFIG_ID
 
 steps:

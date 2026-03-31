@@ -29,7 +29,7 @@ export const setupCommand = new Command('setup')
 
       // No-op: already configured and no options provided
       if (hasExistingConfig && config.api_key && !hasAnyOption) {
-        console.log(success('Already configured (.qa-use-tests.json)'));
+        console.log(success('Already configured (.qa-use.json)'));
         console.log(`  API key:    ${config.api_key.slice(0, 8)}...`);
         console.log(`  Test dir:   ${config.test_directory || './qa-tests'}`);
         if (config.default_app_config_id) {
@@ -134,7 +134,7 @@ export const setupCommand = new Command('setup')
 
       // Save configuration
       await saveConfig(config);
-      console.log(`\n${success('Configuration saved to .qa-use-tests.json')}`);
+      console.log(`\n${success('Configuration saved to .qa-use.json')}`);
     } catch (err) {
       console.log(error(`Setup failed: ${formatError(err)}`));
       process.exit(1);

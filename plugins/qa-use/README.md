@@ -252,7 +252,7 @@ export QA_USE_API_KEY="your-api-key"
 
 ### Config File
 
-Create `.qa-use-tests.json` in your project root:
+Create `.qa-use.json` in your project root:
 
 ```json
 {

@@ -2,6 +2,8 @@
 
 MCP server for browser automation and QA testing using Playwright, integrating with desplega.ai.
 
+**Landing site:** https://qa-use.dev (deployed from `landing/` directory)
+
 ## Quick Reference
 
 **IMPORTANT: Always use `bun`, never `npm` or `yarn`.**
@@ -121,7 +123,7 @@ bun run scripts/e2e.ts --cmd qa-use     # use installed qa-use binary
 ```
 
 **Requirements:**
-- `.qa-use-tests.json` must exist in the project root (with valid `api_key` and `api_url`)
+- `.qa-use.json` must exist in the project root (with valid `api_key` and `api_url`)
 - The backend pointed to by `api_url` must be running
 - Test site: https://evals.desplega.ai/
 
@@ -145,10 +147,10 @@ bun run scripts/e2e.ts --cmd qa-use     # use installed qa-use binary
 
 Use this flow to manually test browser API functionality against a local backend.
 
-**Note:** The `.qa-use-tests.json` file is pre-configured with localhost:5005 and a valid API key. No env setup needed - just run commands directly.
+**Note:** The `.qa-use.json` file is pre-configured with localhost:5005 and a valid API key. No env setup needed - just run commands directly.
 
 ```bash
-# No env setup required - .qa-use-tests.json handles it
+# No env setup required - .qa-use.json handles it
 
 # Create a browser session and navigate to test site (--no-headless to see the browser)
 bun run cli browser create --no-headless https://evals.desplega.ai/
@@ -182,7 +184,7 @@ bun run cli browser logs network -s <session-id>
 
 Use this flow to validate API behavior through the dynamic `qa-use api` command.
 
-**Note:** `.qa-use-tests.json` is pre-configured with localhost:5005 and API key, so these commands run without extra env setup.
+**Note:** `.qa-use.json` is pre-configured with localhost:5005 and API key, so these commands run without extra env setup.
 
 ```bash
 # Discover available API routes from OpenAPI

@@ -24,7 +24,7 @@ steps:
 | Field | Description |
 |-------|-------------|
 | `name` | Human-readable test name |
-| `app_config` | App configuration ID from desplega.ai (or use default from `.qa-use-tests.json`) |
+| `app_config` | App configuration ID from desplega.ai (or use default from `.qa-use.json`) |
 | `steps` | Array of test steps |
 
 ## Optional Fields
@@ -362,7 +362,7 @@ qa-tests/
     └── seed-data.yaml
 ```
 
-Configure the test directory in `.qa-use-tests.json`:
+Configure the test directory in `.qa-use.json`:
 
 ```json
 {

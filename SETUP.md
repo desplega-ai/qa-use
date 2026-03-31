@@ -22,7 +22,7 @@ export QA_USE_API_KEY=your-key
 export QA_USE_REGION=us         # Optional: "us" or "auto"
 ```
 
-You can also use `~/.qa-use.json` config file (env vars take precedence).
+You can also use a `.qa-use.json` config file (in project root or `~/`). Precedence: env vars > project `.qa-use.json` > `~/.qa-use.json`.
 
 ---
 

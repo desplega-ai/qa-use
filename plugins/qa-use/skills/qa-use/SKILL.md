@@ -41,7 +41,7 @@ qa-use info
 | `QA_USE_REGION` | Region: `us` (default) or `auto` |
 | `QA_USE_API_URL` | Override API base URL |
 
-**Config file:** `.qa-use-tests.json` in the project directory or `~/.qa-use.json` in the home directory. Environment variables take precedence.
+**Config file:** `.qa-use.json` in the project directory or `~/.qa-use.json` in the home directory. Precedence: env vars > project `.qa-use.json` > `~/.qa-use.json`.
 
 **If you encounter "API key not configured", 401, or auth errors:** Run `qa-use setup` to check config state. NEVER fabricate or guess API keys.
 

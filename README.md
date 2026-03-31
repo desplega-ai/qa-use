@@ -170,18 +170,28 @@ QA_USE_REGION=us                # Optional: "us" or "auto" (default)
 
 ### Config File
 
-Alternatively, use `~/.qa-use.json`:
+Alternatively, create a `.qa-use.json` in your project root or `~/.qa-use.json` in your home directory:
 
 ```json
 {
-  "env": {
-    "QA_USE_API_KEY": "your-api-key-here",
-    "QA_USE_REGION": "us"
-  }
+  "$schema": "https://qa-use.dev/cli-schema.json",
+  "api_key": "your-api-key-here",
+  "region": "us"
 }
 ```
 
-Environment variables take precedence over the config file.
+**Precedence** (first wins):
+1. Environment variables
+2. `.qa-use.json` in current directory
+3. `~/.qa-use.json` in home directory
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `QA_USE_API_KEY` | API key for authentication | (required) |
+| `QA_USE_API_URL` | API endpoint | `https://api.desplega.ai` |
+| `QA_USE_APP_URL` | App URL | `https://app.desplega.ai` |
+| `QA_USE_REGION` | Region (`us` or `auto`) | `auto` |
+| `QA_USE_DEFAULT_APP_CONFIG_ID` | Default app config | (from API key) |
 
 ## CI/CD Integration
 

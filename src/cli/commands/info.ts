@@ -37,16 +37,16 @@ export const infoCommand = new Command('info')
     const hasLocalConfig = await configExists();
     const config = await loadConfig();
 
-    // Determine API key source
+    // Determine API key source — env vars have highest precedence
     const apiKeyEnvResult = getEnvWithSource('QA_USE_API_KEY');
     const apiKey = config.api_key || apiKeyEnvResult.value;
     const configPath = await findConfigFile();
     let apiKeySource = '';
     if (apiKey) {
-      if (config.api_key && configPath) {
-        apiKeySource = ` (from ${configPath.replace(homedir(), '~')})`;
-      } else if (apiKeyEnvResult.value && apiKeyEnvResult.source === 'env') {
+      if (apiKeyEnvResult.value && apiKeyEnvResult.source === 'env') {
         apiKeySource = ' (from environment variable)';
+      } else if (config.api_key && configPath) {
+        apiKeySource = ` (from ${configPath.replace(homedir(), '~')})`;
       } else if (apiKeyEnvResult.source === 'config') {
         apiKeySource = ' (from ~/.qa-use.json)';
       }

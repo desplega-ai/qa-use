@@ -142,7 +142,7 @@ curl https://your-app.com/health
 qa-use browser logs network -s <session-id>
 
 # 3. Verify credentials haven't expired
-# Check .qa-use-tests.json or environment variables
+# Check .qa-use.json or environment variables
 ```
 
 ### Suggested Actions

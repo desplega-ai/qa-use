@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://qa-use.dev/cli-schema.json",
+  "title": "QA-Use Configuration",
+  "description": "Configuration file for qa-use CLI and MCP server (.qa-use.json)",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference"
+    },
+    "api_key": {
+      "type": "string",
+      "description": "desplega.ai API key for authentication"
+    },
+    "api_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "API endpoint (default: https://api.desplega.ai)"
+    },
+    "app_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "App URL (default: https://app.desplega.ai)"
+    },
+    "region": {
+      "type": "string",
+      "enum": ["us", "auto"],
+      "description": "Tunnel region (default: auto)"
+    },
+    "default_app_config_id": {
+      "type": "string",
+      "description": "Default app configuration ID from desplega.ai"
+    },
+    "test_directory": {
+      "type": "string",
+      "default": "./qa-tests",
+      "description": "Directory containing test definitions"
+    },
+    "defaults": {
+      "type": "object",
+      "description": "Default settings for browser sessions and test runs",
+      "properties": {
+        "headless": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run browser in headless mode"
+        },
+        "persist": {
+          "type": "boolean",
+          "default": false,
+          "description": "Keep browser session alive after command"
+        },
+        "timeout": {
+          "type": "number",
+          "default": 300,
+          "description": "Session timeout in seconds"
+        },
+        "allow_fix": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow automatic fix attempts on test failures"
+        }
+      },
+      "additionalProperties": false
+    },
+    "env": {
+      "type": "object",
+      "description": "Environment variable overrides (legacy — prefer top-level fields)",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true
+}

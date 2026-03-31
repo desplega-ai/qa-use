@@ -3,7 +3,8 @@
  *
  * Priority order:
  * 1. Environment variables (process.env)
- * 2. Config file (~/.qa-use.json) with structure: { "env": { "VAR_NAME": "value" } }
+ * 2. Config file (~/.qa-use.json) top-level fields (api_key, api_url, etc.)
+ * 3. Config file (~/.qa-use.json) env block ({ "env": { "VAR_NAME": "value" } })
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -11,8 +12,23 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 interface QaUseConfig {
+  api_key?: string;
+  api_url?: string;
+  app_url?: string;
+  region?: string;
   env?: Record<string, string>;
 }
+
+/**
+ * Mapping from env var names to top-level config field names.
+ * Allows getEnvWithSource to check direct fields before the env block.
+ */
+const ENV_TO_FIELD: Record<string, keyof QaUseConfig> = {
+  QA_USE_API_KEY: 'api_key',
+  QA_USE_API_URL: 'api_url',
+  QA_USE_APP_URL: 'app_url',
+  QA_USE_REGION: 'region',
+};
 
 let cachedConfig: QaUseConfig | null = null;
 let configLoadAttempted = false;
@@ -60,7 +76,9 @@ export interface EnvResult {
 
 /**
  * Get an environment variable value with fallback to config file,
- * along with the source of the value
+ * along with the source of the value.
+ *
+ * Priority: process.env → config top-level field → config env block
  *
  * @param name - The environment variable name (e.g., 'QA_USE_API_KEY')
  * @returns Object containing the value and its source
@@ -72,10 +90,20 @@ export function getEnvWithSource(name: string): EnvResult {
     return { value: envValue, source: 'env' };
   }
 
-  // Fallback to config file
+  // Fallback to config file — check top-level field first, then env block
   const config = loadConfig();
-  if (config?.env?.[name]) {
-    return { value: config.env[name], source: 'config' };
+  if (config) {
+    const fieldName = ENV_TO_FIELD[name];
+    if (fieldName) {
+      const fieldValue = config[fieldName];
+      if (typeof fieldValue === 'string' && fieldValue) {
+        return { value: fieldValue, source: 'config' };
+      }
+    }
+
+    if (config.env?.[name]) {
+      return { value: config.env[name], source: 'config' };
+    }
   }
 
   return { value: undefined, source: 'none' };

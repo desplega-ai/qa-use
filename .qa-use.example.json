@@ -1,8 +1,13 @@
 {
-  "env": {
-    "QA_USE_API_KEY": "your-api-key-here",
-    "QA_USE_API_URL": "https://api.desplega.ai",
-    "QA_USE_APP_URL": "https://app.desplega.ai",
-    "QA_USE_REGION": "auto"
+  "$schema": "https://qa-use.dev/cli-schema.json",
+  "api_key": "your-api-key-here",
+  "api_url": "https://api.desplega.ai",
+  "region": "auto",
+  "test_directory": "./qa-tests",
+  "defaults": {
+    "headless": true,
+    "persist": false,
+    "timeout": 300,
+    "allow_fix": true
   }
 }

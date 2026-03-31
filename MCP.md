@@ -764,19 +764,21 @@ As an alternative to environment variables, you can store your configuration in 
 
 ```json
 {
-  "env": {
-    "QA_USE_API_KEY": "your-api-key-here",
-    "QA_USE_API_URL": "https://api.desplega.ai",
-    "QA_USE_APP_URL": "https://app.desplega.ai",
-    "QA_USE_REGION": "us"
-  }
+  "$schema": "https://qa-use.dev/cli-schema.json",
+  "api_key": "your-api-key-here",
+  "api_url": "https://api.desplega.ai",
+  "app_url": "https://app.desplega.ai",
+  "region": "us"
 }
 ```
 
+> The `env` block format (`{ "env": { "QA_USE_API_KEY": "..." } }`) is still supported but deprecated — prefer top-level fields.
+
 **Priority order:**
 1. Environment variables (highest priority)
-2. Config file (`~/.qa-use.json`)
-3. Default values
+2. Config file top-level fields (e.g. `api_key`)
+3. Config file `env` block (legacy)
+4. Default values
 
 This is useful when you don't want to set environment variables or when using MCP clients that don't support environment configuration.
 

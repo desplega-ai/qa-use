@@ -102,9 +102,13 @@ async function section(name: string, fn: () => Promise<void> | void) {
 // Pre-checks
 // ---------------------------------------------------------------------------
 
-const configPath = resolve(import.meta.dirname, '..', '.qa-use-tests.json');
+let configPath = resolve(import.meta.dirname, '..', '.qa-use.json');
 if (!existsSync(configPath)) {
-	console.error('ERROR: .qa-use-tests.json not found in project root. Cannot run e2e tests.');
+	// Backward compat: try legacy filename
+	configPath = resolve(import.meta.dirname, '..', '.qa-use-tests.json');
+}
+if (!existsSync(configPath)) {
+	console.error('ERROR: .qa-use.json not found in project root. Cannot run e2e tests.');
 	process.exit(1);
 }
 

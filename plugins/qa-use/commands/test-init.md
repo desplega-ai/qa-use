@@ -11,7 +11,7 @@ Initialize the test directory with an example test file.
 ## What Happens
 
 1. Creates `qa-tests/` directory with `example.yaml`
-2. Optionally creates `.qa-use-tests.json` config file
+2. Optionally creates `.qa-use.json` config file
 3. Shows next steps for running your first test
 
 ## Example
