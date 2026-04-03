@@ -762,6 +762,9 @@ export const runCommand = new Command('run')
           if (session.app_url) {
             console.log(`App URL: ${session.app_url}`);
           }
+          if (session.cdp_url) {
+            console.log(`CDP URL: ${session.cdp_url}`);
+          }
           if (session.last_action_at) {
             console.log(`Last Action: ${session.last_action_at}`);
           }

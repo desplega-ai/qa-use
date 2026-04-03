@@ -189,6 +189,34 @@ describe('BrowserApiClient', () => {
       expect(session.id).toBe('session-123');
       expect(session.status).toBe('active');
     });
+
+    it('should include cdp_url when session is active', async () => {
+      const mockSession = {
+        id: 'session-456',
+        status: 'active',
+        created_at: '2026-01-23T10:00:00Z',
+        cdp_url: 'wss://cdp.desplega.ai/devtools/browser/abc123',
+      };
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: mockSession });
+
+      const session = await client.getSession('session-456');
+
+      expect(session.cdp_url).toBe('wss://cdp.desplega.ai/devtools/browser/abc123');
+      expect(session.status).toBe('active');
+    });
+
+    it('should not include cdp_url when session is not active', async () => {
+      const mockSession = {
+        id: 'session-789',
+        status: 'closed',
+        created_at: '2026-01-23T10:00:00Z',
+      };
+      mockAxiosInstance.get.mockResolvedValueOnce({ data: mockSession });
+
+      const session = await client.getSession('session-789');
+
+      expect(session.cdp_url).toBeUndefined();
+    });
   });
 
   describe('deleteSession', () => {
