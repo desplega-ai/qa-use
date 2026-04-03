@@ -51,15 +51,21 @@ function formatApiError(
 }
 
 // Re-export new types for external consumers
-export type { IssueType, Severity, IssueReport, TestCreatorDoneIntent };
-export type { EnhancedTestSummary, BlockSummary };
+export type {
+  BlockSummary,
+  EnhancedTestSummary,
+  IssueReport,
+  IssueType,
+  Severity,
+  TestCreatorDoneIntent,
+};
 
 // Re-export utility functions for external consumers
 export {
-  generateEnhancedTestSummary,
-  formatEnhancedTestReport,
-  generateIssueStatistics,
   categorizeIssues,
+  formatEnhancedTestReport,
+  generateEnhancedTestSummary,
+  generateIssueStatistics,
 };
 
 export interface CreateSessionOptions {
