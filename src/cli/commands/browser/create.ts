@@ -170,6 +170,12 @@ async function createRemoteSession(
     if (options.wsUrl) {
       console.log(`WebSocket URL: ${options.wsUrl}`);
     }
+
+    // Re-fetch session to get cdp_url (available after active)
+    const activeSession = await client.getSession(session.id);
+    if (activeSession.cdp_url) {
+      console.log(`CDP URL: ${activeSession.cdp_url}`);
+    }
     if (options.startUrl) {
       console.log(`Start URL: ${options.startUrl}`);
     }

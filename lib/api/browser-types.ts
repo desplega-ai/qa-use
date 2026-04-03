@@ -33,6 +33,7 @@ export interface BrowserSession {
   timeout?: number;
   // Additional fields from API documentation
   app_url?: string; // Frontend URL to view session visualization
+  cdp_url?: string; // Chrome DevTools Protocol WebSocket URL (only when status is 'active')
   last_action_at?: string; // Timestamp of last action
   error_message?: string; // Error if session failed
   recording_url?: string; // Video recording URL (after close)

@@ -87,6 +87,11 @@ export const statusCommand = new Command('status')
         console.log(`App URL:      ${session.app_url}`);
       }
 
+      // CDP URL (Chrome DevTools Protocol WebSocket URL, only when active)
+      if (session.cdp_url) {
+        console.log(`CDP URL:      ${session.cdp_url}`);
+      }
+
       // Last action time
       if (session.last_action_at) {
         const lastActionAt = new Date(session.last_action_at);
