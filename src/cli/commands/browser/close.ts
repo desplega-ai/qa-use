@@ -3,9 +3,8 @@
  */
 
 import { Command } from 'commander';
-import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import { removeStoredSession, resolveSessionId } from '../../lib/browser-sessions.js';
-import { loadConfig } from '../../lib/config.js';
+import { createBrowserClient, loadConfig } from '../../lib/config.js';
 import { error, info, success } from '../../lib/output.js';
 
 interface CloseOptions {
@@ -25,8 +24,7 @@ export const closeCommand = new Command('close')
       }
 
       // Create client and set API key
-      const client = new BrowserApiClient(config.api_url);
-      client.setApiKey(config.api_key);
+      const client = createBrowserClient(config);
 
       // Resolve session ID
       const resolved = await resolveSessionId({

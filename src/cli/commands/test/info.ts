@@ -5,9 +5,8 @@
 import * as path from 'node:path';
 import { Command } from 'commander';
 import * as yaml from 'yaml';
-import { ApiClient } from '../../../../lib/api/index.js';
 import type { TestDefinition } from '../../../types/test-definition.js';
-import { loadConfig } from '../../lib/config.js';
+import { createApiClient, loadConfig } from '../../lib/config.js';
 import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
 import { error, formatError, info } from '../../lib/output.js';
 
@@ -109,8 +108,7 @@ export const infoCommand = new Command('info')
           process.exit(1);
         }
 
-        const client = new ApiClient(config.api_url);
-        client.setApiKey(config.api_key);
+        const client = createApiClient(config);
 
         console.log(info(`Fetching test ${options.id} from cloud...`));
 

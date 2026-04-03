@@ -3,10 +3,9 @@
  */
 
 import { Command } from 'commander';
-import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import type { ConsoleLogLevel } from '../../../../lib/api/browser-types.js';
 import { resolveSessionId } from '../../lib/browser-sessions.js';
-import { loadConfig } from '../../lib/config.js';
+import { createBrowserClient, loadConfig } from '../../lib/config.js';
 import { error } from '../../lib/output.js';
 
 interface ConsoleLogsOptions {
@@ -38,8 +37,7 @@ const consoleCommand = new Command('console')
         process.exit(1);
       }
 
-      const client = new BrowserApiClient(config.api_url);
-      client.setApiKey(config.api_key);
+      const client = createBrowserClient(config);
 
       const resolved = await resolveSessionId({
         explicitId: options.sessionId,
@@ -82,8 +80,7 @@ const networkCommand = new Command('network')
         process.exit(1);
       }
 
-      const client = new BrowserApiClient(config.api_url);
-      client.setApiKey(config.api_key);
+      const client = createBrowserClient(config);
 
       const resolved = await resolveSessionId({
         explicitId: options.sessionId,

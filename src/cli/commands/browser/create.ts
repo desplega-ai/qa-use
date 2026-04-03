@@ -3,7 +3,7 @@
  */
 
 import { Command } from 'commander';
-import { BrowserApiClient } from '../../../../lib/api/browser.js';
+import type { BrowserApiClient } from '../../../../lib/api/browser.js';
 import type { ViewportType } from '../../../../lib/api/browser-types.js';
 import { BrowserManager } from '../../../../lib/browser/index.js';
 import { getAgentSessionId } from '../../../../lib/env/index.js';
@@ -14,7 +14,7 @@ import {
   removeStoredSession,
   storeSession,
 } from '../../lib/browser-sessions.js';
-import { loadConfig } from '../../lib/config.js';
+import { createBrowserClient, loadConfig } from '../../lib/config.js';
 import { error, info, success, warning } from '../../lib/output.js';
 
 interface CreateOptions {
@@ -94,8 +94,7 @@ export const createCommand = new Command('create')
     }
 
     // Create client and set API key
-    const client = new BrowserApiClient(config.api_url);
-    client.setApiKey(config.api_key);
+    const client = createBrowserClient(config);
 
     if (options.tunnel) {
       // Tunnel mode: start local browser + tunnel, then create session

@@ -4,8 +4,7 @@
 
 import { homedir } from 'node:os';
 import { Command } from 'commander';
-import type { AppConfig } from '../../../lib/api/index.js';
-import { ApiClient } from '../../../lib/api/index.js';
+import { ApiClient, type AppConfig } from '../../../lib/api/index.js';
 import { BrowserManager } from '../../../lib/browser/index.js';
 import { getEnvWithSource } from '../../../lib/env/index.js';
 import { configExists, findConfigFile, loadConfig } from '../lib/config.js';
@@ -59,6 +58,13 @@ export const infoCommand = new Command('info')
       `  API URL: ${config.api_url || process.env.QA_USE_API_URL || 'https://api.desplega.ai'}`
     );
     console.log(`  Test Directory: ${config.test_directory || './qa-tests'}`);
+    if (config.headers && Object.keys(config.headers).length > 0) {
+      const count = Object.keys(config.headers).length;
+      console.log(`  Headers: ${count} custom header(s)`);
+      for (const [name, value] of Object.entries(config.headers)) {
+        console.log(`    ${name}: ${value}`);
+      }
+    }
 
     // Fetch and display app config if API key is available
     let appConfig: AppConfig | null = null;
@@ -68,6 +74,7 @@ export const infoCommand = new Command('info')
       try {
         const client = new ApiClient(config.api_url);
         client.setApiKey(apiKey);
+        if (config.headers) client.setCustomHeaders(config.headers);
 
         const authResponse = await client.validateApiKey();
 

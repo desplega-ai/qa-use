@@ -5,7 +5,7 @@
 import type { AxiosInstance } from 'axios';
 import axios from 'axios';
 import type { ExtendedStep } from '../../src/types/test-definition.js';
-import { getEnv } from '../env/index.js';
+import { getCustomHeaders, getEnv } from '../env/index.js';
 import type {
   ActionResult,
   BlocksResult,
@@ -45,6 +45,20 @@ export class BrowserApiClient {
     const envApiKey = getEnv('QA_USE_API_KEY');
     if (envApiKey) {
       this.setApiKey(envApiKey);
+    }
+
+    // Auto-load custom headers from environment/config
+    const customHeaders = getCustomHeaders();
+    if (customHeaders) {
+      this.setCustomHeaders(customHeaders);
+    }
+  }
+
+  setCustomHeaders(headers: Record<string, string>): void {
+    for (const [key, value] of Object.entries(headers)) {
+      const lower = key.toLowerCase();
+      if (lower === 'authorization' || lower === 'content-type') continue;
+      this.client.defaults.headers.common[key] = value;
     }
   }
 

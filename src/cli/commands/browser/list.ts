@@ -3,9 +3,8 @@
  */
 
 import { Command } from 'commander';
-import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import { isSessionStale, loadStoredSessions } from '../../lib/browser-sessions.js';
-import { loadConfig } from '../../lib/config.js';
+import { createBrowserClient, loadConfig } from '../../lib/config.js';
 import { error, warning } from '../../lib/output.js';
 
 export const listCommand = new Command('list')
@@ -21,8 +20,7 @@ export const listCommand = new Command('list')
       }
 
       // Create client and set API key
-      const client = new BrowserApiClient(config.api_url);
-      client.setApiKey(config.api_key);
+      const client = createBrowserClient(config);
 
       // Fetch sessions from API
       const sessions = await client.listSessions();

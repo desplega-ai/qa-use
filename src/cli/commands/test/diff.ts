@@ -5,9 +5,8 @@
 import * as path from 'node:path';
 import { Command } from 'commander';
 import * as yaml from 'yaml';
-import { ApiClient } from '../../../../lib/api/index.js';
 import type { TestDefinition } from '../../../types/test-definition.js';
-import { loadConfig } from '../../lib/config.js';
+import { createApiClient, loadConfig } from '../../lib/config.js';
 import { loadTestDefinition } from '../../lib/loader.js';
 import { error, formatError, info } from '../../lib/output.js';
 
@@ -180,8 +179,7 @@ export const diffCommand = new Command('diff')
       console.log(`  Cloud: ${localTest.id}`);
 
       // Fetch cloud version
-      const client = new ApiClient(config.api_url);
-      client.setApiKey(config.api_key);
+      const client = createApiClient(config);
 
       let cloudYaml: string;
       try {

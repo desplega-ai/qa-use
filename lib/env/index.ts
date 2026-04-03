@@ -184,6 +184,38 @@ export function logConfigSources(): void {
 }
 
 /**
+ * Get custom headers from config file and QA_USE_HEADERS env var.
+ * Used by API clients that don't go through CLI's loadConfig().
+ *
+ * Priority: config file headers, then QA_USE_HEADERS env var overrides.
+ */
+export function getCustomHeaders(): Record<string, string> | null {
+  const headers: Record<string, string> = {};
+
+  const config = loadConfig();
+  if (config) {
+    const configHeaders = (config as Record<string, unknown>).headers;
+    if (configHeaders && typeof configHeaders === 'object' && !Array.isArray(configHeaders)) {
+      Object.assign(headers, configHeaders);
+    }
+  }
+
+  const envHeaders = process.env.QA_USE_HEADERS;
+  if (envHeaders) {
+    try {
+      const parsed = JSON.parse(envHeaders);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        Object.assign(headers, parsed);
+      }
+    } catch {
+      // Silently ignore invalid JSON
+    }
+  }
+
+  return Object.keys(headers).length > 0 ? headers : null;
+}
+
+/**
  * Get agent session ID from environment if available.
  * Used for auto-linking browser sessions and test runs to agent sessions.
  *

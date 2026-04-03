@@ -3,8 +3,7 @@
  */
 
 import { Command } from 'commander';
-import { ApiClient } from '../../../../lib/api/index.js';
-import { loadConfig } from '../../lib/config.js';
+import { createApiClient, loadConfig } from '../../lib/config.js';
 import { error, formatError, info } from '../../lib/output.js';
 
 export const schemaCommand = new Command('schema')
@@ -29,10 +28,7 @@ Examples:
       const config = await loadConfig();
 
       // Initialize API client
-      const client = new ApiClient(config.api_url);
-      if (config.api_key) {
-        client.setApiKey(config.api_key);
-      }
+      const client = createApiClient(config);
 
       // Fetch schema
       const schema = await client.getTestDefinitionSchema();

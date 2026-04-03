@@ -5,11 +5,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Command } from 'commander';
-import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import type { FileUploadData } from '../../../../lib/api/browser-types.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { normalizeRef } from '../../lib/browser-utils.js';
-import { loadConfig } from '../../lib/config.js';
+import { createBrowserClient, loadConfig } from '../../lib/config.js';
 import { getMimeType } from '../../lib/mime-types.js';
 import { error, success } from '../../lib/output.js';
 import { formatDownloads, formatSnapshotDiff } from '../../lib/snapshot-diff.js';
@@ -72,8 +71,7 @@ export const uploadCommand = new Command('upload')
         process.exit(1);
       }
 
-      const client = new BrowserApiClient(config.api_url);
-      client.setApiKey(config.api_key);
+      const client = createBrowserClient(config);
 
       const resolved = await resolveSessionId({
         explicitId: options.sessionId,

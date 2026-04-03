@@ -3,8 +3,7 @@
  */
 
 import { Command } from 'commander';
-import { ApiClient } from '../../../../lib/api/index.js';
-import { loadConfig } from '../../lib/config.js';
+import { createApiClient, loadConfig } from '../../lib/config.js';
 import { loadTestWithDeps } from '../../lib/loader.js';
 import { error, formatError, printValidationErrors, success } from '../../lib/output.js';
 
@@ -24,8 +23,7 @@ export const validateCommand = new Command('validate')
       }
 
       // Initialize API client
-      const client = new ApiClient(config.api_url);
-      client.setApiKey(config.api_key);
+      const client = createApiClient(config);
 
       // Load test definitions
       console.log(`Loading test: ${test}...`);

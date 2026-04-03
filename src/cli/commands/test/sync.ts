@@ -6,10 +6,10 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { Command } from 'commander';
 import * as yaml from 'yaml';
-import { ApiClient } from '../../../../lib/api/index.js';
+import type { ApiClient } from '../../../../lib/api/index.js';
 import type { TestDefinition } from '../../../types/test-definition.js';
 import { toSafeFilename } from '../../../utils/strings.js';
-import { loadConfig } from '../../lib/config.js';
+import { createApiClient, loadConfig } from '../../lib/config.js';
 import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
 import { error, formatError, info, success, warning } from '../../lib/output.js';
 
@@ -35,8 +35,7 @@ const pullCommand = new Command('pull')
       }
 
       // Initialize API client
-      const client = new ApiClient(config.api_url);
-      client.setApiKey(config.api_key);
+      const client = createApiClient(config);
 
       const testDir = config.test_directory || './qa-tests';
 
@@ -79,8 +78,7 @@ const pushCommand = new Command('push')
       }
 
       // Initialize API client
-      const client = new ApiClient(config.api_url);
-      client.setApiKey(config.api_key);
+      const client = createApiClient(config);
 
       const testDir = config.test_directory || './qa-tests';
 

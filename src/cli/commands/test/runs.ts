@@ -3,8 +3,7 @@
  */
 
 import { Command } from 'commander';
-import { ApiClient } from '../../../../lib/api/index.js';
-import { loadConfig } from '../../lib/config.js';
+import { createApiClient, loadConfig } from '../../lib/config.js';
 import { error, formatError, warning } from '../../lib/output.js';
 
 // ANSI color codes
@@ -72,8 +71,7 @@ export const runsCommand = new Command('runs')
         process.exit(1);
       }
 
-      const client = new ApiClient(config.api_url);
-      client.setApiKey(config.api_key);
+      const client = createApiClient(config);
 
       // Resolve test name to ID if provided
       let testId = options.id;

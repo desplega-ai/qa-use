@@ -4,8 +4,7 @@
 
 import * as path from 'node:path';
 import { Command } from 'commander';
-import { ApiClient } from '../../../../lib/api/index.js';
-import { loadConfig } from '../../lib/config.js';
+import { createApiClient, loadConfig } from '../../lib/config.js';
 import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
 import { error, formatError, printTestList } from '../../lib/output.js';
 
@@ -25,8 +24,7 @@ export const listCommand = new Command('list')
           process.exit(1);
         }
 
-        const client = new ApiClient(config.api_url);
-        client.setApiKey(config.api_key);
+        const client = createApiClient(config);
 
         console.log('Fetching tests from cloud...\n');
         const tests = await client.listTests({ limit: parseInt(options.limit, 10) });

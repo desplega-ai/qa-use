@@ -3,7 +3,6 @@
  */
 
 import { Command } from 'commander';
-import { ApiClient } from '../../../../lib/api/index.js';
 import { getAgentSessionId } from '../../../../lib/env/index.js';
 import {
   type BrowserTunnelSession,
@@ -11,7 +10,7 @@ import {
   startBrowserWithTunnel,
   stopBrowserWithTunnel,
 } from '../../lib/browser.js';
-import { loadConfig } from '../../lib/config.js';
+import { createApiClient, loadConfig } from '../../lib/config.js';
 import { downloadAssets } from '../../lib/download.js';
 import {
   applyVariableOverrides,
@@ -69,8 +68,7 @@ export const runCommand = new Command('run')
       }
 
       // Initialize API client
-      const client = new ApiClient(config.api_url);
-      client.setApiKey(config.api_key);
+      const client = createApiClient(config);
 
       let testDefinitions;
       let sourceFile: string | undefined;

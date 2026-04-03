@@ -5,10 +5,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Command } from 'commander';
-import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import type { DownloadInfo } from '../../../../lib/api/browser-types.js';
 import { resolveSessionId } from '../../lib/browser-sessions.js';
-import { loadConfig } from '../../lib/config.js';
+import { createBrowserClient, loadConfig } from '../../lib/config.js';
 import { downloadFile } from '../../lib/download.js';
 import { error, success } from '../../lib/output.js';
 
@@ -40,8 +39,7 @@ export const downloadsCommand = new Command('downloads')
         process.exit(1);
       }
 
-      const client = new BrowserApiClient(config.api_url);
-      client.setApiKey(config.api_key);
+      const client = createBrowserClient(config);
 
       const resolved = await resolveSessionId({
         explicitId: options.sessionId,

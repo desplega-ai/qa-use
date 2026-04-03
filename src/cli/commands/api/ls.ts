@@ -42,7 +42,12 @@ export const lsCommand = new Command('ls')
       const apiUrl = config.api_url || process.env.QA_USE_API_URL || 'https://api.desplega.ai';
       const apiKey = config.api_key || process.env.QA_USE_API_KEY;
       const refreshMode = getRefreshMode(effectiveOptions);
-      const loadedSpec = await loadOpenApiSpec({ apiUrl, apiKey, refreshMode });
+      const loadedSpec = await loadOpenApiSpec({
+        apiUrl,
+        apiKey,
+        refreshMode,
+        customHeaders: config.headers,
+      });
 
       if (loadedSpec.stale) {
         for (const message of loadedSpec.warnings) {

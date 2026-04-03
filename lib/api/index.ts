@@ -16,7 +16,7 @@ import {
   generateEnhancedTestSummary,
   generateIssueStatistics,
 } from '../../src/utils/summary.js';
-import { getEnv } from '../env/index.js';
+import { getCustomHeaders, getEnv } from '../env/index.js';
 import { type SSEEvent, streamSSE } from './sse.js';
 
 /**
@@ -353,6 +353,7 @@ export class ApiClient {
   private readonly client: AxiosInstance;
   private apiKey: string | null = null;
   private appConfigId: string | null = null;
+  private customHeaders: Record<string, string> = {};
 
   constructor(baseUrl?: string) {
     // Use environment variable if available, otherwise use provided baseUrl, finally fall back to production
@@ -370,6 +371,21 @@ export class ApiClient {
     const envApiKey = getEnv('QA_USE_API_KEY');
     if (envApiKey) {
       this.setApiKey(envApiKey);
+    }
+
+    // Auto-load custom headers from environment/config
+    const customHeaders = getCustomHeaders();
+    if (customHeaders) {
+      this.setCustomHeaders(customHeaders);
+    }
+  }
+
+  setCustomHeaders(headers: Record<string, string>): void {
+    for (const [key, value] of Object.entries(headers)) {
+      const lower = key.toLowerCase();
+      if (lower === 'authorization' || lower === 'content-type') continue;
+      this.customHeaders[key] = value;
+      this.client.defaults.headers.common[key] = value;
     }
   }
 
@@ -833,6 +849,7 @@ export class ApiClient {
       const response = await fetch(`${this.getApiUrl()}/vibe-qa/cli/run`, {
         method: 'POST',
         headers: {
+          ...this.customHeaders,
           Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
           Accept: 'text/event-stream',

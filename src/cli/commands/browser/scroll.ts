@@ -3,11 +3,10 @@
  */
 
 import { Command } from 'commander';
-import { BrowserApiClient } from '../../../../lib/api/browser.js';
 import type { ScrollDirection } from '../../../../lib/api/browser-types.js';
 import { resolveSessionId, touchSession } from '../../lib/browser-sessions.js';
 import { normalizeRef } from '../../lib/browser-utils.js';
-import { loadConfig } from '../../lib/config.js';
+import { createBrowserClient, loadConfig } from '../../lib/config.js';
 import { error, success } from '../../lib/output.js';
 import { formatDownloads, formatSnapshotDiff } from '../../lib/snapshot-diff.js';
 
@@ -54,8 +53,7 @@ export const scrollCommand = new Command('scroll')
       }
 
       // Create client and set API key
-      const client = new BrowserApiClient(config.api_url);
-      client.setApiKey(config.api_key);
+      const client = createBrowserClient(config);
 
       // Resolve session ID
       const resolved = await resolveSessionId({

@@ -72,6 +72,7 @@ export interface LoadOpenApiSpecOptions {
   apiUrl: string;
   apiKey?: string;
   refreshMode?: OpenApiRefreshMode;
+  customHeaders?: Record<string, string>;
 }
 
 const HTTP_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete', 'options', 'head']);
@@ -198,7 +199,9 @@ export async function loadOpenApiSpec(options: LoadOpenApiSpecOptions): Promise<
     return fromCache(cache, false);
   }
 
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    ...options.customHeaders,
+  };
   if (options.apiKey) {
     headers.Authorization = `Bearer ${options.apiKey}`;
   }

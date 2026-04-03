@@ -5,6 +5,8 @@
 import * as fs from 'node:fs/promises';
 import { homedir } from 'node:os';
 import * as path from 'node:path';
+import { BrowserApiClient } from '../../../lib/api/browser.js';
+import { ApiClient } from '../../../lib/api/index.js';
 
 export interface CliConfig {
   env?: Record<string, string>;
@@ -12,6 +14,7 @@ export interface CliConfig {
   api_url?: string;
   default_app_config_id?: string;
   test_directory?: string;
+  headers?: Record<string, string>;
   defaults?: {
     headless?: boolean;
     persist?: boolean;
@@ -126,6 +129,29 @@ export async function loadConfig(): Promise<CliConfig> {
     config.default_app_config_id = process.env.QA_USE_DEFAULT_APP_CONFIG_ID;
   }
 
+  // Resolve custom headers: config file headers + QA_USE_HEADERS env var (env wins)
+  const resolvedHeaders: Record<string, string> = {};
+
+  if (config.headers) {
+    Object.assign(resolvedHeaders, config.headers);
+  }
+
+  const envHeaders = process.env.QA_USE_HEADERS;
+  if (envHeaders) {
+    try {
+      const parsed = JSON.parse(envHeaders);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        Object.assign(resolvedHeaders, parsed);
+      }
+    } catch {
+      console.error('Warning: QA_USE_HEADERS is not valid JSON, ignoring');
+    }
+  }
+
+  if (Object.keys(resolvedHeaders).length > 0) {
+    config.headers = resolvedHeaders;
+  }
+
   return config;
 }
 
@@ -143,4 +169,24 @@ export async function saveConfig(config: CliConfig): Promise<void> {
  */
 export async function configExists(): Promise<boolean> {
   return (await findConfigFile()) !== null;
+}
+
+/**
+ * Create a BrowserApiClient pre-configured with API key and custom headers from config.
+ */
+export function createBrowserClient(config: CliConfig): BrowserApiClient {
+  const client = new BrowserApiClient(config.api_url);
+  if (config.api_key) client.setApiKey(config.api_key);
+  if (config.headers) client.setCustomHeaders(config.headers);
+  return client;
+}
+
+/**
+ * Create an ApiClient pre-configured with API key and custom headers from config.
+ */
+export function createApiClient(config: CliConfig): ApiClient {
+  const client = new ApiClient(config.api_url);
+  if (config.api_key) client.setApiKey(config.api_key);
+  if (config.headers) client.setCustomHeaders(config.headers);
+  return client;
 }

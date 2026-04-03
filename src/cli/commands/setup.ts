@@ -108,6 +108,7 @@ export const setupCommand = new Command('setup')
         } else {
           const client = new ApiClient(config.api_url);
           client.setApiKey(apiKey);
+          if (config.headers) client.setCustomHeaders(config.headers);
 
           console.log('  Validating API key...');
           const validation = await client.validateApiKey();

@@ -190,12 +190,16 @@ export function registerApiRequestAction(
         const refreshMode = getRefreshMode(options);
         const { path, query: urlQuery } = parseEndpoint(endpoint);
         const fieldMap = parseKeyValuePairs(options.field || [], '=');
-        const headerMap = parseKeyValuePairs(options.header || [], ':');
+        const headerMap: Record<string, string> = {
+          ...config.headers,
+          ...parseKeyValuePairs(options.header || [], ':'),
+        };
 
         const openApi = await loadOpenApiSpec({
           apiUrl,
           apiKey,
           refreshMode,
+          customHeaders: config.headers,
         });
 
         if (openApi.stale) {
