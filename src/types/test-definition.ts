@@ -4,8 +4,8 @@
  * DO NOT EDIT MANUALLY - Generated from API schema
  * Run 'pnpm generate:types' to regenerate
  *
- * Source: http://localhost:5005/vibe-qa/cli/schema
- * Generated: 2026-02-07T10:31:58.156Z
+ * Source: https://api.desplega.ai/vibe-qa/cli/schema
+ * Generated: 2026-04-04T20:44:09.809Z
  */
 
 export type Name = string;
@@ -14,6 +14,10 @@ export type AppConfig = string | null;
 export type Tags = string[];
 export type Description = string | null;
 export type DependsOn = string | null;
+export type Contexts = {
+  [k: string]: ContextDefinition;
+} | null;
+export type AppConfigId = string;
 export type Type = 'simple';
 export type Action =
   | 'goto'
@@ -35,6 +39,9 @@ export type To = string | null;
 export type Url = string | null;
 export type Timeout = number | null;
 export type AaaPhase = ('arrange' | 'act' | 'assert') | null;
+export type StepId = string | null;
+export type Context = string | null;
+export type DependsOn1 = string | null;
 export type Type1 = 'extended';
 /**
  * Action to perform
@@ -304,6 +311,9 @@ export type Name2 = string | null;
 export type Description1 = string | null;
 export type AaaPhase1 = ('arrange' | 'act' | 'assert') | null;
 export type ShouldSkip = boolean;
+export type StepId1 = string | null;
+export type Context1 = string | null;
+export type DependsOn2 = string | null;
 export type Steps = (SimpleStep | ExtendedStep)[];
 export type Severity = ('low' | 'medium' | 'high' | 'critical') | null;
 export type Priority = ('low' | 'medium' | 'high' | 'urgent') | null;
@@ -322,6 +332,7 @@ export interface TestDefinition {
   description?: Description;
   variables?: Variables;
   depends_on?: DependsOn;
+  contexts?: Contexts;
   steps: Steps;
   severity?: Severity;
   priority?: Priority;
@@ -332,6 +343,16 @@ export interface TestDefinition {
 }
 export interface Variables {
   [k: string]: string;
+}
+/**
+ * Definition for a named browser context in multi-context tests.
+ *
+ * This interface was referenced by `TestDefinition`'s JSON-Schema
+ * via the `definition` "ContextDefinition".
+ */
+export interface ContextDefinition {
+  app_config_id: AppConfigId;
+  [k: string]: unknown;
 }
 /**
  * Simplified step format - human-readable, auto-resolved locators.
@@ -362,6 +383,9 @@ export interface SimpleStep {
   url?: Url;
   timeout?: Timeout;
   aaa_phase?: AaaPhase;
+  step_id?: StepId;
+  context?: Context;
+  depends_on?: DependsOn1;
   [k: string]: unknown;
 }
 /**
@@ -380,6 +404,9 @@ export interface ExtendedStep {
   description?: Description1;
   aaa_phase?: AaaPhase1;
   should_skip?: ShouldSkip;
+  step_id?: StepId1;
+  context?: Context1;
+  depends_on?: DependsOn2;
   [k: string]: unknown;
 }
 /**

@@ -294,9 +294,16 @@ Use diff output to interact with newly appeared elements directly, without runni
 
 | Command | Description |
 |---------|-------------|
+| \`qa-use api\` | Show help and available subcommands |
 | \`qa-use api ls\` | List available \`/api/v1/*\` routes from OpenAPI |
 | \`qa-use api ls --refresh\` | Force refresh OpenAPI cache |
 | \`qa-use api ls --offline\` | Use cached OpenAPI metadata only |
+| \`qa-use api info /api/v1/<route>\` | Show route details: parameters, request body, responses |
+| \`qa-use api info /api/v1/<route> -X POST\` | Show info for specific HTTP method |
+| \`qa-use api info /api/v1/<route> --json\` | Route info as JSON |
+| \`qa-use api examples\` | Show usage examples |
+| \`qa-use api openapi\` | Print OpenAPI spec URL |
+| \`qa-use api openapi --raw\` | Dump full OpenAPI spec as JSON |
 | \`qa-use api /api/v1/tests\` | Call endpoint (method inferred when possible) |
 | \`qa-use api -X GET /api/v1/test-runs -f limit=5\` | GET with query fields |
 | \`qa-use api -X POST /api/v1/tests-actions/run --input body.json\` | POST with JSON body file |
