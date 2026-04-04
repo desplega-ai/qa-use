@@ -261,6 +261,144 @@ await section('Section 4: API Subcommands', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Section 5: Suite CRUD
+// ---------------------------------------------------------------------------
+
+await section('Section 5: Suite CRUD', () => {
+	let suiteId = '';
+
+	try {
+		// 1. Create a suite
+		const createOut = runOrThrow([
+			'suite',
+			'create',
+			'-F',
+			'name=E2E Regression Suite',
+		]);
+		// Parse suite ID from create output (JSON or text)
+		const createIdMatch =
+			createOut.match(/"id"\s*:\s*"([0-9a-f-]{36})"/) ??
+			createOut.match(/([0-9a-f-]{36})/);
+		assert(!!createIdMatch, 'Suite create returned an ID');
+		suiteId = createIdMatch ? createIdMatch[1] : '';
+
+		// 2. List suites — should include the one we just created
+		const listOut = runOrThrow(['suite', 'list', '--json']);
+		const suites = JSON.parse(listOut);
+		assert(Array.isArray(suites), 'Suite list returns an array');
+		const found = suites.some(
+			(s: { id?: string }) => s.id === suiteId,
+		);
+		assert(found, 'Created suite appears in list');
+
+		// 3. Info on the suite
+		const infoOut = runOrThrow(['suite', 'info', suiteId, '--json']);
+		const suiteInfo = JSON.parse(infoOut);
+		assert(suiteInfo.id === suiteId, 'Suite info returns correct ID');
+		assert(
+			suiteInfo.name === 'E2E Regression Suite',
+			'Suite info returns correct name',
+		);
+
+		// 4. Update the suite
+		runOrThrow([
+			'suite',
+			'update',
+			suiteId,
+			'-F',
+			'name=E2E Regression Suite Updated',
+		]);
+		const infoOut2 = runOrThrow(['suite', 'info', suiteId, '--json']);
+		const suiteInfo2 = JSON.parse(infoOut2);
+		assert(
+			suiteInfo2.name === 'E2E Regression Suite Updated',
+			'Suite name updated successfully',
+		);
+
+		// 5. Delete the suite
+		runOrThrow(['suite', 'delete', suiteId, '--force']);
+		assert(true, 'Suite deleted successfully');
+		suiteId = ''; // cleared so finally block doesn't double-delete
+	} finally {
+		// Best-effort cleanup
+		if (suiteId) {
+			run(['suite', 'delete', suiteId, '--force']);
+		}
+	}
+});
+
+// ---------------------------------------------------------------------------
+// Section 6: Test Runs Subcommands
+// ---------------------------------------------------------------------------
+
+await section('Section 6: Test Runs Subcommands', () => {
+	// 1. List runs (may be empty, but command should succeed with valid JSON)
+	const listOut = runOrThrow(['test', 'runs', 'list', '--json', '--limit', '3']);
+	const runs = JSON.parse(listOut);
+	assert(Array.isArray(runs), 'Test runs list returns an array');
+
+	// 2. If there are runs, exercise info and steps on the first one
+	if (runs.length > 0) {
+		const runId = runs[0].id;
+		assert(typeof runId === 'string', 'Run has an id field');
+
+		// Info
+		const infoOut = runOrThrow(['test', 'runs', 'info', runId, '--json']);
+		const runInfo = JSON.parse(infoOut);
+		assert(runInfo.id === runId, 'Run info returns correct ID');
+		assert(typeof runInfo.status === 'string', 'Run info has status field');
+
+		// Steps
+		const stepsOut = runOrThrow(['test', 'runs', 'steps', runId, '--json']);
+		const steps = JSON.parse(stepsOut);
+		assert(Array.isArray(steps), 'Run steps returns an array');
+	} else {
+		console.log('  SKIP: No test runs found, skipping info/steps assertions');
+	}
+});
+
+// ---------------------------------------------------------------------------
+// Section 7: Resource Commands Smoke Test
+// ---------------------------------------------------------------------------
+
+await section('Section 7: Resource Commands Smoke Test', () => {
+	// Each resource command should return valid JSON with --json flag
+
+	// Issues
+	const issuesOut = runOrThrow(['issues', 'list', '--json', '--limit', '1']);
+	const issues = JSON.parse(issuesOut);
+	assert(Array.isArray(issues), 'issues list --json returns an array');
+
+	// App Config
+	const configOut = runOrThrow(['app-config', 'list', '--json', '--limit', '1']);
+	const configs = JSON.parse(configOut);
+	assert(Array.isArray(configs), 'app-config list --json returns an array');
+
+	// App Context
+	const contextOut = runOrThrow(['app-context', 'list', '--json', '--limit', '1']);
+	const contexts = JSON.parse(contextOut);
+	assert(Array.isArray(contexts), 'app-context list --json returns an array');
+
+	// Persona
+	const personaOut = runOrThrow(['persona', 'list', '--json', '--limit', '1']);
+	const personas = JSON.parse(personaOut);
+	assert(Array.isArray(personas), 'persona list --json returns an array');
+
+	// Data Asset
+	const assetOut = runOrThrow(['data-asset', 'list', '--json', '--limit', '1']);
+	const assets = JSON.parse(assetOut);
+	assert(Array.isArray(assets), 'data-asset list --json returns an array');
+
+	// Usage
+	const usageOut = runOrThrow(['usage', '--json']);
+	const usage = JSON.parse(usageOut);
+	assert(
+		typeof usage === 'object' && usage !== null,
+		'usage --json returns a valid object',
+	);
+});
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 

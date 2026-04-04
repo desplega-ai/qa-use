@@ -1,0 +1,19 @@
+import { describe, expect, it } from 'bun:test';
+import { listCommand } from './list.js';
+
+describe('app-context list command', () => {
+  it('has --limit option', () => {
+    const opt = listCommand.options.find((o) => o.long === '--limit');
+    expect(opt).toBeDefined();
+  });
+
+  it('has --offset option', () => {
+    const opt = listCommand.options.find((o) => o.long === '--offset');
+    expect(opt).toBeDefined();
+  });
+
+  it('has --json option', () => {
+    const opt = listCommand.options.find((o) => o.long === '--json');
+    expect(opt).toBeDefined();
+  });
+});
