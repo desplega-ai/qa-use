@@ -84,15 +84,16 @@ program.addHelpText('after', () => {
 Command Groups:
   Setup:     setup, info, install-deps, update
   Testing:   test run, test list, test validate, test init
-  Suites:    suite list, suite info, suite create, suite run
-  Browser:   browser create, browser goto, browser snapshot, browser click
-  Configs:   app-config list, app-config create, app-config update
-  Contexts:  app-context list, app-context create, app-context update
-  Personas:  persona list, persona info, persona create, persona update
-  Assets:    data-asset list, data-asset info, data-asset upload
+  Runs:      test runs list, test runs info, test runs steps
+  Suites:    suite list, suite create, suite run
   Issues:    issues list, issues info, issues occurrences
-  API:       api ls, api info, api examples, api openapi
+  Browser:   browser create, browser goto, browser snapshot, browser click
+  Config:    app-config list, app-config create
+  Context:   app-context list, app-context create
+  Personas:  persona list, persona create
+  Assets:    data-asset list, data-asset upload
   Usage:     usage, usage --detailed
+  API:       api ls, api info, api examples, api openapi
   Docs:      docs, docs <topic>, docs --list
   Advanced:  mcp
 
@@ -117,6 +118,20 @@ Common Workflows:
   qa-use browser goto https://your-app.com
   qa-use browser click <ref>
   qa-use browser generate-test my-test
+
+  # Manage test suites
+  qa-use suite create -F name="Smoke Tests"
+  qa-use suite list
+  qa-use suite run <suite-id>
+
+  # Review test run results
+  qa-use test runs list --limit 5
+  qa-use test runs info <run-id>
+  qa-use test runs steps <run-id>
+
+  # Check issues and usage
+  qa-use issues list --limit 10
+  qa-use usage --detailed
 
   # Get help on writing tests
   qa-use docs test-format

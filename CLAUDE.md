@@ -32,7 +32,20 @@ bun run typecheck     # Type check
 src/
 ├── cli/               # Unified CLI (qa-use command)
 │   ├── index.ts       # CLI entry point
-│   └── commands/      # CLI subcommands (setup, info, test, mcp)
+│   └── commands/      # CLI subcommands
+│       ├── api/       # Dynamic OpenAPI-driven API client
+│       ├── app-config/   # App configuration CRUD
+│       ├── app-context/  # App context CRUD
+│       ├── browser/      # Browser automation commands
+│       ├── data-asset/   # Data asset management
+│       ├── issues/       # Test issue viewer
+│       ├── persona/      # Persona management
+│       ├── suite/        # Test suite CRUD & runner
+│       ├── test/         # Test runner, listing, runs subcommands
+│       ├── docs.ts       # Documentation viewer
+│       ├── setup.ts      # Initial setup wizard
+│       ├── usage.ts      # Usage statistics
+│       └── ...           # info, install-deps, mcp, update
 ├── index.ts           # MCP stdio entry point (direct invocation)
 ├── server.ts          # Main MCP server, tools & session management
 ├── http-server.ts     # HTTP/SSE transport implementation
@@ -127,10 +140,14 @@ bun run scripts/e2e.ts --cmd qa-use     # use installed qa-use binary
 - The backend pointed to by `api_url` must be running
 - Test site: https://evals.desplega.ai/
 
-**What it tests (3 sections):**
+**What it tests (7 sections):**
 1. **Browser Commands** — create session, snapshot, url, screenshot, click (--text), back, status, close, logs
 2. **Table Filtering** — navigate to Table Demo, fill filter input by ref, assert filtered snapshot contains expected data and excludes filtered-out data
 3. **Test Runner** — runs `qa-tests/e2e.yaml` via `test run`, asserts it passes
+4. **API Subcommands** — api help, ls, info, info --json, examples, openapi, openapi --raw
+5. **Suite CRUD** — create a suite, list suites, get info, update it, delete it
+6. **Test Runs** — list runs, info on a run (if runs exist), steps
+7. **Resource Smoke Tests** — `list --json` on issues, app-config, app-context, persona, data-asset, and usage
 
 **Extending with new features:**
 - When adding a new browser command, add a step in Section 1 that exercises it

@@ -1,7 +1,7 @@
 ---
 date: 2026-04-04T12:00:00Z
 topic: "DES-103: qa-use CLI Command Coverage for /api/v1 Endpoints"
-status: in-progress
+status: completed
 linear_issue: DES-103
 ---
 
@@ -667,9 +667,9 @@ Update CLI help text, documentation, and extend the E2E regression test to cover
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Type check passes: `bun run typecheck`
-- [ ] Lint/format passes: `bun run check:fix`
-- [ ] Tests pass: `bun test`
+- [x] Type check passes: `bun run typecheck`
+- [x] Lint/format passes: `bun run check:fix`
+- [x] Tests pass: `bun test`
 - [ ] E2E passes: `bun run scripts/e2e.ts`
 
 #### Manual Verification:
