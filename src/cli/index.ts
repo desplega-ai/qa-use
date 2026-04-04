@@ -71,8 +71,9 @@ Command Groups:
   Setup:     setup, info, install-deps, update
   Testing:   test run, test list, test validate, test init
   Browser:   browser create, browser goto, browser snapshot, browser click
+  API:       api ls, api info, api examples, api openapi
   Docs:      docs, docs <topic>, docs --list
-  Advanced:  mcp, api
+  Advanced:  mcp
 
 Common Workflows:
   # Verify a feature in the browser
@@ -84,6 +85,11 @@ Common Workflows:
   # Create and run a test
   qa-use test init
   qa-use test run example-test
+
+  # Explore and call API endpoints
+  qa-use api ls
+  qa-use api info /api/v1/tests
+  qa-use api /api/v1/tests -f limit=5
 
   # Record a flow and generate a test
   qa-use browser create
