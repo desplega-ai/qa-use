@@ -464,10 +464,10 @@ Add read-only `issues` command group and `usage` command.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Type check passes: `bun run typecheck`
-- [ ] Lint/format passes: `bun run check:fix`
-- [ ] Tests pass: `bun test`
-- [ ] Files exist: `ls src/cli/commands/issues/{index,list,info,occurrences}.ts src/cli/commands/usage.ts`
+- [x] Type check passes: `bun run typecheck`
+- [x] Lint/format passes: `bun run check:fix`
+- [x] Tests pass: `bun test`
+- [x] Files exist: `ls src/cli/commands/issues/{index,list,info,occurrences}.ts src/cli/commands/usage.ts`
 
 #### Manual Verification:
 - [ ] `bun run cli issues list` shows issues table

@@ -11,11 +11,13 @@ import { browserCommand } from './commands/browser/index.js';
 import { docsCommand } from './commands/docs.js';
 import { infoCommand } from './commands/info.js';
 import { installDepsCommand } from './commands/install-deps.js';
+import { issuesCommand } from './commands/issues/index.js';
 import { mcpCommand } from './commands/mcp.js';
 import { setupCommand } from './commands/setup.js';
 import { suiteCommand } from './commands/suite/index.js';
 import { testCommand } from './commands/test/index.js';
 import { updateCommand } from './commands/update.js';
+import { usageCommand } from './commands/usage.js';
 import {
   checkForUpdateAsync,
   getUpdateHintForHelp,
@@ -45,6 +47,8 @@ program.addCommand(browserCommand);
 program.addCommand(installDepsCommand);
 program.addCommand(updateCommand);
 program.addCommand(apiCommand);
+program.addCommand(issuesCommand);
+program.addCommand(usageCommand);
 
 // Auto-update hint (reads from cache, fires async fetch — never blocks)
 if (!shouldSkipCheck(process.argv)) {
@@ -74,7 +78,9 @@ Command Groups:
   Testing:   test run, test list, test validate, test init
   Suites:    suite list, suite info, suite create, suite run
   Browser:   browser create, browser goto, browser snapshot, browser click
+  Issues:    issues list, issues info, issues occurrences
   API:       api ls, api info, api examples, api openapi
+  Usage:     usage, usage --detailed
   Docs:      docs, docs <topic>, docs --list
   Advanced:  mcp
 
