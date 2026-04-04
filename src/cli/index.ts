@@ -13,6 +13,7 @@ import { infoCommand } from './commands/info.js';
 import { installDepsCommand } from './commands/install-deps.js';
 import { mcpCommand } from './commands/mcp.js';
 import { setupCommand } from './commands/setup.js';
+import { suiteCommand } from './commands/suite/index.js';
 import { testCommand } from './commands/test/index.js';
 import { updateCommand } from './commands/update.js';
 import {
@@ -38,6 +39,7 @@ program.addCommand(setupCommand);
 program.addCommand(infoCommand);
 program.addCommand(docsCommand);
 program.addCommand(testCommand);
+program.addCommand(suiteCommand);
 program.addCommand(mcpCommand);
 program.addCommand(browserCommand);
 program.addCommand(installDepsCommand);
@@ -70,6 +72,7 @@ program.addHelpText('after', () => {
 Command Groups:
   Setup:     setup, info, install-deps, update
   Testing:   test run, test list, test validate, test init
+  Suites:    suite list, suite info, suite create, suite run
   Browser:   browser create, browser goto, browser snapshot, browser click
   API:       api ls, api info, api examples, api openapi
   Docs:      docs, docs <topic>, docs --list

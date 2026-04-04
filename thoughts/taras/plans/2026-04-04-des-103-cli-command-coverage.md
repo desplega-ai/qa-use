@@ -407,10 +407,10 @@ Create a new `suite` command group for test suite CRUD and execution.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Type check passes: `bun run typecheck`
-- [ ] Lint/format passes: `bun run check:fix`
-- [ ] Tests pass: `bun test`
-- [ ] Files exist: `ls src/cli/commands/suite/{index,list,info,create,update,delete,run}.ts`
+- [x] Type check passes: `bun run typecheck`
+- [x] Lint/format passes: `bun run check:fix`
+- [x] Tests pass: `bun test`
+- [x] Files exist: `ls src/cli/commands/suite/{index,list,info,create,update,delete,run}.ts`
 
 #### Manual Verification:
 - [ ] `bun run cli suite --help` shows all subcommands
