@@ -604,10 +604,10 @@ Add `persona` and `data-asset` command groups. Data asset has a special `upload`
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Type check passes: `bun run typecheck`
-- [ ] Lint/format passes: `bun run check:fix`
-- [ ] Tests pass: `bun test`
-- [ ] Files exist: `ls src/cli/commands/persona/ src/cli/commands/data-asset/`
+- [x] Type check passes: `bun run typecheck`
+- [x] Lint/format passes: `bun run check:fix`
+- [x] Tests pass: `bun test`
+- [x] Files exist: `ls src/cli/commands/persona/ src/cli/commands/data-asset/`
 
 #### Manual Verification:
 - [ ] `bun run cli persona list` shows personas

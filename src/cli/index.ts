@@ -10,11 +10,13 @@ import { apiCommand } from './commands/api/index.js';
 import { appConfigCommand } from './commands/app-config/index.js';
 import { appContextCommand } from './commands/app-context/index.js';
 import { browserCommand } from './commands/browser/index.js';
+import { dataAssetCommand } from './commands/data-asset/index.js';
 import { docsCommand } from './commands/docs.js';
 import { infoCommand } from './commands/info.js';
 import { installDepsCommand } from './commands/install-deps.js';
 import { issuesCommand } from './commands/issues/index.js';
 import { mcpCommand } from './commands/mcp.js';
+import { personaCommand } from './commands/persona/index.js';
 import { setupCommand } from './commands/setup.js';
 import { suiteCommand } from './commands/suite/index.js';
 import { testCommand } from './commands/test/index.js';
@@ -51,6 +53,8 @@ program.addCommand(updateCommand);
 program.addCommand(apiCommand);
 program.addCommand(appConfigCommand);
 program.addCommand(appContextCommand);
+program.addCommand(personaCommand);
+program.addCommand(dataAssetCommand);
 program.addCommand(issuesCommand);
 program.addCommand(usageCommand);
 
@@ -84,6 +88,8 @@ Command Groups:
   Browser:   browser create, browser goto, browser snapshot, browser click
   Configs:   app-config list, app-config create, app-config update
   Contexts:  app-context list, app-context create, app-context update
+  Personas:  persona list, persona info, persona create, persona update
+  Assets:    data-asset list, data-asset info, data-asset upload
   Issues:    issues list, issues info, issues occurrences
   API:       api ls, api info, api examples, api openapi
   Usage:     usage, usage --detailed
