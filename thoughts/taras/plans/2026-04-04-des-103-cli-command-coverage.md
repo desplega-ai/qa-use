@@ -262,9 +262,9 @@ Improve `test list` and `test info` per the issue requirements: add `--json` to 
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Type check passes: `bun run typecheck`
-- [ ] Lint/format passes: `bun run check:fix`
-- [ ] Tests pass: `bun test`
+- [x] Type check passes: `bun run typecheck`
+- [x] Lint/format passes: `bun run check:fix`
+- [x] Tests pass: `bun test`
 
 #### Manual Verification:
 - [ ] `bun run cli test list --cloud` shows table with ID column

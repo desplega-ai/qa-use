@@ -6,9 +6,13 @@ import * as path from 'node:path';
 import { Command } from 'commander';
 import * as yaml from 'yaml';
 import type { TestDefinition } from '../../../types/test-definition.js';
+import { apiCall, requireApiKey } from '../../lib/api-helpers.js';
 import { createApiClient, loadConfig } from '../../lib/config.js';
 import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
 import { error, formatError, info } from '../../lib/output.js';
+import { formatStatus, formatTimestamp } from '../../lib/table.js';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ANSI color codes
 const colors = {
@@ -19,7 +23,7 @@ const colors = {
 };
 
 /**
- * Format a test definition for display
+ * Format a test definition for display (local mode)
  */
 function displayTestInfo(test: TestDefinition, source: string): void {
   console.log(`\n${colors.cyan}Test: ${test.name}${colors.reset}`);
@@ -55,7 +59,7 @@ function displayTestInfo(test: TestDefinition, source: string): void {
 
   // Variables
   if (test.variables && Object.keys(test.variables).length > 0) {
-    console.log(`  Variables:`);
+    console.log('  Variables:');
     for (const [key, value] of Object.entries(test.variables)) {
       const displayValue = value.length > 50 ? `${value.substring(0, 47)}...` : value;
       console.log(`    ${key}: ${colors.gray}${displayValue}${colors.reset}`);
@@ -80,44 +84,161 @@ function displayTestInfo(test: TestDefinition, source: string): void {
   console.log('');
 }
 
+/**
+ * Display cloud test detail from /api/v1/tests/{id} response.
+ */
+function displayCloudTestInfo(data: Record<string, unknown>): void {
+  const name = String(data.name ?? 'Unnamed');
+  console.log(`\n${colors.cyan}Test: ${name}${colors.reset}`);
+  console.log(`${colors.gray}${'─'.repeat(40)}${colors.reset}`);
+
+  console.log(`  ID:          ${String(data.id ?? '-')}`);
+  console.log(`  Source:      cloud`);
+
+  if (data.description) {
+    console.log(`  Description: ${String(data.description)}`);
+  }
+
+  if (data.status) {
+    console.log(`  Status:      ${formatStatus(String(data.status))}`);
+  }
+
+  if (Array.isArray(data.tags) && data.tags.length > 0) {
+    console.log(`  Tags:        ${data.tags.join(', ')}`);
+  }
+
+  if (data.app_config) {
+    console.log(`  App Config:  ${String(data.app_config)}`);
+  }
+
+  if (data.created_at) {
+    console.log(`  Created:     ${formatTimestamp(String(data.created_at))}`);
+  }
+
+  if (data.updated_at) {
+    console.log(`  Updated:     ${formatTimestamp(String(data.updated_at))}`);
+  }
+
+  // Last run info
+  if (data.last_run && typeof data.last_run === 'object') {
+    const run = data.last_run as Record<string, unknown>;
+    console.log('  Last Run:');
+    if (run.id) console.log(`    Run ID:    ${String(run.id)}`);
+    if (run.status) console.log(`    Status:    ${formatStatus(String(run.status))}`);
+    if (run.started_at) console.log(`    Started:   ${formatTimestamp(String(run.started_at))}`);
+    if (run.finished_at) console.log(`    Finished:  ${formatTimestamp(String(run.finished_at))}`);
+  }
+
+  // Variables
+  if (data.variables && typeof data.variables === 'object') {
+    const vars = data.variables as Record<string, string>;
+    const keys = Object.keys(vars);
+    if (keys.length > 0) {
+      console.log('  Variables:');
+      for (const [key, value] of Object.entries(vars)) {
+        const displayValue =
+          typeof value === 'string' && value.length > 50
+            ? `${value.substring(0, 47)}...`
+            : String(value);
+        console.log(`    ${key}: ${colors.gray}${displayValue}${colors.reset}`);
+      }
+    }
+  }
+
+  // Steps summary
+  if (Array.isArray(data.steps) && data.steps.length > 0) {
+    console.log(`  Steps:       ${data.steps.length}`);
+    for (let i = 0; i < data.steps.length; i++) {
+      const step = data.steps[i] as Record<string, unknown>;
+      const action = step.action ?? step.type ?? '?';
+      const target = step.name || step.url || '';
+      const targetStr = target ? ` ${colors.gray}→ ${String(target)}${colors.reset}` : '';
+      console.log(`    [${i + 1}] ${String(action)}${targetStr}`);
+    }
+  }
+
+  console.log('');
+}
+
 export const infoCommand = new Command('info')
-  .description('Show test definition details')
-  .argument('[name]', 'Local test name/path (relative to test directory)')
-  .option('--id <id>', 'Cloud test ID (UUID) - fetches from cloud')
+  .description(
+    `Show test definition details.
+
+For local tests, provide the test name (relative to test directory):
+  qa-use test info auth/login
+
+For cloud tests, provide the UUID:
+  qa-use test info 550e8400-e29b-41d4-a716-446655440000`
+  )
+  .argument('[id-or-name]', 'Test name (local) or UUID (cloud)')
+  .option('--id <id>', 'Cloud test ID (UUID) - fetches from cloud (backward compat)')
   .option('--format <format>', 'Output format: pretty (default), yaml, json', 'pretty')
-  .action(async (name, options) => {
+  .option('--json', 'Output raw JSON (shorthand for --format json)')
+  .action(async (idOrName, options) => {
     try {
       const config = await loadConfig();
 
-      // Must provide either name or --id
-      if (!name && !options.id) {
-        console.log(error('Please provide a test name or use --id <uuid> for cloud tests'));
-        console.log('  Usage: qa-use test info <name>');
+      // Resolve the effective format
+      const format = options.json ? 'json' : options.format;
+
+      // Determine the lookup key: --id takes precedence, then positional arg
+      const lookupKey: string | undefined = options.id || idOrName;
+
+      if (!lookupKey) {
+        console.log(error('Please provide a test name or UUID'));
+        console.log('  Usage: qa-use test info <name-or-uuid>');
         console.log('         qa-use test info --id <uuid>');
         process.exit(1);
       }
 
-      let test: TestDefinition;
-      let source: string;
+      // Auto-detect: if it looks like a UUID, fetch from cloud
+      const isUuid = options.id !== undefined || UUID_RE.test(lookupKey);
 
-      if (options.id) {
-        // Fetch from cloud
-        if (!config.api_key) {
-          console.log(error('API key not configured'));
-          console.log('  Run `qa-use setup` to configure');
-          process.exit(1);
+      if (isUuid) {
+        // Cloud mode
+        requireApiKey(config);
+        const testId = lookupKey;
+
+        console.error(info(`Fetching test ${testId} from cloud...`));
+
+        let cloudData: Record<string, unknown> | null = null;
+
+        try {
+          cloudData = (await apiCall(config, 'GET', `/api/v1/tests/${testId}`)) as Record<
+            string,
+            unknown
+          >;
+        } catch {
+          // API call failed — fall back to export
         }
 
+        if (cloudData) {
+          // Rich cloud detail
+          if (format === 'json') {
+            console.log(JSON.stringify(cloudData, null, 2));
+          } else if (format === 'yaml') {
+            console.log(yaml.stringify(cloudData));
+          } else {
+            displayCloudTestInfo(cloudData);
+          }
+          return;
+        }
+
+        // Fallback: use legacy client export
         const client = createApiClient(config);
+        const content = await client.exportTest(testId, 'yaml', false);
+        const test = yaml.parse(content) as TestDefinition;
+        const source = `cloud (${testId})`;
 
-        console.log(info(`Fetching test ${options.id} from cloud...`));
-
-        // Use export to get full definition (including steps)
-        const content = await client.exportTest(options.id, 'yaml', false);
-        test = yaml.parse(content) as TestDefinition;
-        source = `cloud (${options.id})`;
+        if (format === 'json') {
+          console.log(JSON.stringify(test, null, 2));
+        } else if (format === 'yaml') {
+          console.log(yaml.stringify(test));
+        } else {
+          displayTestInfo(test, source);
+        }
       } else {
-        // Load local test
+        // Local mode
         const testDir = config.test_directory || './qa-tests';
         const files = await discoverTests(testDir);
 
@@ -130,7 +251,7 @@ export const infoCommand = new Command('info')
             .relative(resolvedTestDir, file)
             .replace(/\.(yaml|yml|json)$/, '');
 
-          if (relativePath === name || path.basename(relativePath) === name) {
+          if (relativePath === lookupKey || path.basename(relativePath) === lookupKey) {
             matchedFile = file;
             break;
           }
@@ -140,10 +261,10 @@ export const infoCommand = new Command('info')
           // Try with extensions
           for (const file of files) {
             if (
-              file.endsWith(name) ||
-              file.endsWith(`${name}.yaml`) ||
-              file.endsWith(`${name}.yml`) ||
-              file.endsWith(`${name}.json`)
+              file.endsWith(lookupKey) ||
+              file.endsWith(`${lookupKey}.yaml`) ||
+              file.endsWith(`${lookupKey}.yml`) ||
+              file.endsWith(`${lookupKey}.json`)
             ) {
               matchedFile = file;
               break;
@@ -152,22 +273,22 @@ export const infoCommand = new Command('info')
         }
 
         if (!matchedFile) {
-          console.log(error(`Test not found: ${name}`));
+          console.log(error(`Test not found: ${lookupKey}`));
           console.log(`  Searched in: ${testDir}`);
           process.exit(1);
         }
 
-        test = await loadTestDefinition(matchedFile);
-        source = path.relative(process.cwd(), matchedFile);
-      }
+        const test = await loadTestDefinition(matchedFile);
+        const relPath = path.relative(process.cwd(), matchedFile);
+        const source = `${relPath} (local file)`;
 
-      // Output based on format
-      if (options.format === 'yaml') {
-        console.log(yaml.stringify(test));
-      } else if (options.format === 'json') {
-        console.log(JSON.stringify(test, null, 2));
-      } else {
-        displayTestInfo(test, source);
+        if (format === 'json') {
+          console.log(JSON.stringify(test, null, 2));
+        } else if (format === 'yaml') {
+          console.log(yaml.stringify(test));
+        } else {
+          displayTestInfo(test, source);
+        }
       }
     } catch (err) {
       console.log(error(`Failed to get test info: ${formatError(err)}`));
