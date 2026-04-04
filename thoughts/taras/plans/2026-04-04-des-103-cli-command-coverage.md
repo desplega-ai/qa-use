@@ -351,11 +351,11 @@ runsCommand.addCommand(cancelCommand);
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Type check passes: `bun run typecheck`
-- [ ] Lint/format passes: `bun run check:fix`
-- [ ] Tests pass: `bun test`
-- [ ] Old file removed: `! test -f src/cli/commands/test/runs.ts`
-- [ ] New directory exists: `ls src/cli/commands/test/runs/`
+- [x] Type check passes: `bun run typecheck`
+- [x] Lint/format passes: `bun run check:fix`
+- [x] Tests pass: `bun test`
+- [x] Old file removed: `! test -f src/cli/commands/test/runs.ts`
+- [x] New directory exists: `ls src/cli/commands/test/runs/`
 
 #### Manual Verification:
 - [ ] `bun run cli test runs list` shows same output as old `test runs`

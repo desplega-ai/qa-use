@@ -9,7 +9,7 @@ import { infoCommand } from './info.js';
 import { initCommand } from './init.js';
 import { listCommand } from './list.js';
 import { runCommand } from './run.js';
-import { runsCommand } from './runs.js';
+import { runsCommand } from './runs/index.js';
 import { schemaCommand } from './schema.js';
 import { syncCommand } from './sync.js';
 import { validateCommand } from './validate.js';
