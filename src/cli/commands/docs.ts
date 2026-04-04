@@ -28,7 +28,13 @@ Usage:
   qa-use docs                      Main documentation
   qa-use docs browser-commands     Browser commands reference
   qa-use docs templates            List all templates
-  qa-use docs template:auth-flow   Show auth flow template`);
+  qa-use docs template:auth-flow   Show auth flow template
+
+API Documentation (via qa-use api):
+  qa-use api ls                    List available API endpoints
+  qa-use api info <route>          Route details (input/output types)
+  qa-use api examples              API usage examples
+  qa-use api openapi               OpenAPI spec URL (--raw for JSON)`);
 }
 
 export const docsCommand = new Command('docs')

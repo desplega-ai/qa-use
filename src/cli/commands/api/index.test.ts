@@ -2,9 +2,12 @@ import { describe, expect, it } from 'bun:test';
 import { apiCommand } from './index.js';
 
 describe('api command', () => {
-  it('registers ls as a subcommand', () => {
+  it('registers all expected subcommands', () => {
     const names = apiCommand.commands.map((command) => command.name());
     expect(names).toContain('ls');
+    expect(names).toContain('info');
+    expect(names).toContain('examples');
+    expect(names).toContain('openapi');
   });
 
   it('uses optional endpoint argument for direct requests', () => {
