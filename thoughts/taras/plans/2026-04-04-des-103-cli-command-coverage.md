@@ -535,10 +535,10 @@ Add `app-config` and `app-context` command groups. These share the same CRUD pat
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Type check passes: `bun run typecheck`
-- [ ] Lint/format passes: `bun run check:fix`
-- [ ] Tests pass: `bun test`
-- [ ] Files exist: `ls src/cli/commands/app-config/ src/cli/commands/app-context/`
+- [x] Type check passes: `bun run typecheck`
+- [x] Lint/format passes: `bun run check:fix`
+- [x] Tests pass: `bun test`
+- [x] Files exist: `ls src/cli/commands/app-config/ src/cli/commands/app-context/`
 
 #### Manual Verification:
 - [ ] `bun run cli app-config list` shows configs

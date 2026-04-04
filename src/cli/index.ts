@@ -7,6 +7,8 @@
 import { createRequire } from 'node:module';
 import { Command } from 'commander';
 import { apiCommand } from './commands/api/index.js';
+import { appConfigCommand } from './commands/app-config/index.js';
+import { appContextCommand } from './commands/app-context/index.js';
 import { browserCommand } from './commands/browser/index.js';
 import { docsCommand } from './commands/docs.js';
 import { infoCommand } from './commands/info.js';
@@ -47,6 +49,8 @@ program.addCommand(browserCommand);
 program.addCommand(installDepsCommand);
 program.addCommand(updateCommand);
 program.addCommand(apiCommand);
+program.addCommand(appConfigCommand);
+program.addCommand(appContextCommand);
 program.addCommand(issuesCommand);
 program.addCommand(usageCommand);
 
@@ -78,6 +82,8 @@ Command Groups:
   Testing:   test run, test list, test validate, test init
   Suites:    suite list, suite info, suite create, suite run
   Browser:   browser create, browser goto, browser snapshot, browser click
+  Configs:   app-config list, app-config create, app-config update
+  Contexts:  app-context list, app-context create, app-context update
   Issues:    issues list, issues info, issues occurrences
   API:       api ls, api info, api examples, api openapi
   Usage:     usage, usage --detailed
