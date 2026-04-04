@@ -8,6 +8,7 @@ import {
   type NormalizedOperation,
   type OpenApiRefreshMode,
 } from './lib/openapi-spec.js';
+import { resolveOperationCandidates } from './lib/route-matching.js';
 
 interface RequestCommandOptions {
   method?: string;
@@ -57,21 +58,6 @@ function parseEndpoint(endpoint: string): { path: string; query: Record<string, 
     path: parsed.pathname,
     query,
   };
-}
-
-function pathTemplateToRegExp(pathTemplate: string): RegExp {
-  const escaped = pathTemplate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const pattern = escaped.replace(/\\\{[^/]+\\\}/g, '[^/]+');
-  return new RegExp(`^${pattern}$`);
-}
-
-function resolveOperationCandidates(
-  path: string,
-  operations: Record<string, NormalizedOperation>
-): NormalizedOperation[] {
-  return Object.values(operations).filter((operation) =>
-    pathTemplateToRegExp(operation.path).test(path)
-  );
 }
 
 export function inferMethod(
@@ -176,12 +162,11 @@ export function registerApiRequestAction(
     .option('--raw', 'Print raw response body')
     .option('--refresh', 'Force refresh OpenAPI spec from server')
     .option('--offline', 'Use cached OpenAPI spec only')
-    .action(async (endpoint: string | undefined, options: RequestCommandOptions) => {
+    .action(async (endpoint: string | undefined, options: RequestCommandOptions, cmd: Command) => {
       try {
         if (!endpoint) {
-          throw new Error(
-            'Endpoint path is required. Use `qa-use api ls` to list available endpoints.'
-          );
+          cmd.help();
+          return;
         }
 
         const config = await loadConfig();

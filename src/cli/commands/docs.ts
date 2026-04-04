@@ -23,12 +23,20 @@ function printList(): void {
     console.log(`    template:${key.padEnd(14)} ${TEMPLATES[key].title}`);
   }
 
+  console.log('\n  API:');
+  console.log(`    ${'api ls'.padEnd(22)} List available API endpoints`);
+  console.log(`    ${'api info <route>'.padEnd(22)} Route details (input/output types)`);
+  console.log(`    ${'api examples'.padEnd(22)} API usage examples`);
+  console.log(`    ${'api openapi'.padEnd(22)} OpenAPI spec URL (--raw for JSON)`);
+
   console.log(`
 Usage:
   qa-use docs                      Main documentation
   qa-use docs browser-commands     Browser commands reference
   qa-use docs templates            List all templates
-  qa-use docs template:auth-flow   Show auth flow template`);
+  qa-use docs template:auth-flow   Show auth flow template
+  qa-use api info /api/v1/tests    Route input/output types
+  qa-use api examples              API usage examples`);
 }
 
 export const docsCommand = new Command('docs')

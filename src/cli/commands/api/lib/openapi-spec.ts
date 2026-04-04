@@ -7,24 +7,45 @@ import {
   formatStaleCacheWarning,
   OpenApiError,
 } from './openapi-errors.js';
+import { type OpenApiSchemaRef, type ResolvedSchema, resolveSchemaRef } from './schema-resolver.js';
 
 export type OpenApiRefreshMode = 'default' | 'refresh' | 'offline';
 
 interface OpenApiPathOperation {
   summary?: string;
+  description?: string;
   operationId?: string;
   tags?: string[];
   parameters?: Array<{
     name?: string;
     in?: string;
     required?: boolean;
+    description?: string;
     schema?: {
       type?: string;
     };
   }>;
   requestBody?: {
     required?: boolean;
+    content?: Record<
+      string,
+      {
+        schema?: OpenApiSchemaRef;
+      }
+    >;
   };
+  responses?: Record<
+    string,
+    {
+      description?: string;
+      content?: Record<
+        string,
+        {
+          schema?: OpenApiSchemaRef;
+        }
+      >;
+    }
+  >;
 }
 
 interface OpenApiSpecDocument {
@@ -32,7 +53,13 @@ interface OpenApiSpecDocument {
   paths: Record<string, Record<string, OpenApiPathOperation>>;
   components?: {
     securitySchemes?: Record<string, unknown>;
+    schemas?: Record<string, OpenApiSchemaRef>;
   };
+}
+
+export interface NormalizedResponseSchema {
+  description?: string;
+  schema?: ResolvedSchema;
 }
 
 export interface NormalizedOperation {
@@ -40,16 +67,20 @@ export interface NormalizedOperation {
   method: string;
   path: string;
   summary?: string;
+  description?: string;
   operationId?: string;
   tags: string[];
   parameters: Array<{
     name: string;
     in: 'path' | 'query' | 'header' | 'cookie' | 'unknown';
     required: boolean;
+    description?: string;
     schemaType?: string;
   }>;
   parameterCount: number;
   requestBodyRequired: boolean;
+  requestBodySchema?: ResolvedSchema;
+  responseSchemas?: Record<string, NormalizedResponseSchema>;
 }
 
 export interface OpenApiSpecIndex {
@@ -118,8 +149,38 @@ function validateOpenApiDocument(spec: unknown): OpenApiSpecDocument {
   return candidate as OpenApiSpecDocument;
 }
 
+function resolveRequestBodySchema(
+  op: OpenApiPathOperation,
+  componentSchemas: Record<string, OpenApiSchemaRef>
+): ResolvedSchema | undefined {
+  const content = op.requestBody?.content;
+  if (!content) return undefined;
+  const jsonContent = content['application/json'];
+  if (!jsonContent?.schema) return undefined;
+  return resolveSchemaRef(jsonContent.schema, componentSchemas);
+}
+
+function resolveResponseSchemas(
+  op: OpenApiPathOperation,
+  componentSchemas: Record<string, OpenApiSchemaRef>
+): Record<string, NormalizedResponseSchema> | undefined {
+  if (!op.responses) return undefined;
+  const result: Record<string, NormalizedResponseSchema> = {};
+  for (const [statusCode, response] of Object.entries(op.responses)) {
+    const jsonContent = response.content?.['application/json'];
+    result[statusCode] = {
+      description: response.description,
+      schema: jsonContent?.schema
+        ? resolveSchemaRef(jsonContent.schema, componentSchemas)
+        : undefined,
+    };
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
 function normalizeOperations(spec: OpenApiSpecDocument): Record<string, NormalizedOperation> {
   const operations: Record<string, NormalizedOperation> = {};
+  const componentSchemas = spec.components?.schemas || {};
 
   for (const [path, pathItem] of Object.entries(spec.paths)) {
     if (!pathItem || typeof pathItem !== 'object') {
@@ -139,6 +200,7 @@ function normalizeOperations(spec: OpenApiSpecDocument): Record<string, Normaliz
         method: normalizedMethod.toUpperCase(),
         path,
         summary: op.summary,
+        description: op.description,
         operationId: op.operationId,
         tags: Array.isArray(op.tags) ? op.tags.filter((tag) => typeof tag === 'string') : [],
         parameters: Array.isArray(op.parameters)
@@ -154,11 +216,14 @@ function normalizeOperations(spec: OpenApiSpecDocument): Record<string, Normaliz
                     ? parameter.in
                     : 'unknown',
                 required: Boolean(parameter.required),
+                description: parameter.description,
                 schemaType: parameter.schema?.type,
               }))
           : [],
         parameterCount: Array.isArray(op.parameters) ? op.parameters.length : 0,
         requestBodyRequired: Boolean(op.requestBody?.required),
+        requestBodySchema: resolveRequestBodySchema(op, componentSchemas),
+        responseSchemas: resolveResponseSchemas(op, componentSchemas),
       };
     }
   }

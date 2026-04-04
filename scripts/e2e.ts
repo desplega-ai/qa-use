@@ -222,6 +222,45 @@ await section('Section 3: Test Runner', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Section 4: API Subcommands
+// ---------------------------------------------------------------------------
+
+await section('Section 4: API Subcommands', () => {
+	// 1. Bare `api` shows help (exit 0)
+	const helpOut = runOrThrow(['api']);
+	assert(helpOut.includes('Call desplega.ai API endpoints'), 'Bare api shows help text');
+
+	// 2. `api ls` lists endpoints
+	const lsOut = runOrThrow(['api', 'ls']);
+	assert(lsOut.includes('METHOD') && lsOut.includes('PATH'), 'api ls shows endpoint table');
+
+	// 3. `api info` shows route details
+	const infoOut = runOrThrow(['api', 'info', '/api/v1/tests']);
+	assert(infoOut.includes('GET /api/v1/tests'), 'api info shows route method and path');
+	assert(infoOut.includes('Parameters:'), 'api info shows parameters section');
+	assert(infoOut.includes('Responses:'), 'api info shows responses section');
+
+	// 4. `api info --json` produces JSON
+	const infoJson = runOrThrow(['api', 'info', '/api/v1/tests', '--json']);
+	const parsed = JSON.parse(infoJson);
+	assert(parsed.method === 'GET', 'api info --json has correct method');
+	assert(parsed.path === '/api/v1/tests', 'api info --json has correct path');
+
+	// 5. `api examples` shows examples
+	const exOut = runOrThrow(['api', 'examples']);
+	assert(exOut.includes('API Command Examples'), 'api examples shows title');
+
+	// 6. `api openapi` shows URL
+	const oaOut = runOrThrow(['api', 'openapi']);
+	assert(oaOut.includes('/api/v1/openapi.json'), 'api openapi shows spec URL');
+
+	// 7. `api openapi --raw` dumps JSON spec
+	const oaRaw = runOrThrow(['api', 'openapi', '--raw']);
+	const spec = JSON.parse(oaRaw);
+	assert(spec.openapi && spec.paths, 'api openapi --raw returns valid OpenAPI JSON');
+});
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 
