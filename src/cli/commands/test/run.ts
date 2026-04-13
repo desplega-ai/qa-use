@@ -26,6 +26,7 @@ import {
   formatError,
   info,
   printDownloadedFilesSummary,
+  printPersistenceNote,
   printScreenshotsSummary,
   success,
 } from '../../lib/output.js';
@@ -151,13 +152,14 @@ export const runCommand = new Command('run')
 
         // Run the test with SSE streaming
         const varOverrides = Object.keys(options.var).length > 0 ? options.var : undefined;
+        const resolvedPersist = options.persist || config.defaults?.persist || false;
 
         const result = await runTest(
           client,
           {
             test_definitions: testDefinitions,
             test_id: options.id,
-            persist: options.persist || config.defaults?.persist || false,
+            persist: resolvedPersist,
             // When using ws_url, headless flag is irrelevant (backend uses our browser)
             // When --headful without tunnel (dev mode), tell backend to run visible browser
             headless: wsUrl ? true : options.headful ? false : (config.defaults?.headless ?? true),
@@ -209,6 +211,10 @@ export const runCommand = new Command('run')
             console.log(`  HAR: ${result.assets.har_url}`);
           }
         }
+
+        // Tip/warning about persist vs sync state (skipped for --id runs,
+        // which have no local definitions to classify).
+        printPersistenceNote(testDefinitions, resolvedPersist);
 
         // Exit with appropriate code
         if (result.status !== 'passed') {

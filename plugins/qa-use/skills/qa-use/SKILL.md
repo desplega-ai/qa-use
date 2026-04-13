@@ -150,6 +150,9 @@ qa-use test run login
 # Run with autofix (AI self-healing)
 qa-use test run login --autofix
 
+# Run and save the (non-synced) local test to cloud
+qa-use test run login --persist
+
 # Validate syntax
 qa-use test validate login
 
@@ -185,6 +188,23 @@ qa-use test sync push --force
 # Compare local vs cloud
 qa-use test diff login.yaml
 ```
+
+**Persist vs Sync:**
+
+A local test is **synced** when its YAML has both an `id:` and a `version_hash:`
+(these are written back by `test sync push`/`pull`). `--persist` on `test run`
+and `qa-use test sync` are related but not the same:
+
+| Local file state | `persist` | What happens at run time |
+|---|---|---|
+| Non-synced | `false` (default) | Runs locally; nothing saved to cloud. Re-run with `--persist` or use `test sync push` to persist. |
+| Non-synced | `true` | Test is uploaded as a **new** cloud entry after the run. Re-running like this creates **duplicates** — prefer `test sync push` once the file tracks the cloud id. |
+| Synced | `false` | Runs against the cloud-tracked definition; no extra write. |
+| Synced | `true` | Cloud definition is **upserted** (may overwrite newer cloud edits). Use `test sync push`/`pull` for explicit version control. |
+
+Rule of thumb: `test sync push`/`pull` is the deliberate path. Reserve `--persist`
+(or `defaults.persist: true` in `.qa-use.json`) for one-off uploads of brand-new
+local tests.
 
 **No Plugin Shortcut** - Use CLI commands directly
 

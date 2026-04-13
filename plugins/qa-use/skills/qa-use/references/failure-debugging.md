@@ -93,7 +93,14 @@ qa-use test run my-test --autofix --update-local
 
 # 3. Check what changed
 git diff qa-tests/my-test.yaml
+
+# 4. If the test is synced to cloud, push the fix up too
+qa-use test sync push --id <uuid>
 ```
+
+> `--update-local` writes the AI-fixed YAML to the local file only. It does not
+> push to cloud. For synced tests, follow up with `test sync push` (or run with
+> `--persist`) so the cloud definition matches what you just committed locally.
 
 ### Suggested Actions
 

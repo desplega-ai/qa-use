@@ -5,6 +5,7 @@
 import * as fs from 'node:fs';
 import * as yaml from 'yaml';
 import type { SSEEvent } from '../../../lib/api/sse.js';
+import type { TestDefinition } from '../../types/test-definition.js';
 import { buildDownloadPath, downloadFile, getExtensionFromUrl } from './download.js';
 
 /**
@@ -132,6 +133,60 @@ export function warning(message: string): string {
  */
 export function info(message: string): string {
   return `${colors.blue}ℹ${colors.reset} ${message}`;
+}
+
+/**
+ * A test definition is "synced" with cloud when it carries both an `id` and
+ * a `version_hash` (the hash is written back by `test sync push`).
+ */
+function isSynced(def: TestDefinition): boolean {
+  return Boolean(def.id && def.version_hash);
+}
+
+/**
+ * Print a tip/warning explaining the persistence state of the just-completed
+ * run. Skip entirely for `--id` runs (no local definition context).
+ */
+export function printPersistenceNote(defs: TestDefinition[] | undefined, persisted: boolean): void {
+  if (!defs || defs.length === 0) return;
+
+  const synced = defs.filter(isSynced);
+  const nonSynced = defs.filter((d) => !isSynced(d));
+
+  if (persisted) {
+    if (nonSynced.length > 0) {
+      const label =
+        nonSynced.length === 1
+          ? `"${nonSynced[0].name || 'test'}" was saved to cloud as a new entry`
+          : `${nonSynced.length} non-synced tests were saved to cloud as new entries`;
+      console.log(
+        warning(
+          `Ran with --persist: ${label}. Re-running like this creates duplicates — prefer \`qa-use test sync push\` once the file tracks the cloud id.`
+        )
+      );
+    }
+    if (synced.length > 0) {
+      const label =
+        synced.length === 1
+          ? `"${synced[0].name || 'test'}" (synced)`
+          : `${synced.length} synced tests`;
+      console.log(
+        warning(
+          `Ran with --persist on ${label}: cloud definition was upserted and may overwrite newer cloud edits. Use \`qa-use test sync push\`/\`pull\` for explicit version control.`
+        )
+      );
+    }
+  } else if (nonSynced.length > 0) {
+    const label =
+      nonSynced.length === 1
+        ? 'This run is not linked to cloud'
+        : `${nonSynced.length} non-synced test(s) ran locally only`;
+    console.log(
+      info(
+        `${label}. To persist the test and future runs, run \`qa-use test sync push\` (or re-run with \`--persist\`).`
+      )
+    );
+  }
 }
 
 /**
