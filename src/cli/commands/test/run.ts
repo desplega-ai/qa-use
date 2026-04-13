@@ -46,7 +46,6 @@ export const runCommand = new Command('run')
   .option('--tunnel', 'Start local browser with tunnel (required for localhost URLs)')
   .option('--headful', 'Show browser window (use with --tunnel)')
   .option('--ws-url <url>', 'Use existing tunneled browser (from `browser create --tunnel`)')
-  .option('--autofix', 'Enable AI self-healing (default: off)')
   .option('--screenshots', 'Capture screenshots at each step')
   .option(
     '--download',
@@ -56,7 +55,6 @@ export const runCommand = new Command('run')
   .option('--app-config-id <uuid>', 'App config ID to use')
   .option('--timeout <seconds>', 'Timeout in seconds', '300')
   .option('--verbose', 'Output raw SSE event data for debugging')
-  .option('--update-local', 'Update local test file when AI auto-fixes the test')
   .action(async (test, options) => {
     try {
       const config = await loadConfig();
@@ -82,13 +80,11 @@ export const runCommand = new Command('run')
         console.log('Loading all tests...');
         testDefinitions = await loadAllTests(config.test_directory || './qa-tests');
         console.log(success(`Loaded ${testDefinitions.length} tests\n`));
-        // Note: --update-local only works for single test runs
       } else if (test) {
         // Load specific test and its dependencies
         console.log(`Loading test: ${test}...`);
         const testDir = config.test_directory || './qa-tests';
         testDefinitions = await loadTestWithDeps(test, testDir);
-        // Track source file for --update-local support
         sourceFile = resolveTestPath(test, testDir);
         console.log(success(`Loaded ${testDefinitions.length} test(s)\n`));
       } else {
@@ -163,7 +159,6 @@ export const runCommand = new Command('run')
             // When using ws_url, headless flag is irrelevant (backend uses our browser)
             // When --headful without tunnel (dev mode), tell backend to run visible browser
             headless: wsUrl ? true : options.headful ? false : (config.defaults?.headless ?? true),
-            allow_fix: options.autofix || config.defaults?.allow_fix || false,
             capture_screenshots: options.screenshots || options.download || false,
             ws_url: wsUrl,
             vars: varOverrides,
@@ -171,7 +166,6 @@ export const runCommand = new Command('run')
           },
           {
             verbose: options.verbose || false,
-            updateLocal: options.updateLocal || false,
             sourceFile,
             download: options.download || false,
             downloadBaseDir: '/tmp/qa-use/downloads',

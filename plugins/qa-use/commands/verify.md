@@ -19,7 +19,7 @@ Verify a feature works through automated browser testing.
 
 1. Searches for existing tests matching your description
 2. If no test exists, offers to explore and create one
-3. Runs the test with AI self-healing
+3. Runs the test
 4. Reports results with specific fix recommendations
 
 ## Examples

@@ -55,11 +55,6 @@
           "type": "number",
           "default": 300,
           "description": "Session timeout in seconds"
-        },
-        "allow_fix": {
-          "type": "boolean",
-          "default": true,
-          "description": "Allow automatic fix attempts on test failures"
         }
       },
       "additionalProperties": false

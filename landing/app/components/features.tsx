@@ -27,11 +27,6 @@ const testingFeatures = [
     description:
       "Sync tests to desplega.ai. Run in CI/CD with GitHub Actions. Persistent storage and reporting.",
   },
-  {
-    title: "Self-Healing",
-    description:
-      "AI auto-fixes broken selectors with --autofix. Tests adapt as your UI evolves. No more flaky tests.",
-  },
 ];
 
 function FeatureGrid({

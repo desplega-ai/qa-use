@@ -19,7 +19,6 @@ export interface CliConfig {
     headless?: boolean;
     persist?: boolean;
     timeout?: number;
-    allow_fix?: boolean;
   };
 }
 
@@ -92,7 +91,6 @@ export async function loadConfig(): Promise<CliConfig> {
       headless: true,
       persist: false,
       timeout: 300,
-      allow_fix: true,
     },
   };
 

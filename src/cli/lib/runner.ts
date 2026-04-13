@@ -8,8 +8,6 @@ import { printSSEProgress, type SSEProgressContext } from './output.js';
 
 export interface RunTestOptions {
   verbose?: boolean;
-  /** Whether to update local file on test_fixed event */
-  updateLocal?: boolean;
   /** Path to the source test definition file */
   sourceFile?: string;
   /** Whether to download assets locally */
@@ -37,21 +35,11 @@ export async function runTest(
   runOptions: RunTestOptions = {},
   onEvent?: (event: SSEEvent) => void
 ): Promise<RunCliTestResult> {
-  const {
-    verbose = false,
-    updateLocal,
-    sourceFile,
-    download,
-    downloadBaseDir,
-    testId,
-    runId,
-  } = runOptions;
+  const { verbose = false, sourceFile, download, downloadBaseDir, testId, runId } = runOptions;
 
   // Build context for SSE progress handler
   const context: SSEProgressContext | undefined =
-    updateLocal || sourceFile || download
-      ? { updateLocal, sourceFile, download, downloadBaseDir, testId, runId }
-      : undefined;
+    sourceFile || download ? { sourceFile, download, downloadBaseDir, testId, runId } : undefined;
 
   return await client.runCliTest(options, (event) => {
     // Print progress to console

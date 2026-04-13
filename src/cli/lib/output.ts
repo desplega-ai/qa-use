@@ -2,18 +2,14 @@
  * Console output formatting utilities
  */
 
-import * as fs from 'node:fs';
-import * as yaml from 'yaml';
 import type { SSEEvent } from '../../../lib/api/sse.js';
 import type { TestDefinition } from '../../types/test-definition.js';
 import { buildDownloadPath, downloadFile, getExtensionFromUrl } from './download.js';
 
 /**
- * Context for SSE progress output, used for features like --update-local and --download
+ * Context for SSE progress output, used for features like --download
  */
 export interface SSEProgressContext {
-  /** Whether to update local file on test_fixed event */
-  updateLocal?: boolean;
   /** Path to the source test definition file */
   sourceFile?: string;
   /** Whether to download assets locally */
@@ -288,7 +284,7 @@ function printLogsIncremental(stepIndex: number, logs: string[] | undefined): vo
  * Print SSE event progress in real-time
  * @param event - SSE event to print
  * @param verbose - If true, also print raw event data
- * @param context - Optional context for features like --update-local
+ * @param context - Optional context for features like --download
  */
 export function printSSEProgress(
   event: SSEEvent,
@@ -459,26 +455,6 @@ export function printSSEProgress(
     case 'persisted':
       console.log(success(`Test saved to cloud (ID: ${event.data.test_id})`));
       break;
-
-    case 'test_fixed': {
-      console.log('');
-      console.log(`${colors.blue}🔧${colors.reset} Test auto-fixed: "${event.data.name}"`);
-
-      if (context?.updateLocal && context?.sourceFile) {
-        // event.data contains the fixed TestDefinition
-        // Serialize based on source file extension
-        const isYaml = context.sourceFile.match(/\.ya?ml$/i);
-        const content = isYaml ? yaml.stringify(event.data) : JSON.stringify(event.data, null, 2);
-
-        fs.writeFileSync(context.sourceFile, content);
-        console.log(`${colors.green}✓${colors.reset} Updated ${context.sourceFile}`);
-      } else {
-        console.log(
-          `${colors.gray}Use --update-local to save fixed version to local file.${colors.reset}`
-        );
-      }
-      break;
-    }
 
     case 'step_log':
       // Individual log line streamed from the backend

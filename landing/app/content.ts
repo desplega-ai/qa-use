@@ -24,7 +24,6 @@ Works with Claude, Cursor, and any MCP client.
 
 - **YAML Test Definitions** — Human-readable, version-controllable. 40+ actions, AI assertions.
 - **Cloud Execution** — Sync tests to desplega.ai. Run in CI/CD with GitHub Actions.
-- **Self-Healing** — AI auto-fixes broken selectors. Tests adapt as your UI evolves.
 
 ## Getting Started
 
@@ -129,7 +128,6 @@ E2E TESTING
 -----------
 - YAML Test Definitions   Human-readable, version-controllable. 40+ actions, AI assertions.
 - Cloud Execution         Sync tests to desplega.ai. Run in CI/CD with GitHub Actions.
-- Self-Healing            AI auto-fixes broken selectors. Tests adapt as your UI evolves.
 
 GETTING STARTED
 ---------------

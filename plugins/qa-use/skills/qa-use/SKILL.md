@@ -147,9 +147,6 @@ qa-use test run my_test
 # Run test by name
 qa-use test run login
 
-# Run with autofix (AI self-healing)
-qa-use test run login --autofix
-
 # Run and save the (non-synced) local test to cloud
 qa-use test run login --persist
 
@@ -165,7 +162,7 @@ qa-use test runs --status failed
 
 **Plugin Shortcut:**
 ```
-/qa-use:test-run login --autofix
+/qa-use:test-run login
 ```
 (Convenience shortcut for common test execution)
 
@@ -283,8 +280,6 @@ Use diff output to interact with newly appeared elements directly, without runni
 | `qa-use test run <name>` | Run test by name |
 | `qa-use test run --all` | Run all tests |
 | `qa-use test run <name> --tunnel` | Run with local browser tunnel |
-| `qa-use test run <name> --autofix` | Enable AI self-healing |
-| `qa-use test run <name> --update-local` | Persist AI fixes to file |
 | `qa-use test run <name> --download` | Download assets to `/tmp/qa-use/downloads/` |
 | `qa-use test run <name> --var key=value` | Override variable |
 | `qa-use test validate <name>` | Validate test syntax |
@@ -382,8 +377,8 @@ qa-use browser create --after-test-id <login-test-uuid> \
 # 1. Search for existing test
 qa-use test list | grep "login"
 
-# 2. Run test with autofix
-qa-use test run login --autofix
+# 2. Run test
+qa-use test run login
 
 # 3. Debug failures
 qa-use browser logs console

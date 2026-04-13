@@ -7,7 +7,6 @@
   "defaults": {
     "headless": true,
     "persist": false,
-    "timeout": 300,
-    "allow_fix": true
+    "timeout": 300
   }
 }

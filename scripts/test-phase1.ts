@@ -109,7 +109,6 @@ async function main() {
         test_definitions: [testDef],
         persist: false, // Don't save to DB
         headless: true,
-        allow_fix: false, // Disable AI self-healing
         capture_screenshots: false,
         store_recording: false,
         store_har: false,

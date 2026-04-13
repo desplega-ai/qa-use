@@ -153,9 +153,6 @@ qa-use test run my_test
 # Run test by name
 qa-use test run login
 
-# Run with autofix (AI self-healing)
-qa-use test run login --autofix
-
 # Run and save the (non-synced) local test to cloud
 qa-use test run login --persist
 
@@ -171,7 +168,7 @@ qa-use test runs --status failed
 
 **Plugin Shortcut:**
 \`\`\`
-/qa-use:test-run login --autofix
+/qa-use:test-run login
 \`\`\`
 (Convenience shortcut for common test execution)
 
@@ -289,8 +286,6 @@ Use diff output to interact with newly appeared elements directly, without runni
 | \`qa-use test run <name>\` | Run test by name |
 | \`qa-use test run --all\` | Run all tests |
 | \`qa-use test run <name> --tunnel\` | Run with local browser tunnel |
-| \`qa-use test run <name> --autofix\` | Enable AI self-healing |
-| \`qa-use test run <name> --update-local\` | Persist AI fixes to file |
 | \`qa-use test run <name> --download\` | Download assets to \`/tmp/qa-use/downloads/\` |
 | \`qa-use test run <name> --var key=value\` | Override variable |
 | \`qa-use test validate <name>\` | Validate test syntax |
@@ -388,8 +383,8 @@ qa-use browser create --after-test-id <login-test-uuid> \\
 # 1. Search for existing test
 qa-use test list | grep "login"
 
-# 2. Run test with autofix
-qa-use test run login --autofix
+# 2. Run test
+qa-use test run login
 
 # 3. Debug failures
 qa-use browser logs console
@@ -1668,34 +1663,28 @@ qa-use browser logs network -s <session-id>
 
 1. Has the UI changed recently (button text, layout, element attributes)?
 2. Is this a timing/race condition issue?
-3. Does the test pass with \`--autofix\`?
-4. Did someone refactor the component without updating tests?
+3. Did someone refactor the component without updating tests?
 
 ### Investigation Steps
 
 \`\`\`bash
-# 1. Run with autofix to see if AI can fix it
-qa-use test run my-test --autofix
+# 1. Re-read the test definition and the current page snapshot
+qa-use browser snapshot
 
-# 2. If autofix works, persist the fix
-qa-use test run my-test --autofix --update-local
+# 2. Compare the test's targets to what's actually on the page
 
-# 3. Check what changed
+# 3. Edit the test YAML to match the current UI
 git diff qa-tests/my-test.yaml
 
 # 4. If the test is synced to cloud, push the fix up too
 qa-use test sync push --id <uuid>
 \`\`\`
 
-> \`--update-local\` writes the AI-fixed YAML to the local file only. It does not
-> push to cloud. For synced tests, follow up with \`test sync push\` (or run with
-> \`--persist\`) so the cloud definition matches what you just committed locally.
-
 ### Suggested Actions
 
 - **Update target description** to match current UI
 - **Add wait steps** for timing issues
-- **Run with \`--autofix --update-local\`** to let AI fix and persist
+- **Edit the test YAML** directly — the agent owns failure triage and fixes
 - **Review the diff** to understand what changed
 
 ### Common Test Bug Patterns
@@ -1771,11 +1760,12 @@ Test Failed
                    │
                    ▼
 ┌──────────────────────────────────────┐
-│ 3. Try --autofix                     │
-│    qa-use test run name --autofix    │
-│    - Works = TEST BUG, use           │
-│      --update-local to persist       │
-│    - Still fails = probably CODE BUG │
+│ 3. Inspect current state             │
+│    qa-use browser snapshot           │
+│    - Compare to test's targets       │
+│    - Targets stale = TEST BUG, edit  │
+│      the YAML directly               │
+│    - Page broken = CODE BUG          │
 └──────────────────┬───────────────────┘
                    │
                    ▼
@@ -1802,32 +1792,6 @@ Test Failed
 | "Internal Server Error" / "500" | CODE BUG | Check server logs |
 | "Not Found" / "404" | CODE BUG | Check routing |
 | "TypeError: Cannot read ..." | CODE BUG | Fix JavaScript error |
-
-## Using AI Self-Healing
-
-The \`--autofix\` flag enables AI-powered test repair:
-
-\`\`\`bash
-# Try autofix
-qa-use test run my-test --autofix
-
-# If it works, persist the changes
-qa-use test run my-test --autofix --update-local
-
-# Review what changed
-git diff qa-tests/my-test.yaml
-\`\`\`
-
-**What autofix can fix:**
-- Selector/target changes
-- Timing issues (adds waits)
-- Minor assertion value changes
-
-**What autofix cannot fix:**
-- Broken application code
-- Major workflow changes
-- Missing features
-- Authentication issues
 
 ---
 

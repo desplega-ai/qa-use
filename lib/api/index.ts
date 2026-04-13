@@ -176,7 +176,6 @@ export interface TestRun {
     | 'cancelled'
     | 'timeout';
   final_comment_id?: string;
-  allow_fix?: boolean;
   result?: string;
   error_message?: string;
   recording_path?: string;
@@ -272,7 +271,6 @@ export interface RunCliTestOptions {
   test_id?: string;
   persist?: boolean;
   headless?: boolean;
-  allow_fix?: boolean;
   capture_screenshots?: boolean;
   store_recording?: boolean;
   store_har?: boolean;

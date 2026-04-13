@@ -150,7 +150,6 @@ export const infoCommand = new Command('info')
     console.log(`  Headless: ${config.defaults?.headless ?? true}`);
     console.log(`  Persist: ${config.defaults?.persist ?? false}`);
     console.log(`  Timeout: ${config.defaults?.timeout ?? 300}s`);
-    console.log(`  Allow Fix: ${config.defaults?.allow_fix ?? true}`);
 
     // Show test variables if app config is available
     if (appConfig) {

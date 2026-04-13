@@ -121,12 +121,10 @@ qa-use test run --all                  # Run all tests in qa-tests/
 | Option | Description |
 |--------|-------------|
 | `--headful` | Show browser window (starts local browser + tunnel) |
-| `--autofix` | Enable AI self-healing for broken selectors |
 | `--screenshots` | Capture screenshots at each step |
 | `--download` | Download assets (recordings, HAR, screenshots) |
 | `--var key=value` | Override variables |
 | `--persist` | Save test to cloud after successful run |
-| `--update-local` | Update local file when AI auto-fixes |
 
 ---
 

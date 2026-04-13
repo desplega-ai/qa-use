@@ -120,8 +120,6 @@ qa-use api ls --offline
 
 - `--tunnel` - Start local browser with tunnel (required for localhost URLs!)
 - `--headful` - Show browser window (use with `--tunnel`)
-- `--autofix` - Enable AI self-healing
-- `--update-local` - Persist AI fixes to local file
 - `--download` - Download assets to `/tmp/qa-use/downloads/`
 - `--var key=value` - Override variables
 
