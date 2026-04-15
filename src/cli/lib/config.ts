@@ -127,12 +127,12 @@ export async function loadConfig(): Promise<CliConfig> {
     config.default_app_config_id = process.env.QA_USE_DEFAULT_APP_CONFIG_ID;
   }
 
-  // Resolve custom headers: config file headers + QA_USE_HEADERS env var (env wins)
+  // Resolve custom headers: QA_USE_HEADERS env var seeds defaults, config-file
+  // headers override per-key. Headers intentionally use file-wins precedence
+  // (unlike api_key / api_url) so a per-session .qa-use.json can override an
+  // ambient env value baked in by a multi-tenant host (e.g. a sandbox gateway
+  // that sets QA_USE_HEADERS process-wide but writes per-session config files).
   const resolvedHeaders: Record<string, string> = {};
-
-  if (config.headers) {
-    Object.assign(resolvedHeaders, config.headers);
-  }
 
   const envHeaders = process.env.QA_USE_HEADERS;
   if (envHeaders) {
@@ -144,6 +144,10 @@ export async function loadConfig(): Promise<CliConfig> {
     } catch {
       console.error('Warning: QA_USE_HEADERS is not valid JSON, ignoring');
     }
+  }
+
+  if (config.headers) {
+    Object.assign(resolvedHeaders, config.headers);
   }
 
   if (Object.keys(resolvedHeaders).length > 0) {
