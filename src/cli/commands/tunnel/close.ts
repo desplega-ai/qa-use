@@ -133,14 +133,37 @@ export const closeCommand = new Command('close')
       // the primary path.
       await tunnelRegistry.forceClose(record.target);
 
+      // Non-session holders (e.g. `tunnel start --hold`, foreground
+      // `test run`) are intentionally NOT SIGTERM'd. But after the
+      // registry file is gone, the user has no clue the holder is still
+      // around. Emit a one-line hint if (a) the registry record pointed
+      // at a pid, (b) that pid is still alive, and (c) no session was
+      // matched above (otherwise the "Reaped ..." line covers it).
+      const lingeringHolderPid =
+        record.pid && reaped.length === 0 && isPidAlive(record.pid) ? record.pid : undefined;
+
       if (options.json) {
-        console.log(
-          JSON.stringify({ closed: true, target: record.target, reapedPids: reaped }, null, 2)
-        );
+        const payload: {
+          closed: boolean;
+          target: string;
+          reapedPids: number[];
+          holderPid?: number;
+        } = { closed: true, target: record.target, reapedPids: reaped };
+        if (lingeringHolderPid !== undefined) {
+          payload.holderPid = lingeringHolderPid;
+        }
+        console.log(JSON.stringify(payload, null, 2));
       } else {
         console.log(success(`Tunnel closed: ${record.target}`));
         if (reaped.length > 0) {
           console.log(info(`Reaped ${reaped.length} session process(es): ${reaped.join(', ')}`));
+        }
+        if (lingeringHolderPid !== undefined) {
+          console.error(
+            info(
+              `Note: holder process PID ${lingeringHolderPid} still running — send SIGTERM (kill ${lingeringHolderPid}) to terminate.`
+            )
+          );
         }
       }
     } catch (err) {
