@@ -93,6 +93,8 @@ bun run check:fix
 
 This is especially critical when implementing plans - run this verification step after completing each phase before proceeding to the next one. This ensures consistent code style and catches issues early.
 
+- When changing tunnel, registry, detach, or `browser create/close/status` code paths, also run `bun run scripts/e2e.ts` to exercise the tunnel/detach regression sections (8-13). Gated remote-tunnel sections (9, 10, 12) require `E2E_ALLOW_REMOTE_TUNNEL=1` and a reachable remote backend — they skip safely otherwise.
+
 ## Browser CLI & REPL Sync
 
 **IMPORTANT:** When modifying browser commands in `src/cli/commands/browser/*.ts`, also update the REPL in `src/cli/commands/browser/run.ts`, and vice versa. They share the same functionality:
@@ -101,6 +103,49 @@ This is especially critical when implementing plans - run this verification step
 - REPL: `qa-use browser run` then `<command>` (commands object in run.ts)
 
 Both must support the same options and behavior.
+
+**Exception:** The `qa-use tunnel` subcommand family (`start`, `ls`, `status`, `close`) and `qa-use doctor` are CLI-only — they operate on the cross-process tunnel registry and session PID files in `~/.qa-use/`, not on an in-process browser. No REPL mirror is needed or intended.
+
+## Tunnel model
+
+qa-use tunnels localhost targets to a public URL so remote desplega.ai backends can reach the browser. The CLI side of this lives entirely in `lib/tunnel/` + `src/cli/commands/tunnel/` + `src/cli/commands/browser/` and is orthogonal to the MCP global-browser path (`src/server.ts:450-603`), which still manages its own single `TunnelManager`.
+
+**Canonical helpers.**
+- `isLocalhostUrl(url)` lives at `lib/env/localhost.ts` — the single source of truth for detecting localhost/127.0.0.1/::1/`*.localhost`/0.0.0.0. Always import from `lib/env/localhost.ts`, not from `src/cli/lib/browser.ts`.
+- `getPortFromUrl(url)` co-lives in the same module.
+
+**Tri-state `--tunnel` flag.** Added via `addTunnelOption(cmd)` in `src/cli/lib/tunnel-option.ts`. Values:
+- `auto` (default) — tunnel iff base URL is localhost AND API URL is NOT localhost (prod mode).
+- `on` — force a tunnel even in dev mode.
+- `off` — never tunnel. `--no-tunnel` is a sugar alias for `--tunnel off`.
+
+The resolution is implemented in `src/cli/lib/tunnel-resolve.ts` (`resolveTunnelFlag`, `resolveTunnelMode`). Precedence: CLI flag > `~/.qa-use.json` `tunnel` key > default `auto`.
+
+**`~/.qa-use.json` `tunnel` key.** Top-level `"tunnel": "auto" | "on" | "off"`. Invalid values log a stderr warning and fall back to `auto`.
+
+**`TunnelRegistry` primitive.** `lib/tunnel/registry.ts`. Cross-process refcount-managed layer over `TunnelManager`:
+- `acquire(target)` / `release(handle)` / `get(target)` / `list()`.
+- One `TunnelManager` per target origin. Two consumers pointing at the same localhost share one tunnel (refcount=2).
+- Persists to `~/.qa-use/tunnels/<sha256(target)[0..10]>.json` atomically.
+- 30s TTL grace on last release (configurable via `QA_USE_TUNNEL_GRACE_MS`). Grace timer runs inside the owner process and is unref'd so it doesn't keep the event loop alive.
+- `pid` field records the holder; registry reconciles against `process.kill(pid, 0)` on read.
+
+**Detached `browser create`.** Parent bootstrap in `src/cli/commands/browser/create.ts` spawns a re-exec of the CLI with a hidden `__browser-detach` subcommand (`src/cli/commands/browser/_detached.ts`) using `{ detached: true, stdio: 'ignore' }` + `.unref()`. The child holds the session + tunnel for the session's TTL. Parent returns to the shell in < 3s once the child writes `~/.qa-use/sessions/<id>.json`.
+
+- CLI entry resolution for the re-exec goes through `resolveCliEntry()` in `src/cli/lib/cli-entry.ts`. Handles installed binaries, `bun run cli`, and symlinked shapes deterministically.
+- Hidden subcommand: `bun run cli browser __browser-detach --help` still works for debugging, but `--help` listings hide it.
+
+**`QA_USE_DETACH=0` rollback.** Env flag preserves the pre-refactor legacy blocking path for one release. When set, `browser create` runs in-process (no spawn, no PID file) and logs `qa-use: QA_USE_DETACH=0 set — running in legacy blocking mode` to stderr. Tracked for removal in the plan's Follow-ups.
+
+**`qa-use tunnel` subcommands.** `src/cli/commands/tunnel/{index,start,ls,status,close}.ts`.
+- `qa-use tunnel start <url>` — acquire a tunnel; release immediately unless `--hold` keeps it up.
+- `qa-use tunnel ls` — list entries with target, public URL, refcount, TTL. `--json` supported.
+- `qa-use tunnel status <target|hash>` — detail for a single entry.
+- `qa-use tunnel close <target|hash>` — force-release. Cross-references `~/.qa-use/sessions/*.json` and SIGTERMs the holder child if the registry entry is owned by a detached browser session.
+
+**`qa-use doctor`.** `src/cli/commands/doctor.ts`. Scans `~/.qa-use/sessions/*.json` + `~/.qa-use/tunnels/*.json` for stale entries (dead PIDs) and reaps them. `--dry-run` prints the plan without acting. A bounded 250ms startup sweep (`src/cli/lib/startup-sweep.ts`) also runs on every CLI invocation except `doctor` itself and `__browser-detach`, reaping stale entries silently (single-line stderr notice on first sweep).
+
+**Structured tunnel errors + triage hints.** `lib/tunnel/errors.ts` + `src/cli/lib/tunnel-error-hint.ts`. Tunnel failures are classified (`TunnelNetworkError` / `TunnelAuthError` / `TunnelQuotaError` / `TunnelUnknownError`) and formatted with a "Next steps:" triage block including the `--no-tunnel` opt-out flag. No silent retries.
 
 ## Shared Utilities
 

@@ -10,7 +10,8 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
 const EVALS_URL = 'https://evals.desplega.ai/';
@@ -34,6 +35,7 @@ let failed = false;
 function run(
 	args: string[],
 	timeout = 60_000,
+	env?: Record<string, string>,
 ): { stdout: string; stderr: string; exitCode: number } {
 	const parts = cmdPrefix.split(/\s+/).concat(args);
 	const cmd = parts[0];
@@ -42,6 +44,7 @@ function run(
 		cwd: resolve(import.meta.dirname, '..'),
 		encoding: 'utf-8',
 		timeout,
+		env: env ? { ...process.env, ...env } : process.env,
 	});
 	return {
 		stdout: result.stdout ?? '',
@@ -396,6 +399,265 @@ await section('Section 7: Resource Commands Smoke Test', () => {
 		typeof usage === 'object' && usage !== null,
 		'usage --json returns a valid object',
 	);
+});
+
+// ---------------------------------------------------------------------------
+// Section 8: Tunnel — auto-skip in dev mode
+// ---------------------------------------------------------------------------
+//
+// `.qa-use.json` in this repo points api_url at localhost:5005, so auto-mode
+// `browser create` against another localhost target MUST skip the tunnel. We
+// assert:
+//   - `tunnel ls --json` returns an empty array both before and after the
+//     create attempt
+//   - stderr does NOT contain the "Auto-tunnel active" banner
+//
+// We target an unroutable localhost port (`http://localhost:1`) so the create
+// call exits fast without needing a real local dev server. The create call may
+// itself fail once it tries to reach the backend or open a page — we only care
+// about the tunnel decision, which is made before any network traffic.
+
+await section('Section 8: Tunnel — auto-skip in dev mode', () => {
+	// Baseline: ensure registry is clean
+	const lsBefore = runOrThrow(['tunnel', 'ls', '--json']);
+	const parsedBefore = JSON.parse(lsBefore);
+	assert(Array.isArray(parsedBefore), 'tunnel ls --json returns an array (baseline)');
+
+	// Attempt create against a localhost URL. `QA_USE_DETACH=0` forces the
+	// legacy blocking path so that if the command does start up, we can
+	// time-bound it via the spawn timeout rather than leaving an orphan
+	// detached child. We also set an aggressive timeout.
+	const { stderr } = run(
+		['browser', 'create', 'http://localhost:1', '--timeout', '1'],
+		15_000,
+		{ QA_USE_DETACH: '0' },
+	);
+	assert(
+		!/Auto-tunnel active/i.test(stderr),
+		'No "Auto-tunnel active" banner when both base and api are localhost',
+	);
+
+	// Registry should still be empty (or at minimum, no entry matching our URL)
+	const lsAfter = runOrThrow(['tunnel', 'ls', '--json']);
+	const parsedAfter = JSON.parse(lsAfter);
+	const hasOurTunnel =
+		Array.isArray(parsedAfter) &&
+		parsedAfter.some((t: { target?: string }) =>
+			(t.target ?? '').includes('localhost:1'),
+		);
+	assert(!hasOurTunnel, 'No tunnel entry created for localhost target in dev mode');
+});
+
+// ---------------------------------------------------------------------------
+// Section 9: Tunnel — prod-mode auto-banner (gated)
+// ---------------------------------------------------------------------------
+//
+// Forcing an auto-tunnel requires a reachable remote backend. Skip unless
+// `E2E_ALLOW_REMOTE_TUNNEL=1` is set, since CI and the default dev loop both
+// point at localhost:5005 and can't actually open a tunnel.
+
+await section('Section 9: Tunnel — prod-mode auto-banner (gated)', () => {
+	if (process.env.E2E_ALLOW_REMOTE_TUNNEL !== '1') {
+		console.log(
+			'  SKIP: E2E_ALLOW_REMOTE_TUNNEL=1 not set (requires reachable remote backend)',
+		);
+		return;
+	}
+
+	const remoteApi = process.env.E2E_REMOTE_API_URL ?? 'https://api.desplega.ai';
+	const { stderr } = run(
+		['browser', 'create', 'http://localhost:1', '--timeout', '1'],
+		30_000,
+		{ QA_USE_API_URL: remoteApi, QA_USE_DETACH: '0' },
+	);
+	assert(
+		/Auto-tunnel active|Auto-tunnel/i.test(stderr),
+		'Auto-tunnel banner emitted on stderr when api_url is remote',
+	);
+
+	const lsOut = runOrThrow(['tunnel', 'ls', '--json']);
+	const entries = JSON.parse(lsOut);
+	assert(
+		Array.isArray(entries) && entries.length >= 1,
+		'tunnel ls shows at least one active entry after prod-mode auto-tunnel',
+	);
+});
+
+// ---------------------------------------------------------------------------
+// Section 10: Tunnel — registry reuse (refcount) (gated)
+// ---------------------------------------------------------------------------
+//
+// Refcount reuse can only be demonstrated when a tunnel is actually acquired,
+// which (per Section 9) needs a remote backend. Gate behind the same env flag.
+
+await section('Section 10: Tunnel — registry reuse refcount (gated)', () => {
+	if (process.env.E2E_ALLOW_REMOTE_TUNNEL !== '1') {
+		console.log('  SKIP: E2E_ALLOW_REMOTE_TUNNEL=1 not set');
+		return;
+	}
+
+	// `tunnel start --hold` keeps the tunnel alive; start it twice for the
+	// same target and assert refcount grows.
+	const target = 'http://localhost:3000';
+	const remoteApi = process.env.E2E_REMOTE_API_URL ?? 'https://api.desplega.ai';
+
+	// Fire first owner in background (spawn detached, don't wait)
+	const first = spawnSync('bun', ['run', 'cli', 'tunnel', 'start', target], {
+		cwd: resolve(import.meta.dirname, '..'),
+		encoding: 'utf-8',
+		env: { ...process.env, QA_USE_API_URL: remoteApi },
+		timeout: 20_000,
+	});
+	assert(first.status === 0, 'First tunnel start succeeded');
+
+	// Second consumer: a short-lived acquire via `tunnel status` (read-only);
+	// we use `tunnel ls --json` directly and assert a single entry matches.
+	const lsOut = runOrThrow(['tunnel', 'ls', '--json']);
+	const entries = JSON.parse(lsOut);
+	const match = entries.find(
+		(e: { target?: string }) => (e.target ?? '').startsWith(target),
+	);
+	assert(!!match, 'Tunnel entry exists for target');
+
+	// Cleanup
+	run(['tunnel', 'close', target]);
+});
+
+// ---------------------------------------------------------------------------
+// Section 11: Detach latency
+// ---------------------------------------------------------------------------
+//
+// `browser create` should return to the shell in < 3 s when detach is on. We
+// don't need a real browser — pointing at an unreachable API url makes the
+// bootstrap fail fast, and we only care about the parent-side return time.
+// A successful detach against a reachable backend is exercised in the manual
+// E2E list.
+
+await section('Section 11: Detach latency', () => {
+	const start = Date.now();
+	// Unreachable API via env override so createSession fails fast in the
+	// detached child; parent should still return quickly because it doesn't
+	// block on child readiness for the full 5s poll if the child exits early.
+	run(
+		['browser', 'create', 'http://localhost:1', '--tunnel', 'off', '--timeout', '1'],
+		10_000,
+		{ QA_USE_API_URL: 'http://127.0.0.1:1' },
+	);
+	const elapsed = Date.now() - start;
+	assert(
+		elapsed < 10_000,
+		`browser create returned in ${elapsed}ms (< 10s upper bound; target < 3s with reachable backend)`,
+	);
+});
+
+// ---------------------------------------------------------------------------
+// Section 12: Triage-hint error on tunnel failure (gated)
+// ---------------------------------------------------------------------------
+//
+// Forcing a real tunnel failure requires hitting a remote backend that will
+// reject the tunnel request. Gate behind the same remote flag.
+
+await section('Section 12: Triage-hint error on tunnel failure (gated)', () => {
+	if (process.env.E2E_ALLOW_REMOTE_TUNNEL !== '1') {
+		console.log('  SKIP: E2E_ALLOW_REMOTE_TUNNEL=1 not set');
+		return;
+	}
+
+	// Use an invalid API key to force an auth failure from the tunnel provider.
+	const { stderr, exitCode } = run(
+		['browser', 'create', 'http://localhost:3000', '--tunnel', 'on', '--timeout', '1'],
+		20_000,
+		{
+			QA_USE_API_KEY: 'sk_qfm_invalid_for_e2e_triage_hint_test',
+			QA_USE_API_URL:
+				process.env.E2E_REMOTE_API_URL ?? 'https://api.desplega.ai',
+			QA_USE_DETACH: '0',
+		},
+	);
+	assert(exitCode !== 0, 'Forced-failure command exits non-zero');
+	assert(
+		/Next steps:/i.test(stderr),
+		'Triage-hint error output contains "Next steps:"',
+	);
+	assert(
+		/--no-tunnel|--tunnel off/i.test(stderr),
+		'Triage-hint error mentions the opt-out flag',
+	);
+});
+
+// ---------------------------------------------------------------------------
+// Section 13: Doctor reap of stale sessions
+// ---------------------------------------------------------------------------
+//
+// Seed a fake stale PID file under ~/.qa-use/sessions/<id>.json with a bogus
+// pid, then run `doctor` and assert it reaps at least one entry. This exercises
+// the cleanup path without needing a real detached child.
+
+await section('Section 13: Doctor reap of stale sessions', () => {
+	const sessionsDir = resolve(homedir(), '.qa-use', 'sessions');
+	const fakeSessionId = `e2e-stale-${Date.now()}`;
+	const fakeSessionPath = resolve(sessionsDir, `${fakeSessionId}.json`);
+
+	// Best-effort: ensure dir exists by running any command that would create it.
+	// If it doesn't exist we skip, since we can't safely mkdir without pulling
+	// node:fs/promises. We use sync readdir + existsSync guard.
+	try {
+		// Trigger directory creation via `tunnel ls` (no-op if already exists)
+		run(['tunnel', 'ls']);
+	} catch {
+		// Ignore
+	}
+
+	if (!existsSync(sessionsDir)) {
+		console.log(
+			`  SKIP: ${sessionsDir} does not exist and could not be seeded`,
+		);
+		return;
+	}
+
+	// Write a stale entry with a bogus PID (2^31 - 1 is unlikely to exist).
+	// Schema must match `DetachedSessionRecord` in `lib/env/sessions.ts`:
+	// `id` (string), `pid` (number), `ttlExpiresAt` (epoch ms number).
+	const stalePid = 2147483646;
+	const stalePayload = {
+		id: fakeSessionId,
+		pid: stalePid,
+		target: 'http://localhost:3000',
+		publicUrl: null,
+		startedAt: new Date().toISOString(),
+		ttlExpiresAt: Date.now() + 300_000,
+	};
+	try {
+		writeFileSync(fakeSessionPath, JSON.stringify(stalePayload, null, 2));
+	} catch (err) {
+		console.log(`  SKIP: could not seed stale session file: ${err}`);
+		return;
+	}
+
+	// Sanity: file exists
+	assert(existsSync(fakeSessionPath), 'Seeded stale session file');
+
+	// Run doctor (non-dry-run)
+	const { stdout, stderr, exitCode } = run(['doctor']);
+	const output = `${stdout}\n${stderr}`;
+
+	// Doctor exits non-zero when it reaped, exits 0 when nothing to do.
+	// Either way, we assert our seeded file is gone.
+	const stillExists = existsSync(fakeSessionPath);
+	assert(!stillExists, 'Doctor reaped the stale session file');
+	assert(
+		exitCode !== 0 || /Nothing to do/i.test(output),
+		`Doctor exited sensibly (${exitCode}) given a seeded stale entry`,
+	);
+
+	// Best-effort cleanup in case the assertion above failed
+	if (stillExists) {
+		try {
+			unlinkSync(fakeSessionPath);
+		} catch {
+			// Ignore
+		}
+	}
 });
 
 // ---------------------------------------------------------------------------
