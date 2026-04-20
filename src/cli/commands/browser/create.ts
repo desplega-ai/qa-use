@@ -1,12 +1,27 @@
 /**
  * qa-use browser create - Create a new browser session
+ *
+ * Phase 4: when tunnel mode is 'on', the lifecycle is handed off to a
+ * detached child process (re-exec of the CLI with the hidden
+ * `__browser-detach` subcommand). The parent returns in < 2 s after
+ * printing the session id + public URL. For `QA_USE_DETACH=0` we
+ * preserve the legacy blocking flow for one release as a rollback
+ * escape hatch.
  */
 
+import { type ChildProcess, spawn } from 'node:child_process';
+import crypto from 'node:crypto';
 import { Command } from 'commander';
 import type { BrowserApiClient } from '../../../../lib/api/browser.js';
 import type { ViewportType } from '../../../../lib/api/browser-types.js';
 import { BrowserManager } from '../../../../lib/browser/index.js';
 import { getAgentSessionId, getTunnelModeFromConfig } from '../../../../lib/env/index.js';
+import {
+  isPidAlive,
+  listSessionRecords,
+  readSessionRecord,
+  removeSessionRecord,
+} from '../../../../lib/env/sessions.js';
 import { classifyTunnelFailure, TunnelError } from '../../../../lib/tunnel/errors.js';
 import { TunnelManager } from '../../../../lib/tunnel/index.js';
 import { ensureBrowsersInstalled } from '../../lib/browser.js';
@@ -15,6 +30,7 @@ import {
   removeStoredSession,
   storeSession,
 } from '../../lib/browser-sessions.js';
+import { resolveCliEntry } from '../../lib/cli-entry.js';
 import { createBrowserClient, loadConfig } from '../../lib/config.js';
 import { error, info, success, warning } from '../../lib/output.js';
 import { printTunnelStartBanner } from '../../lib/tunnel-banner.js';
@@ -113,13 +129,208 @@ export const createCommand = addTunnelOption(
   const client = createBrowserClient(config);
 
   if (tunnelOn) {
-    // Tunnel mode: start local browser + tunnel, then create session
-    await runTunnelMode(client, config.api_key, options, viewport, timeout);
+    // Phase 4: detach by default. Legacy blocking path preserved behind
+    // QA_USE_DETACH=0 for one release.
+    if (process.env.QA_USE_DETACH === '0') {
+      console.error('qa-use: QA_USE_DETACH=0 set — running in legacy blocking mode');
+      await runLegacyTunnelMode(client, config.api_key, options, viewport, timeout);
+    } else {
+      await runDetachedTunnelMode(options, viewport, timeout);
+    }
   } else {
     // Normal mode: create remote session and exit
     await createRemoteSession(client, options, viewport, timeout);
   }
 });
+
+/**
+ * Phase 4: spawn a detached child that owns the browser + tunnel +
+ * backend session. Parent polls the PID file for readiness, prints
+ * the session id + public URL, and exits.
+ */
+async function runDetachedTunnelMode(
+  options: CreateOptions,
+  viewport: ViewportType,
+  timeout: number
+): Promise<void> {
+  ensureBrowsersInstalled();
+
+  // Generate a spawn token so we can find the PID file regardless of
+  // whether the backend session id is known yet.
+  const spawnId = crypto.randomBytes(8).toString('hex');
+
+  const detachArgs = [
+    'browser',
+    '__browser-detach',
+    spawnId,
+    '--tunnel-mode',
+    'on',
+    '--viewport',
+    viewport,
+    '--timeout',
+    String(timeout),
+  ];
+  if (options.headless === true) {
+    detachArgs.push('--headless');
+  }
+  if (options.startUrl) {
+    detachArgs.push('--target', options.startUrl, '--start-url', options.startUrl);
+  }
+  if (options.subdomain) {
+    detachArgs.push('--subdomain', options.subdomain);
+  }
+  if (options.afterTestId) {
+    detachArgs.push('--after-test-id', options.afterTestId);
+  }
+  if (options.var && Object.keys(options.var).length > 0) {
+    detachArgs.push('--var-json', JSON.stringify(options.var));
+  }
+
+  const entry = resolveCliEntry(detachArgs);
+
+  let child: ChildProcess;
+  try {
+    child = spawn(entry.command, entry.args, {
+      detached: true,
+      stdio: 'ignore',
+      env: process.env,
+    });
+  } catch (err) {
+    console.log(
+      error(`Failed to spawn detached process: ${err instanceof Error ? err.message : String(err)}`)
+    );
+    process.exit(1);
+  }
+
+  const childPid = child.pid;
+  // Unref so the parent can exit independently.
+  child.unref();
+
+  if (!childPid) {
+    console.log(error('Detached process failed to start (no PID assigned)'));
+    process.exit(1);
+  }
+
+  // Poll the sessions dir for the spawn-id record to appear and progress
+  // through the readiness phases. 5 s budget total.
+  const deadline = Date.now() + 5_000;
+  let lastRecord: ReturnType<typeof readSessionRecord> = null;
+  let actualSessionId: string | null = null;
+
+  while (Date.now() < deadline) {
+    // Check child is still alive — spawn might have succeeded syntactically
+    // but exited immediately (e.g. API key missing, tunnel-create failed,
+    // backend createSession errored). Prefer a structured failure record
+    // over the generic "exited before readiness" message.
+    if (!isPidAlive(childPid)) {
+      const failed = readSessionRecord(spawnId);
+      const failureMsg = extractFailureMessage(failed);
+      if (failureMsg) {
+        console.error(error(`Detached child failed: ${failureMsg}`));
+        removeSessionRecord(spawnId);
+      } else {
+        console.error(error('Detached child exited before reporting readiness'));
+      }
+      process.exit(1);
+    }
+
+    lastRecord = readSessionRecord(spawnId);
+    if (lastRecord) {
+      const phase = (lastRecord as { phase?: string }).phase;
+      if (phase === 'failed') {
+        const failureMsg = extractFailureMessage(lastRecord) ?? 'unknown';
+        console.error(error(`Detached child failed: ${failureMsg}`));
+        removeSessionRecord(spawnId);
+        process.exit(1);
+      }
+      if (lastRecord.publicUrl && phase === 'tunnel_ready') {
+        // Tunnel is up; look for the real session record to appear.
+        const byId = listSessionRecords().find(
+          (r) => r.pid === childPid && r.id !== spawnId && !('phase' in r)
+        );
+        if (byId) {
+          actualSessionId = byId.id;
+          lastRecord = byId;
+          break;
+        }
+      }
+    }
+    await sleep(150);
+  }
+
+  if (!actualSessionId || !lastRecord) {
+    console.log(
+      warning(
+        'Detached child did not finish initialising within 5s. It may still be starting — run `qa-use browser status` shortly.'
+      )
+    );
+    if (lastRecord?.publicUrl) {
+      console.log(info(`Public URL (partial): ${lastRecord.publicUrl}`));
+    }
+    process.exit(0);
+  }
+
+  // Banner — use the same copy as the legacy flow.
+  if (lastRecord.publicUrl) {
+    printTunnelStartBanner({
+      target: options.startUrl ?? lastRecord.target,
+      publicUrl: lastRecord.publicUrl,
+    });
+  }
+
+  console.log('');
+  console.log(success('Browser session detached'));
+  console.log(`Session ID:     ${actualSessionId}`);
+  if (lastRecord.publicUrl) {
+    console.log(`Public URL:     ${lastRecord.publicUrl}`);
+  }
+  console.log(`PID:            ${childPid}`);
+  console.log(`Viewport:       ${viewport}`);
+  console.log(`Timeout:        ${timeout}s`);
+  if (options.startUrl) {
+    console.log(`Start URL:      ${options.startUrl}`);
+  }
+  console.log('');
+  console.log(info(`Close with: qa-use browser close ${actualSessionId}`));
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Pull a human-readable failure message out of a spawn-id session record
+ * written by the detached child. Handles both the structured error object
+ * shape `{ message, name, stack? }` and any legacy string payload.
+ *
+ * Returns `null` when the record has no recognisable failure payload (for
+ * example, a plain `starting` record) so callers can distinguish between
+ * "child reported a failure" and "child exited with nothing on disk".
+ */
+function extractFailureMessage(record: unknown): string | null {
+  if (!record || typeof record !== 'object') return null;
+  const rec = record as {
+    phase?: string;
+    error?: unknown;
+  };
+  // We only treat records as "failed" when either the phase says so or a
+  // structured error is present — avoids false positives on in-flight
+  // records that happen to have extra fields.
+  const isFailed = rec.phase === 'failed' || rec.error !== undefined;
+  if (!isFailed) return null;
+  const err = rec.error;
+  if (err && typeof err === 'object') {
+    const structured = err as { message?: unknown; name?: unknown };
+    const name = typeof structured.name === 'string' ? structured.name : '';
+    const message =
+      typeof structured.message === 'string' && structured.message.length > 0
+        ? structured.message
+        : 'unknown error';
+    return name ? `[${name}] ${message}` : message;
+  }
+  if (typeof err === 'string' && err.length > 0) return err;
+  return null;
+}
 
 /**
  * Create a remote browser session (normal mode)
@@ -223,9 +434,11 @@ async function createRemoteSession(
 }
 
 /**
- * Tunnel mode: start local browser + tunnel + API session, then keep running
+ * Legacy blocking tunnel mode — preserved behind `QA_USE_DETACH=0` for
+ * one release. Will be removed in a follow-up once the detach flow has
+ * stabilised in production.
  */
-async function runTunnelMode(
+async function runLegacyTunnelMode(
   client: BrowserApiClient,
   apiKey: string,
   options: CreateOptions,
