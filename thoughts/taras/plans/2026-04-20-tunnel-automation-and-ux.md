@@ -484,11 +484,11 @@ New `qa-use doctor` command that scans PID files + tunnel registry, reaps stale 
 - [x] `bun run cli doctor --dry-run` lists candidates without removing files
 
 #### Manual Verification:
-- [ ] Create a detached session → `kill -9 $(jq -r .pid ~/.qa-use/sessions/*.json | head -n1)` → `qa-use doctor` reports and reaps 1 stale session
-- [ ] After reap, `qa-use browser status` shows empty (or only live sessions)
-- [ ] With a fresh stale entry in place, running `qa-use info` prints the single-line stale-count notice to stderr (once); a second `qa-use info` is silent (sweep already cleaned)
-- [ ] `qa-use doctor` with nothing to reap exits 0 and prints "Nothing to do"
-- [ ] `qa-use doctor --dry-run` against a seeded stale state lists candidates but leaves `~/.qa-use/sessions/` untouched (verify with `ls` before and after)
+- [~] Create a detached session → `kill -9 $(jq -r .pid ~/.qa-use/sessions/*.json | head -n1)` → `qa-use doctor` reports and reaps 1 stale session — DEFERRED: live detached session requires a working backend (local dev backend hangs on session creation). Equivalent scenario verified by seeding a PID file with pid=99999999 (reap output: `Reaped 1 stale session(s) — abc (pid=99999999)`, exit 1).
+- [~] After reap, `qa-use browser status` shows empty (or only live sessions) — DEFERRED: same reason; unit-tested in `src/cli/commands/browser/status.test.ts`.
+- [x] With a fresh stale entry in place, running `qa-use info` prints the single-line stale-count notice to stderr (once); a second `qa-use info` is silent — verified: first `info` printed `qa-use: cleaned up 1 stale session`, second run silent.
+- [x] `qa-use doctor` with nothing to reap exits 0 and prints "Nothing to do" — verified.
+- [x] `qa-use doctor --dry-run` against a seeded stale state lists candidates but leaves `~/.qa-use/sessions/` untouched — verified: prints `Would reap 1 stale session(s): - abc (pid=99999999, target=http://localhost:3000)`, file count unchanged before and after.
 
 **Implementation Note**: Pause for confirmation. Commit: `[phase 5] qa-use doctor + bounded startup sweep for stale sessions/tunnels`.
 
@@ -578,6 +578,46 @@ bun run cli browser status                                       # empty
 
 # Phase 6 — e2e
 bun run scripts/e2e.ts
+```
+
+## QA Handoff Notes
+
+**Branch state (2026-04-21):** all 6 phases committed on `feat/qa-use-tunnel-imrpov` (`5708630`, `93e5b88`, `aa0e6f6`, `126f35e`, `94cd598`, `e170f41`). 496/496 tests pass. Plan `status: completed`.
+
+**QA scope.** The per-phase `### QA Spec (optional)` sections (Phases 2, 3, 4) define `cli-verification` scenarios that are the primary QA target. Phases 1, 5, 6 have no QA Spec. All QA Spec checkboxes are currently unchecked — intentionally left for a dedicated QA pass.
+
+**Environment prerequisites.**
+- `.qa-use.json` in the repo root has `api_key` set and `api_url=http://localhost:5005` — this is **dev mode**. Several QA scenarios require a **remote** backend (prod mode). Use `QA_USE_API_URL=https://api.desplega.ai` env override OR swap the config file.
+- **Local backend caveat.** The local backend at `http://localhost:5005` responds to `/health` but currently hangs on `POST /api/v1/browser-sessions` (observed during Phase 4 manual verification). Any scenario that actually creates a browser session needs a remote backend with a valid key.
+- `E2E_ALLOW_REMOTE_TUNNEL=1` gates the three e2e sections (9, 10, 12) in `scripts/e2e.ts` that require a reachable remote backend. Without the flag they skip cleanly.
+- `QA_USE_TUNNEL_GRACE_MS` env override shortens the tunnel registry's TTL-grace timer for faster testing (default 30000 ms).
+- `QA_USE_DETACH=0` preserves the pre-refactor legacy blocking path for `browser create` — useful as a control for detach-vs-blocking comparisons.
+- `QA_USE_HOME=<dir>` redirects `~/.qa-use/` to a custom path — used heavily in unit tests; lets QA seed fake session/tunnel state hermetically.
+
+**Scenarios that can run against the local dev setup (no remote backend):**
+- Phase 2 TC-2 (auto-tunnel skipped in dev mode)
+- Phase 2 TC-3 (`--no-tunnel` override wins)
+- Phase 3 TC-3 (`tunnel close` force teardown — use `tunnel start --hold` as the consumer)
+- Phase 4 TC-3 (stale entry after forced kill — seed a PID file with dead pid; `browser status --list` shows `(stale — run qa-use doctor)`)
+
+**Scenarios that require a remote backend:**
+- Phase 2 TC-1 (auto-tunnel kicks in for localhost base) — needs `QA_USE_API_URL=https://api.desplega.ai`
+- Phase 3 TC-1 (refcount reuse via two consumers) — same
+- Phase 3 TC-2 (TTL grace after last release) — use `QA_USE_TUNNEL_GRACE_MS=8000` to avoid a 30s wait
+- Phase 4 TC-1 (fire-and-forget latency) — detach path needs a working backend to progress beyond tunnel startup; alternatively measure parent-return time with an intentionally-unreachable API (see mid-flight verification: 0.75s measured with `QA_USE_API_URL=http://127.0.0.1:1`)
+- Phase 4 TC-2 (lifecycle tied to `browser close`, not parent shell) — needs live session
+
+**Where to find test context:**
+- Unit test coverage matrix: `bun test --coverage` (key files: `lib/tunnel/registry.test.ts`, `src/cli/commands/browser/status.test.ts`, `src/cli/commands/browser/create.detach.test.ts`, `src/cli/commands/doctor.test.ts`, `src/cli/lib/startup-sweep.test.ts`).
+- E2E: `bun run scripts/e2e.ts` — sections 8-13 cover the tunnel/detach deliverables. Gated sections log `SKIP:` when `E2E_ALLOW_REMOTE_TUNNEL=1` is not set.
+- Manual spot-checks executed during implementation: documented inline in each phase's Manual Verification list with `[x]` (verified) or `[~]` (deferred with unit-test cross-reference).
+
+**Safety sweeps** (run before and after QA sessions):
+```bash
+bun run cli browser status --list 2>/dev/null | grep -oE '[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}' | xargs -I {} bun run cli browser close {} 2>/dev/null || true
+bun run cli tunnel ls --json 2>/dev/null | jq -r '.[].target' 2>/dev/null | xargs -I {} bun run cli tunnel close {} 2>/dev/null || true
+pkill -f 'Google Chrome for Testing' 2>/dev/null || true
+rm -rf ~/.qa-use/sessions/* ~/.qa-use/tunnels/* 2>/dev/null || true
 ```
 
 ## References
