@@ -61,6 +61,19 @@ describe('shouldSweep', () => {
     expect(shouldSweep(['node', 'qa-use', '--help'])).toBe(true);
     expect(shouldSweep(['node', 'qa-use', '-v'])).toBe(true);
   });
+
+  it('returns false for `browser status` so the sweep does not race with rendering', () => {
+    expect(shouldSweep(['node', 'cli', 'browser', 'status'])).toBe(false);
+    expect(shouldSweep(['node', 'cli', 'browser', 'status', '--list'])).toBe(false);
+    // `browser status <session-id>` — skip as well.
+    expect(shouldSweep(['node', 'cli', 'browser', 'status', 'abc123'])).toBe(false);
+  });
+
+  it('still sweeps for other `browser` subcommands (regression)', () => {
+    expect(shouldSweep(['node', 'cli', 'browser', 'create', 'http://localhost:3000'])).toBe(true);
+    expect(shouldSweep(['node', 'cli', 'browser', 'close'])).toBe(true);
+    expect(shouldSweep(['node', 'cli', 'browser', 'snapshot'])).toBe(true);
+  });
 });
 
 describe('runStartupSweep', () => {

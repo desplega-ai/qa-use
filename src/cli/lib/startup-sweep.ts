@@ -56,6 +56,20 @@ export function shouldSweep(argv: string[] = process.argv): boolean {
   }
   // Also explicitly scan entire argv for __browser-detach (can be nested).
   if (argv.includes('__browser-detach')) return false;
+  // `browser status` (with or without --list / session id) must not sweep:
+  // the sweep would race with rendering and silently reap the very
+  // stale entries the user asked to see. `browser` followed (somewhere)
+  // by `status` is the canonical shape we skip. Other `browser`
+  // subcommands (create/close/snapshot/...) still sweep normally.
+  const browserIdx = argv.indexOf('browser');
+  if (browserIdx !== -1) {
+    for (let i = browserIdx + 1; i < argv.length; i++) {
+      const token = argv[i];
+      if (!token || token.startsWith('-')) continue;
+      if (token === 'status') return false;
+      break;
+    }
+  }
   return true;
 }
 
