@@ -12,6 +12,7 @@ import { appContextCommand } from './commands/app-context/index.js';
 import { browserCommand } from './commands/browser/index.js';
 import { dataAssetCommand } from './commands/data-asset/index.js';
 import { docsCommand } from './commands/docs.js';
+import { doctorCommand } from './commands/doctor.js';
 import { infoCommand } from './commands/info.js';
 import { installDepsCommand } from './commands/install-deps.js';
 import { issuesCommand } from './commands/issues/index.js';
@@ -23,6 +24,7 @@ import { testCommand } from './commands/test/index.js';
 import { tunnelCommand } from './commands/tunnel/index.js';
 import { updateCommand } from './commands/update.js';
 import { usageCommand } from './commands/usage.js';
+import { kickoffStartupSweep } from './lib/startup-sweep.js';
 import {
   checkForUpdateAsync,
   getUpdateHintForHelp,
@@ -59,6 +61,11 @@ program.addCommand(personaCommand);
 program.addCommand(dataAssetCommand);
 program.addCommand(issuesCommand);
 program.addCommand(usageCommand);
+program.addCommand(doctorCommand);
+
+// Bounded startup sweep — reaps orphaned PID files silently. Budget-capped
+// at 250 ms, skips itself when `doctor` or `__browser-detach` is running.
+kickoffStartupSweep();
 
 // Auto-update hint (reads from cache, fires async fetch — never blocks)
 if (!shouldSkipCheck(process.argv)) {

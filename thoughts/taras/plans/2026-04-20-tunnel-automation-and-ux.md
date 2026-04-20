@@ -5,7 +5,7 @@ topic: "Transparent tunnel automation and background browser UX"
 tags: [plan, tunnel, browser, cli, ux, qa-use]
 status: in-progress
 last_updated: 2026-04-20
-last_updated_by: Claude (phase 4 automated verification)
+last_updated_by: Claude (phase 5 automated verification)
 brainstorm: thoughts/taras/brainstorms/2026-04-20-tunnel-automation-and-ux.md
 ---
 
@@ -478,10 +478,10 @@ New `qa-use doctor` command that scans PID files + tunnel registry, reaps stale 
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Type + lint + format pass: `bun run check:fix`
-- [ ] Tests pass: `bun test src/cli/commands/doctor.test.ts src/cli/lib/startup-sweep.test.ts`
-- [ ] `bun run cli doctor --help` exists
-- [ ] `bun run cli doctor --dry-run` lists candidates without removing files
+- [x] Type + lint + format pass: `bun run check:fix`
+- [x] Tests pass: `bun test src/cli/commands/doctor.test.ts src/cli/lib/startup-sweep.test.ts`
+- [x] `bun run cli doctor --help` exists
+- [x] `bun run cli doctor --dry-run` lists candidates without removing files
 
 #### Manual Verification:
 - [ ] Create a detached session → `kill -9 $(jq -r .pid ~/.qa-use/sessions/*.json | head -n1)` → `qa-use doctor` reports and reaps 1 stale session
