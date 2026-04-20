@@ -6,7 +6,7 @@ import { Command } from 'commander';
 import type { BrowserApiClient } from '../../../../lib/api/browser.js';
 import type { ViewportType } from '../../../../lib/api/browser-types.js';
 import { BrowserManager } from '../../../../lib/browser/index.js';
-import { getAgentSessionId } from '../../../../lib/env/index.js';
+import { getAgentSessionId, getTunnelModeFromConfig } from '../../../../lib/env/index.js';
 import { TunnelManager } from '../../../../lib/tunnel/index.js';
 import { ensureBrowsersInstalled } from '../../lib/browser.js';
 import {
@@ -16,13 +16,15 @@ import {
 } from '../../lib/browser-sessions.js';
 import { createBrowserClient, loadConfig } from '../../lib/config.js';
 import { error, info, success, warning } from '../../lib/output.js';
+import { addTunnelOption, type TunnelMode } from '../../lib/tunnel-option.js';
+import { resolveTunnelFlag } from '../../lib/tunnel-resolve.js';
 
 interface CreateOptions {
   headless?: boolean;
   viewport?: ViewportType;
   timeout?: number;
   wsUrl?: string;
-  tunnel?: boolean;
+  tunnel?: TunnelMode;
   subdomain?: string;
   afterTestId?: string;
   var?: Record<string, string>;
@@ -34,76 +36,85 @@ function collectVars(value: string, previous: Record<string, string>) {
   return { ...previous, [key]: val };
 }
 
-export const createCommand = new Command('create')
-  .description('Create a new browser session')
-  .argument('[url]', 'URL to navigate to after session is ready')
-  .option('--headless', 'Run browser in headless mode (default: true for remote, false for tunnel)')
-  .option('--no-headless', 'Run browser with visible UI')
-  .option(
-    '--viewport <type>',
-    'Viewport type: desktop, mobile, or tablet (default: desktop)',
-    'desktop'
-  )
-  .option('--timeout <seconds>', 'Session timeout in seconds (default: 300)', '300')
-  .option('--ws-url <url>', 'WebSocket URL for remote/tunneled browser')
-  .option('--tunnel', 'Start local browser with tunnel (keeps process running)')
-  .option('-s, --subdomain <name>', 'Custom tunnel subdomain (only with --tunnel)')
-  .option('--after-test-id <uuid>', 'Run a test before session becomes interactive')
-  .option(
-    '--var <key=value...>',
-    'Variable overrides: base_url, login_url, login_username, login_password',
-    collectVars,
-    {}
-  )
-  .action(async (startUrl: string | undefined, options: CreateOptions) => {
-    options.startUrl = startUrl;
+export const createCommand = addTunnelOption(
+  new Command('create')
+    .description('Create a new browser session')
+    .argument('[url]', 'URL to navigate to after session is ready')
+    .option(
+      '--headless',
+      'Run browser in headless mode (default: true for remote, false for tunnel)'
+    )
+    .option('--no-headless', 'Run browser with visible UI')
+    .option(
+      '--viewport <type>',
+      'Viewport type: desktop, mobile, or tablet (default: desktop)',
+      'desktop'
+    )
+    .option('--timeout <seconds>', 'Session timeout in seconds (default: 300)', '300')
+    .option('--ws-url <url>', 'WebSocket URL for remote/tunneled browser')
+    .option('-s, --subdomain <name>', 'Custom tunnel subdomain (only with --tunnel on)')
+    .option('--after-test-id <uuid>', 'Run a test before session becomes interactive')
+    .option(
+      '--var <key=value...>',
+      'Variable overrides: base_url, login_url, login_username, login_password',
+      collectVars,
+      {}
+    )
+).action(async (startUrl: string | undefined, options: CreateOptions) => {
+  options.startUrl = startUrl;
 
-    // Validate mutually exclusive options
-    if (options.tunnel && options.wsUrl) {
-      console.log(error('Cannot use both --tunnel and --ws-url'));
-      process.exit(1);
-    }
+  // Resolve tri-state tunnel flag: CLI > config > default 'auto'.
+  // Phase 1 note: 'on' behaves like the old --tunnel boolean; 'auto' and
+  // 'off' both mean "no tunnel" (preserves pre-Phase-2 behaviour).
+  const resolvedTunnelMode = resolveTunnelFlag(options.tunnel, getTunnelModeFromConfig());
+  const tunnelOn = resolvedTunnelMode === 'on';
 
-    if (options.subdomain && !options.tunnel) {
-      console.log(error('--subdomain can only be used with --tunnel'));
-      process.exit(1);
-    }
+  // Validate mutually exclusive options
+  if (tunnelOn && options.wsUrl) {
+    console.log(error('Cannot use both --tunnel on and --ws-url'));
+    process.exit(1);
+  }
 
-    // Load configuration
-    const config = await loadConfig();
-    if (!config.api_key) {
-      console.log(error('API key not configured. Run `qa-use setup` first.'));
-      process.exit(1);
-    }
+  if (options.subdomain && !tunnelOn) {
+    console.log(error('--subdomain can only be used with --tunnel on'));
+    process.exit(1);
+  }
 
-    // Validate viewport type
-    const validViewports: ViewportType[] = ['desktop', 'mobile', 'tablet'];
-    const viewport = (options.viewport || 'desktop') as ViewportType;
-    if (!validViewports.includes(viewport)) {
-      console.log(
-        error(`Invalid viewport: ${viewport}. Must be one of: ${validViewports.join(', ')}`)
-      );
-      process.exit(1);
-    }
+  // Load configuration
+  const config = await loadConfig();
+  if (!config.api_key) {
+    console.log(error('API key not configured. Run `qa-use setup` first.'));
+    process.exit(1);
+  }
 
-    // Parse timeout
-    const timeout = parseInt(String(options.timeout), 10);
-    if (Number.isNaN(timeout) || timeout < 60 || timeout > 3600) {
-      console.log(error('Timeout must be between 60 and 3600 seconds'));
-      process.exit(1);
-    }
+  // Validate viewport type
+  const validViewports: ViewportType[] = ['desktop', 'mobile', 'tablet'];
+  const viewport = (options.viewport || 'desktop') as ViewportType;
+  if (!validViewports.includes(viewport)) {
+    console.log(
+      error(`Invalid viewport: ${viewport}. Must be one of: ${validViewports.join(', ')}`)
+    );
+    process.exit(1);
+  }
 
-    // Create client and set API key
-    const client = createBrowserClient(config);
+  // Parse timeout
+  const timeout = parseInt(String(options.timeout), 10);
+  if (Number.isNaN(timeout) || timeout < 60 || timeout > 3600) {
+    console.log(error('Timeout must be between 60 and 3600 seconds'));
+    process.exit(1);
+  }
 
-    if (options.tunnel) {
-      // Tunnel mode: start local browser + tunnel, then create session
-      await runTunnelMode(client, config.api_key, options, viewport, timeout);
-    } else {
-      // Normal mode: create remote session and exit
-      await createRemoteSession(client, options, viewport, timeout);
-    }
-  });
+  // Create client and set API key
+  const client = createBrowserClient(config);
+
+  if (tunnelOn) {
+    // Tunnel mode: start local browser + tunnel, then create session
+    await runTunnelMode(client, config.api_key, options, viewport, timeout);
+  } else {
+    // Normal mode: create remote session and exit
+    await createRemoteSession(client, options, viewport, timeout);
+  }
+});
 
 /**
  * Create a remote browser session (normal mode)

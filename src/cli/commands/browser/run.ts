@@ -6,6 +6,7 @@ import * as readline from 'node:readline';
 import { Command } from 'commander';
 import type { BrowserApiClient } from '../../../../lib/api/browser.js';
 import type { FileUploadData, ScrollDirection } from '../../../../lib/api/browser-types.js';
+import { getTunnelModeFromConfig } from '../../../../lib/env/index.js';
 import {
   createStoredSession,
   removeStoredSession,
@@ -18,12 +19,15 @@ import { createBrowserClient, loadConfig } from '../../lib/config.js';
 import { getMimeType } from '../../lib/mime-types.js';
 import { error, info, success } from '../../lib/output.js';
 import { formatDownloads, formatSnapshotDiff } from '../../lib/snapshot-diff.js';
+import { addTunnelOption, type TunnelMode } from '../../lib/tunnel-option.js';
+import { resolveTunnelFlag } from '../../lib/tunnel-resolve.js';
 
 interface RunOptions {
   sessionId?: string;
   headless?: boolean;
   afterTestId?: string;
   var?: Record<string, string>;
+  tunnel?: TunnelMode;
 }
 
 function collectVars(value: string, previous: Record<string, string>) {
@@ -42,243 +46,846 @@ const colors = {
   cyan: '\x1b[36m',
 };
 
-export const runCommand = new Command('run')
-  .description('Start an interactive REPL session for browser control')
-  .option('-s, --session-id <id>', 'Use existing session ID')
-  .option('--headless', 'Run browser in headless mode (for new sessions)', true)
-  .option('--no-headless', 'Run browser with visible UI (for new sessions)')
-  .option(
-    '--after-test-id <uuid>',
-    'Run a test before session becomes interactive (for new sessions)'
-  )
-  .option(
-    '--var <key=value...>',
-    'Variable overrides: base_url, login_url, login_username, login_password',
-    collectVars,
-    {}
-  )
-  .action(async (options: RunOptions) => {
-    try {
-      // Load configuration
-      const config = await loadConfig();
-      if (!config.api_key) {
-        console.log(error('API key not configured. Run `qa-use setup` first.'));
+export const runCommand = addTunnelOption(
+  new Command('run')
+    .description('Start an interactive REPL session for browser control')
+    .option('-s, --session-id <id>', 'Use existing session ID')
+    .option('--headless', 'Run browser in headless mode (for new sessions)', true)
+    .option('--no-headless', 'Run browser with visible UI (for new sessions)')
+    .option(
+      '--after-test-id <uuid>',
+      'Run a test before session becomes interactive (for new sessions)'
+    )
+    .option(
+      '--var <key=value...>',
+      'Variable overrides: base_url, login_url, login_username, login_password',
+      collectVars,
+      {}
+    )
+).action(async (options: RunOptions) => {
+  // Resolve tri-state tunnel flag for REPL session creation.
+  // Phase 1: value is plumbed through but REPL doesn't currently auto-start
+  // a tunnel — this prepares the option for Phase 2.
+  const _resolvedTunnelMode = resolveTunnelFlag(options.tunnel, getTunnelModeFromConfig());
+  void _resolvedTunnelMode;
+
+  try {
+    // Load configuration
+    const config = await loadConfig();
+    if (!config.api_key) {
+      console.log(error('API key not configured. Run `qa-use setup` first.'));
+      process.exit(1);
+    }
+
+    // Create client and set API key
+    const client = createBrowserClient(config);
+
+    let sessionId: string;
+    let sessionOwned = false;
+
+    // Try to use existing session or create new one
+    if (options.sessionId) {
+      // Use explicitly provided session
+      try {
+        await client.getSession(options.sessionId);
+        sessionId = options.sessionId;
+        console.log(info(`Attached to session ${sessionId}`));
+      } catch {
+        console.log(error(`Session ${options.sessionId} not found`));
         process.exit(1);
       }
-
-      // Create client and set API key
-      const client = createBrowserClient(config);
-
-      let sessionId: string;
-      let sessionOwned = false;
-
-      // Try to use existing session or create new one
-      if (options.sessionId) {
-        // Use explicitly provided session
-        try {
-          await client.getSession(options.sessionId);
-          sessionId = options.sessionId;
-          console.log(info(`Attached to session ${sessionId}`));
-        } catch {
-          console.log(error(`Session ${options.sessionId} not found`));
-          process.exit(1);
+    } else {
+      // Try to resolve from storage, otherwise create new
+      try {
+        const resolved = await resolveSessionId({
+          explicitId: undefined,
+          client,
+          verify: true,
+        });
+        sessionId = resolved.id;
+        console.log(info(`Using existing session ${sessionId}`));
+      } catch {
+        // No existing session, create new one
+        if (options.afterTestId) {
+          console.log(
+            info(`Creating new browser session with after-test: ${options.afterTestId}...`)
+          );
+        } else {
+          console.log(info('Creating new browser session...'));
         }
-      } else {
-        // Try to resolve from storage, otherwise create new
+
+        let session;
         try {
-          const resolved = await resolveSessionId({
-            explicitId: undefined,
-            client,
-            verify: true,
+          session = await client.createSession({
+            headless: options.headless !== false,
+            viewport: 'desktop',
+            timeout: 300,
+            after_test_id: options.afterTestId,
+            vars: options.var,
           });
-          sessionId = resolved.id;
-          console.log(info(`Using existing session ${sessionId}`));
-        } catch {
-          // No existing session, create new one
-          if (options.afterTestId) {
-            console.log(
-              info(`Creating new browser session with after-test: ${options.afterTestId}...`)
-            );
-          } else {
-            console.log(info('Creating new browser session...'));
-          }
-
-          let session;
-          try {
-            session = await client.createSession({
-              headless: options.headless !== false,
-              viewport: 'desktop',
-              timeout: 300,
-              after_test_id: options.afterTestId,
-              vars: options.var,
-            });
-          } catch (createErr) {
-            // Handle specific error cases for after_test_id
-            if (options.afterTestId && createErr instanceof Error) {
-              const message = createErr.message.toLowerCase();
-              if (message.includes('not found') || message.includes('404')) {
-                console.log(error('Test not found'));
-                process.exit(1);
-              }
-              if (message.includes('forbidden') || message.includes('403')) {
-                console.log(error('Test belongs to different organization'));
-                process.exit(1);
-              }
-            }
-            throw createErr;
-          }
-
-          sessionId = session.id;
-          sessionOwned = true;
-
-          if (session.status === 'starting') {
-            if (options.afterTestId) {
-              console.log(info('Waiting for test to complete...'));
-            } else {
-              console.log(info('Waiting for session to become active...'));
-            }
-            // Use longer timeout for after-test scenarios (180s) vs normal (60s)
-            const waitTimeout = options.afterTestId ? 180000 : 60000;
-            const waitedSession = await client.waitForStatus(session.id, 'active', waitTimeout);
-            // Check if session failed (e.g., after_test_id test failed)
-            if (waitedSession.status === 'failed') {
-              const errorMsg = waitedSession.error_message || 'Test execution failed';
-              console.log(error(`Session failed: ${errorMsg}`));
+        } catch (createErr) {
+          // Handle specific error cases for after_test_id
+          if (options.afterTestId && createErr instanceof Error) {
+            const message = createErr.message.toLowerCase();
+            if (message.includes('not found') || message.includes('404')) {
+              console.log(error('Test not found'));
               process.exit(1);
             }
-          } else if (session.status === 'failed') {
-            const errorMsg = session.error_message || 'Test execution failed';
+            if (message.includes('forbidden') || message.includes('403')) {
+              console.log(error('Test belongs to different organization'));
+              process.exit(1);
+            }
+          }
+          throw createErr;
+        }
+
+        sessionId = session.id;
+        sessionOwned = true;
+
+        if (session.status === 'starting') {
+          if (options.afterTestId) {
+            console.log(info('Waiting for test to complete...'));
+          } else {
+            console.log(info('Waiting for session to become active...'));
+          }
+          // Use longer timeout for after-test scenarios (180s) vs normal (60s)
+          const waitTimeout = options.afterTestId ? 180000 : 60000;
+          const waitedSession = await client.waitForStatus(session.id, 'active', waitTimeout);
+          // Check if session failed (e.g., after_test_id test failed)
+          if (waitedSession.status === 'failed') {
+            const errorMsg = waitedSession.error_message || 'Test execution failed';
             console.log(error(`Session failed: ${errorMsg}`));
             process.exit(1);
           }
-
-          // Store session locally
-          const storedSession = createStoredSession(session.id);
-          await storeSession(storedSession);
-
-          console.log(success(`Session ${sessionId} ready.`));
+        } else if (session.status === 'failed') {
+          const errorMsg = session.error_message || 'Test execution failed';
+          console.log(error(`Session failed: ${errorMsg}`));
+          process.exit(1);
         }
+
+        // Store session locally
+        const storedSession = createStoredSession(session.id);
+        await storeSession(storedSession);
+
+        console.log(success(`Session ${sessionId} ready.`));
       }
+    }
 
-      console.log('');
-      console.log('Type "help" for available commands, "exit" to quit.');
-      console.log('');
+    console.log('');
+    console.log('Type "help" for available commands, "exit" to quit.');
+    console.log('');
 
-      // Create readline interface
-      const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
-        prompt: `${colors.cyan}browser>${colors.reset} `,
-      });
+    // Create readline interface
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      prompt: `${colors.cyan}browser>${colors.reset} `,
+    });
 
-      // Command handlers
-      const commands: Record<
-        string,
-        (args: string[], client: BrowserApiClient, sessionId: string) => Promise<void>
-      > = {
-        help: async () => printHelp(),
-        goto: async (args, client, sessionId) => {
-          if (args.length === 0) {
-            console.log(error('Usage: goto <url>'));
-            return;
+    // Command handlers
+    const commands: Record<
+      string,
+      (args: string[], client: BrowserApiClient, sessionId: string) => Promise<void>
+    > = {
+      help: async () => printHelp(),
+      goto: async (args, client, sessionId) => {
+        if (args.length === 0) {
+          console.log(error('Usage: goto <url>'));
+          return;
+        }
+        let url = args[0];
+        const hasVarSyntax = url.startsWith('<var>') || url.startsWith('{{');
+        if (!url.startsWith('http://') && !url.startsWith('https://') && !hasVarSyntax) {
+          url = `https://${url}`;
+        }
+        const result = await client.executeAction(sessionId, { type: 'goto', url });
+        if (result.success) {
+          console.log(success(`Navigated to ${url}`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
           }
-          let url = args[0];
-          const hasVarSyntax = url.startsWith('<var>') || url.startsWith('{{');
-          if (!url.startsWith('http://') && !url.startsWith('https://') && !hasVarSyntax) {
-            url = `https://${url}`;
-          }
-          const result = await client.executeAction(sessionId, { type: 'goto', url });
-          if (result.success) {
-            console.log(success(`Navigated to ${url}`));
+        } else {
+          console.log(error(result.error || 'Navigation failed'));
+        }
+      },
+      back: async (_args, client, sessionId) => {
+        const result = await client.executeAction(sessionId, { type: 'back' });
+        if (result.success) {
+          console.log(success('Navigated back'));
 
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Back failed'));
+        }
+      },
+      forward: async (_args, client, sessionId) => {
+        const result = await client.executeAction(sessionId, { type: 'forward' });
+        if (result.success) {
+          console.log(success('Navigated forward'));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Forward failed'));
+        }
+      },
+      reload: async (_args, client, sessionId) => {
+        const result = await client.executeAction(sessionId, { type: 'reload' });
+        if (result.success) {
+          console.log(success('Page reloaded'));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Reload failed'));
+        }
+      },
+      click: async (args, client, sessionId) => {
+        // Check for --force/-f flag and --no-diff flag
+        const forceIdx = args.findIndex((a) => a === '-f' || a === '--force');
+        const noDiffIdx = args.indexOf('--no-diff');
+        const force = forceIdx !== -1;
+        const disableDiff = noDiffIdx !== -1;
+
+        // Filter out flags
+        let filteredArgs = [...args];
+        if (forceIdx !== -1) {
+          filteredArgs = filteredArgs.filter((_, i) => i !== forceIdx);
+        }
+        if (noDiffIdx !== -1) {
+          filteredArgs = filteredArgs.filter((a) => a !== '--no-diff');
+        }
+
+        const parsed = parseTextOption(filteredArgs);
+        if (!parsed.ref && !parsed.text) {
+          console.log(error('Usage: click <ref> or click -t "description" [--force] [--no-diff]'));
+          return;
+        }
+        const action: {
+          type: 'click';
+          ref?: string;
+          text?: string;
+          force?: boolean;
+          include_snapshot_diff?: boolean;
+        } = {
+          type: 'click',
+        };
+        if (parsed.ref) action.ref = normalizeRef(parsed.ref);
+        if (parsed.text) action.text = parsed.text;
+        if (force) action.force = true;
+        if (!disableDiff) action.include_snapshot_diff = true;
+
+        const result = await client.executeAction(sessionId, action);
+        if (result.success) {
+          const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
+          console.log(success(`Clicked ${target}`));
+
+          if (result.snapshot_diff) {
+            console.log('');
+            console.log(formatSnapshotDiff(result.snapshot_diff));
+          }
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Click failed'));
+        }
+      },
+      fill: async (args, client, sessionId) => {
+        const parsed = parseTextOption(args);
+        if ((!parsed.ref && !parsed.text) || parsed.remaining.length === 0) {
+          console.log(error('Usage: fill <ref> <value> or fill -t "description" <value>'));
+          return;
+        }
+        const value = parsed.remaining.join(' ');
+        const action: { type: 'fill'; ref?: string; text?: string; value: string } = {
+          type: 'fill',
+          value,
+        };
+        if (parsed.ref) action.ref = normalizeRef(parsed.ref);
+        if (parsed.text) action.text = parsed.text;
+        const result = await client.executeAction(sessionId, action);
+        if (result.success) {
+          const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
+          console.log(success(`Filled ${target}`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Fill failed'));
+        }
+      },
+      type: async (args, client, sessionId) => {
+        if (args.length < 2) {
+          console.log(error('Usage: type <ref> <text>'));
+          return;
+        }
+        const ref = normalizeRef(args[0]);
+        const text = args.slice(1).join(' ');
+        const result = await client.executeAction(sessionId, { type: 'type', ref, text });
+        if (result.success) {
+          console.log(success(`Typed into ${ref}`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Type failed'));
+        }
+      },
+      press: async (args, client, sessionId) => {
+        if (args.length === 0) {
+          console.log(error('Usage: press <key>'));
+          return;
+        }
+        const key = args[0];
+        const result = await client.executeAction(sessionId, { type: 'press', key });
+        if (result.success) {
+          console.log(success(`Pressed ${key}`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Press failed'));
+        }
+      },
+      hover: async (args, client, sessionId) => {
+        const parsed = parseTextOption(args);
+        if (!parsed.ref && !parsed.text) {
+          console.log(error('Usage: hover <ref> or hover -t "description"'));
+          return;
+        }
+        const action: { type: 'hover'; ref?: string; text?: string } = { type: 'hover' };
+        if (parsed.ref) action.ref = normalizeRef(parsed.ref);
+        if (parsed.text) action.text = parsed.text;
+        const result = await client.executeAction(sessionId, action);
+        if (result.success) {
+          const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
+          console.log(success(`Hovering ${target}`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Hover failed'));
+        }
+      },
+      focus: async (args, client, sessionId) => {
+        const parsed = parseTextOption(args);
+        if (!parsed.ref && !parsed.text) {
+          console.log(error('Usage: focus <ref> or focus -t "description"'));
+          return;
+        }
+        const action: { type: 'focus'; ref?: string; text?: string } = { type: 'focus' };
+        if (parsed.ref) action.ref = normalizeRef(parsed.ref);
+        if (parsed.text) action.text = parsed.text;
+        const result = await client.executeAction(sessionId, action);
+        if (result.success) {
+          const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
+          console.log(success(`Focused ${target}`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Focus failed'));
+        }
+      },
+      blur: async (args, client, sessionId) => {
+        const parsed = parseTextOption(args);
+        if (!parsed.ref && !parsed.text) {
+          console.log(error('Usage: blur <ref> or blur -t "description"'));
+          return;
+        }
+        const action: { type: 'blur'; ref?: string; text?: string } = { type: 'blur' };
+        if (parsed.ref) action.ref = normalizeRef(parsed.ref);
+        if (parsed.text) action.text = parsed.text;
+        const result = await client.executeAction(sessionId, action);
+        if (result.success) {
+          const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
+          console.log(success(`Blurred ${target}`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Blur failed'));
+        }
+      },
+      scroll: async (args, client, sessionId) => {
+        if (args.length === 0) {
+          console.log(error('Usage: scroll <direction> [amount] [--ref <ref>] [-t "text"]'));
+          return;
+        }
+        // Parse --ref/-r and -t/--text options from args
+        const refIdx = args.findIndex((a) => a === '-r' || a === '--ref');
+        const textIdx = args.findIndex((a) => a === '-t' || a === '--text');
+
+        let ref: string | undefined;
+        let text: string | undefined;
+        let filteredArgs = [...args];
+
+        if (refIdx !== -1 && args[refIdx + 1]) {
+          ref = normalizeRef(args[refIdx + 1]);
+          filteredArgs = [...args.slice(0, refIdx), ...args.slice(refIdx + 2)];
+        }
+        if (textIdx !== -1 && args[textIdx + 1]) {
+          text = args[textIdx + 1];
+          const adjustedIdx = filteredArgs.findIndex((a) => a === '-t' || a === '--text');
+          if (adjustedIdx !== -1) {
+            filteredArgs = [
+              ...filteredArgs.slice(0, adjustedIdx),
+              ...filteredArgs.slice(adjustedIdx + 2),
+            ];
+          }
+        }
+
+        const direction = filteredArgs[0]?.toLowerCase() as ScrollDirection;
+        const amount = filteredArgs[1] ? parseInt(filteredArgs[1], 10) : 500;
+        const action: {
+          type: 'scroll';
+          direction: ScrollDirection;
+          amount: number;
+          ref?: string;
+          text?: string;
+        } = { type: 'scroll', direction, amount };
+        if (ref) action.ref = ref;
+        if (text) action.text = text;
+
+        const result = await client.executeAction(sessionId, action);
+        if (result.success) {
+          const scope = ref ? ` (element ${ref})` : text ? ` (${text})` : '';
+          console.log(success(`Scrolled ${direction} ${amount}px${scope}`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Scroll failed'));
+        }
+      },
+      'scroll-into-view': async (args, client, sessionId) => {
+        const parsed = parseTextOption(args);
+        if (!parsed.ref && !parsed.text) {
+          console.log(error('Usage: scroll-into-view <ref> or scroll-into-view -t "description"'));
+          return;
+        }
+        const action: { type: 'scroll_into_view'; ref?: string; text?: string } = {
+          type: 'scroll_into_view',
+        };
+        if (parsed.ref) action.ref = normalizeRef(parsed.ref);
+        if (parsed.text) action.text = parsed.text;
+        const result = await client.executeAction(sessionId, action);
+        if (result.success) {
+          const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
+          console.log(success(`Scrolled ${target} into view`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Scroll into view failed'));
+        }
+      },
+      select: async (args, client, sessionId) => {
+        const parsed = parseTextOption(args);
+        if ((!parsed.ref && !parsed.text) || parsed.remaining.length === 0) {
+          console.log(error('Usage: select <ref> <value> or select -t "description" <value>'));
+          return;
+        }
+        const value = parsed.remaining.join(' ');
+        const action: { type: 'select'; ref?: string; text?: string; value: string } = {
+          type: 'select',
+          value,
+        };
+        if (parsed.ref) action.ref = normalizeRef(parsed.ref);
+        if (parsed.text) action.text = parsed.text;
+        const result = await client.executeAction(sessionId, action);
+        if (result.success) {
+          const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
+          console.log(success(`Selected "${value}" in ${target}`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Select failed'));
+        }
+      },
+      check: async (args, client, sessionId) => {
+        const parsed = parseTextOption(args);
+        if (!parsed.ref && !parsed.text) {
+          console.log(error('Usage: check <ref> or check -t "description"'));
+          return;
+        }
+        const action: { type: 'check'; ref?: string; text?: string } = { type: 'check' };
+        if (parsed.ref) action.ref = normalizeRef(parsed.ref);
+        if (parsed.text) action.text = parsed.text;
+        const result = await client.executeAction(sessionId, action);
+        if (result.success) {
+          const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
+          console.log(success(`Checked ${target}`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Check failed'));
+        }
+      },
+      uncheck: async (args, client, sessionId) => {
+        const parsed = parseTextOption(args);
+        if (!parsed.ref && !parsed.text) {
+          console.log(error('Usage: uncheck <ref> or uncheck -t "description"'));
+          return;
+        }
+        const action: { type: 'uncheck'; ref?: string; text?: string } = { type: 'uncheck' };
+        if (parsed.ref) action.ref = normalizeRef(parsed.ref);
+        if (parsed.text) action.text = parsed.text;
+        const result = await client.executeAction(sessionId, action);
+        if (result.success) {
+          const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
+          console.log(success(`Unchecked ${target}`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Uncheck failed'));
+        }
+      },
+      wait: async (args, client, sessionId) => {
+        if (args.length === 0) {
+          console.log(error('Usage: wait <ms>'));
+          return;
+        }
+        const duration_ms = parseInt(args[0], 10);
+        const result = await client.executeAction(sessionId, { type: 'wait', duration_ms });
+        if (result.success) {
+          console.log(success(`Waited ${duration_ms}ms`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Wait failed'));
+        }
+      },
+      'wait-for-selector': async (args, client, sessionId) => {
+        if (args.length === 0) {
+          console.log(
+            error('Usage: wait-for-selector <selector> [--state visible|hidden|attached|detached]')
+          );
+          return;
+        }
+        const selector = args[0];
+        let state: 'visible' | 'hidden' | 'attached' | 'detached' = 'visible';
+        const stateIdx = args.indexOf('--state');
+        if (stateIdx !== -1 && args[stateIdx + 1]) {
+          state = args[stateIdx + 1] as typeof state;
+        }
+        const result = await client.executeAction(sessionId, {
+          type: 'wait_for_selector',
+          selector,
+          state,
+        });
+        if (result.success) {
+          console.log(success(`Selector "${selector}" is ${state}`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Wait for selector failed'));
+        }
+      },
+      'wait-for-load': async (args, client, sessionId) => {
+        let state: 'load' | 'domcontentloaded' | 'networkidle' = 'load';
+        const stateIdx = args.indexOf('--state');
+        if (stateIdx !== -1 && args[stateIdx + 1]) {
+          state = args[stateIdx + 1] as typeof state;
+        } else if (args.length > 0 && !args[0].startsWith('--')) {
+          state = args[0] as typeof state;
+        }
+        const result = await client.executeAction(sessionId, {
+          type: 'wait_for_load',
+          state,
+        });
+        if (result.success) {
+          console.log(success(`Page reached ${state} state`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Wait for load failed'));
+        }
+      },
+      snapshot: async (args, client, sessionId) => {
+        // Parse flags from args
+        const interactive = args.includes('--interactive') || args.includes('-i');
+        const compact = args.includes('--compact') || args.includes('-c');
+        const depthIdx = args.findIndex((a) => a === '--max-depth' || a === '-d');
+        const max_depth = depthIdx !== -1 ? parseInt(args[depthIdx + 1], 10) : undefined;
+        const scopeIdx = args.indexOf('--scope');
+        const scope = scopeIdx !== -1 ? args[scopeIdx + 1] : undefined;
+
+        const snapshot = await client.getSnapshot(sessionId, {
+          interactive,
+          compact,
+          max_depth,
+          scope,
+        });
+
+        if (snapshot.url) {
+          console.log(`URL: ${snapshot.url}\n`);
+        }
+        if (snapshot.filter_stats) {
+          console.log(
+            `Filtered: ${snapshot.filter_stats.filtered_lines}/${snapshot.filter_stats.original_lines} lines (${snapshot.filter_stats.reduction_percent}% reduction)\n`
+          );
+        }
+        console.log(snapshot.snapshot);
+      },
+      screenshot: async (args, client, sessionId) => {
+        const urlMode = args.includes('--url');
+
+        if (urlMode) {
+          const url = await client.getScreenshot(sessionId, { returnUrl: true });
+          console.log(url);
+          return;
+        }
+
+        const buffer = (await client.getScreenshot(sessionId)) as Buffer;
+        const filteredArgs = args.filter((a) => a !== '--url');
+        const filename = filteredArgs[0] || `screenshot-${Date.now()}.png`;
+        const fs = await import('node:fs');
+        fs.writeFileSync(filename, buffer);
+        console.log(success(`Screenshot saved to ${filename}`));
+      },
+      url: async (_args, client, sessionId) => {
+        const url = await client.getUrl(sessionId);
+        console.log(url);
+      },
+      evaluate: async (args, client, sessionId) => {
+        if (args.length === 0) {
+          console.log(error('Usage: evaluate <expression> [-r <ref>] [-t "description"]'));
+          return;
+        }
+
+        // Parse options
+        const refIdx = args.findIndex((a) => a === '-r' || a === '--ref');
+        const textIdx = args.findIndex((a) => a === '-t' || a === '--text');
+
+        let ref: string | undefined;
+        let text: string | undefined;
+        let expressionParts: string[] = [...args];
+
+        if (refIdx !== -1 && args[refIdx + 1]) {
+          ref = normalizeRef(args[refIdx + 1]);
+          expressionParts = [...args.slice(0, refIdx), ...args.slice(refIdx + 2)];
+        }
+        if (textIdx !== -1 && args[textIdx + 1]) {
+          text = args[textIdx + 1];
+          const adjustedTextIdx = expressionParts.findIndex((a) => a === '-t' || a === '--text');
+          if (adjustedTextIdx !== -1) {
+            expressionParts = [
+              ...expressionParts.slice(0, adjustedTextIdx),
+              ...expressionParts.slice(adjustedTextIdx + 2),
+            ];
+          }
+        }
+
+        const expression = expressionParts.join(' ');
+        if (!expression) {
+          console.log(error('Expression is required'));
+          return;
+        }
+
+        const action: {
+          type: 'evaluate';
+          expression: string;
+          ref?: string;
+          text?: string;
+        } = { type: 'evaluate', expression };
+
+        if (ref) action.ref = ref;
+        if (text) action.text = text;
+
+        const result = await client.executeAction(sessionId, action);
+        if (result.success) {
+          const data = result.data as { result?: unknown };
+          const value = data.result;
+          if (typeof value === 'string') {
+            console.log(value);
+          } else if (value === null || value === undefined) {
+            console.log(String(value));
           } else {
-            console.log(error(result.error || 'Navigation failed'));
+            console.log(JSON.stringify(value, null, 2));
           }
-        },
-        back: async (_args, client, sessionId) => {
-          const result = await client.executeAction(sessionId, { type: 'back' });
-          if (result.success) {
-            console.log(success('Navigated back'));
+        } else {
+          console.log(error(result.error || 'Evaluation failed'));
+        }
+      },
+      'get-blocks': async (_args, client, sessionId) => {
+        const blocks = await client.getBlocks(sessionId);
+        console.log(JSON.stringify(blocks, null, 2));
+      },
+      status: async (_args, client, sessionId) => {
+        const session = await client.getSession(sessionId);
+        console.log(`ID: ${session.id}`);
+        console.log(`Status: ${session.status}`);
+        console.log(`URL: ${session.current_url || 'none'}`);
+        if (session.app_url) {
+          console.log(`App URL: ${session.app_url}`);
+        }
+        if (session.cdp_url) {
+          console.log(`CDP URL: ${session.cdp_url}`);
+        }
+        if (session.last_action_at) {
+          console.log(`Last Action: ${session.last_action_at}`);
+        }
+        if (session.error_message) {
+          console.log(`Error: ${session.error_message}`);
+        }
+      },
+      'logs-console': async (args, client, sessionId) => {
+        const levelIdx = args.indexOf('--level');
+        const limitIdx = args.indexOf('--limit');
+        const level = levelIdx !== -1 ? args[levelIdx + 1] : undefined;
+        const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
 
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Back failed'));
-          }
-        },
-        forward: async (_args, client, sessionId) => {
-          const result = await client.executeAction(sessionId, { type: 'forward' });
-          if (result.success) {
-            console.log(success('Navigated forward'));
+        const result = await client.getConsoleLogs(sessionId, {
+          level: level as 'log' | 'warn' | 'error' | 'info' | 'debug' | undefined,
+          limit,
+        });
 
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Forward failed'));
-          }
-        },
-        reload: async (_args, client, sessionId) => {
-          const result = await client.executeAction(sessionId, { type: 'reload' });
-          if (result.success) {
-            console.log(success('Page reloaded'));
+        console.log(`Console logs (${result.total} total):\n`);
+        for (const log of result.logs) {
+          const prefix = log.level.toUpperCase().padEnd(5);
+          console.log(`[${prefix}] ${log.text}`);
+          if (log.url) console.log(`        at ${log.url}`);
+        }
+      },
+      'logs-network': async (args, client, sessionId) => {
+        const statusIdx = args.indexOf('--status');
+        const patternIdx = args.indexOf('--url-pattern');
+        const limitIdx = args.indexOf('--limit');
+        const status = statusIdx !== -1 ? args[statusIdx + 1] : undefined;
+        const url_pattern = patternIdx !== -1 ? args[patternIdx + 1] : undefined;
+        const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
 
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Reload failed'));
-          }
-        },
-        click: async (args, client, sessionId) => {
-          // Check for --force/-f flag and --no-diff flag
-          const forceIdx = args.findIndex((a) => a === '-f' || a === '--force');
-          const noDiffIdx = args.indexOf('--no-diff');
-          const force = forceIdx !== -1;
-          const disableDiff = noDiffIdx !== -1;
+        const result = await client.getNetworkLogs(sessionId, { status, url_pattern, limit });
 
-          // Filter out flags
-          let filteredArgs = [...args];
-          if (forceIdx !== -1) {
-            filteredArgs = filteredArgs.filter((_, i) => i !== forceIdx);
-          }
-          if (noDiffIdx !== -1) {
-            filteredArgs = filteredArgs.filter((a) => a !== '--no-diff');
-          }
+        console.log(`Network requests (${result.total} total):\n`);
+        for (const req of result.requests) {
+          const statusColor = req.status >= 400 ? '!' : ' ';
+          console.log(
+            `${statusColor}${req.method.padEnd(6)} ${req.status} ${req.url} (${req.duration_ms}ms)`
+          );
+        }
+      },
+      'generate-test': async (args, client, sessionId) => {
+        const nameIdx = args.indexOf('--name');
+        const configIdx = args.indexOf('--app-config');
+        const outputIdx = args.indexOf('--output');
 
-          const parsed = parseTextOption(filteredArgs);
-          if (!parsed.ref && !parsed.text) {
-            console.log(
-              error('Usage: click <ref> or click -t "description" [--force] [--no-diff]')
-            );
-            return;
-          }
+        if (nameIdx === -1 || !args[nameIdx + 1]) {
+          console.log(
+            error('Usage: generate-test --name <name> [--app-config <id>] [--output <file>]')
+          );
+          return;
+        }
+
+        const name = args[nameIdx + 1];
+        const app_config = configIdx !== -1 ? args[configIdx + 1] : undefined;
+        const outputFile = outputIdx !== -1 ? args[outputIdx + 1] : undefined;
+
+        const result = await client.generateTest(sessionId, { name, app_config });
+
+        if (outputFile) {
+          const fs = await import('node:fs');
+          fs.writeFileSync(outputFile, result.yaml);
+          console.log(success(`Test written to ${outputFile} (${result.block_count} blocks)`));
+        } else {
+          console.log(result.yaml);
+        }
+      },
+      drag: async (args, client, sessionId) => {
+        // Parse: drag <ref> --target <target-ref> or --target-selector <sel>
+        // Also support: drag <ref> --delta-x <px> --delta-y <px>
+        // Also support: drag -t "text" --target <ref>
+        const noDiffIdx = args.indexOf('--no-diff');
+        const disableDiff = noDiffIdx !== -1;
+        const filteredArgs = disableDiff ? args.filter((a) => a !== '--no-diff') : args;
+
+        const parsed = parseTextOption(filteredArgs);
+        if (!parsed.ref && !parsed.text) {
+          console.log(
+            error(
+              'Usage: drag <ref> --target <ref> OR drag <ref> --delta-x <px> --delta-y <px> [--no-diff]'
+            )
+          );
+          return;
+        }
+
+        // Check for relative drag options
+        const deltaXIdx = parsed.remaining.indexOf('--delta-x');
+        const deltaYIdx = parsed.remaining.indexOf('--delta-y');
+        const isRelativeDrag = deltaXIdx !== -1 || deltaYIdx !== -1;
+
+        if (isRelativeDrag) {
+          const deltaX = deltaXIdx !== -1 ? parseInt(parsed.remaining[deltaXIdx + 1], 10) : 0;
+          const deltaY = deltaYIdx !== -1 ? parseInt(parsed.remaining[deltaYIdx + 1], 10) : 0;
+
           const action: {
-            type: 'click';
+            type: 'relative_drag_and_drop';
             ref?: string;
             text?: string;
-            force?: boolean;
+            delta_x: number;
+            delta_y: number;
             include_snapshot_diff?: boolean;
           } = {
-            type: 'click',
+            type: 'relative_drag_and_drop',
+            delta_x: deltaX,
+            delta_y: deltaY,
           };
+
           if (parsed.ref) action.ref = normalizeRef(parsed.ref);
           if (parsed.text) action.text = parsed.text;
-          if (force) action.force = true;
           if (!disableDiff) action.include_snapshot_diff = true;
 
           const result = await client.executeAction(sessionId, action);
           if (result.success) {
-            const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
-            console.log(success(`Clicked ${target}`));
+            const source = parsed.ref ? `element ${normalizeRef(parsed.ref)}` : `"${parsed.text}"`;
+            console.log(success(`Dragged ${source} by (${deltaX}, ${deltaY}) pixels`));
 
             if (result.snapshot_diff) {
               console.log('');
@@ -290,953 +897,349 @@ export const runCommand = new Command('run')
               console.log(formatDownloads(result.downloads));
             }
           } else {
-            console.log(error(result.error || 'Click failed'));
+            console.log(error(result.error || 'Relative drag failed'));
           }
-        },
-        fill: async (args, client, sessionId) => {
-          const parsed = parseTextOption(args);
-          if ((!parsed.ref && !parsed.text) || parsed.remaining.length === 0) {
-            console.log(error('Usage: fill <ref> <value> or fill -t "description" <value>'));
+          return;
+        }
+
+        // Standard drag (existing code)
+        const targetIdx = parsed.remaining.indexOf('--target');
+        const targetSelectorIdx = parsed.remaining.indexOf('--target-selector');
+
+        if (targetIdx === -1 && targetSelectorIdx === -1) {
+          console.log(
+            error(
+              'Either --target <ref>, --target-selector <selector>, or --delta-x/--delta-y is required'
+            )
+          );
+          return;
+        }
+
+        const targetRef =
+          targetIdx !== -1 && parsed.remaining[targetIdx + 1]
+            ? normalizeRef(parsed.remaining[targetIdx + 1])
+            : undefined;
+        const targetSelector =
+          targetSelectorIdx !== -1 && parsed.remaining[targetSelectorIdx + 1]
+            ? parsed.remaining[targetSelectorIdx + 1]
+            : undefined;
+
+        const action: {
+          type: 'drag_and_drop';
+          ref?: string;
+          text?: string;
+          target_ref?: string;
+          target_selector?: string;
+          include_snapshot_diff?: boolean;
+        } = { type: 'drag_and_drop' };
+
+        if (parsed.ref) action.ref = normalizeRef(parsed.ref);
+        if (parsed.text) action.text = parsed.text;
+        if (targetRef) action.target_ref = targetRef;
+        if (targetSelector) action.target_selector = targetSelector;
+        if (!disableDiff) action.include_snapshot_diff = true;
+
+        const result = await client.executeAction(sessionId, action);
+        if (result.success) {
+          const source = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
+          const target = targetRef ? targetRef : `selector "${targetSelector}"`;
+          console.log(success(`Dragged ${source} to ${target}`));
+
+          if (result.snapshot_diff) {
+            console.log('');
+            console.log(formatSnapshotDiff(result.snapshot_diff));
+          }
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Drag failed'));
+        }
+      },
+      'mfa-totp': async (args, client, sessionId) => {
+        // Parse: mfa-totp [ref] <secret> or mfa-totp -t "text" <secret>
+        // Also support: mfa-totp <secret> (generate only)
+        const parsed = parseTextOption(args);
+
+        let ref: string | undefined;
+        let secret: string;
+
+        if (parsed.text) {
+          // Using -t "text" <secret>
+          if (parsed.remaining.length === 0) {
+            console.log(error('Usage: mfa-totp -t "description" <secret>'));
             return;
           }
-          const value = parsed.remaining.join(' ');
-          const action: { type: 'fill'; ref?: string; text?: string; value: string } = {
-            type: 'fill',
-            value,
-          };
-          if (parsed.ref) action.ref = normalizeRef(parsed.ref);
-          if (parsed.text) action.text = parsed.text;
-          const result = await client.executeAction(sessionId, action);
-          if (result.success) {
-            const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
-            console.log(success(`Filled ${target}`));
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Fill failed'));
-          }
-        },
-        type: async (args, client, sessionId) => {
-          if (args.length < 2) {
-            console.log(error('Usage: type <ref> <text>'));
-            return;
-          }
-          const ref = normalizeRef(args[0]);
-          const text = args.slice(1).join(' ');
-          const result = await client.executeAction(sessionId, { type: 'type', ref, text });
-          if (result.success) {
-            console.log(success(`Typed into ${ref}`));
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Type failed'));
-          }
-        },
-        press: async (args, client, sessionId) => {
-          if (args.length === 0) {
-            console.log(error('Usage: press <key>'));
-            return;
-          }
-          const key = args[0];
-          const result = await client.executeAction(sessionId, { type: 'press', key });
-          if (result.success) {
-            console.log(success(`Pressed ${key}`));
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Press failed'));
-          }
-        },
-        hover: async (args, client, sessionId) => {
-          const parsed = parseTextOption(args);
-          if (!parsed.ref && !parsed.text) {
-            console.log(error('Usage: hover <ref> or hover -t "description"'));
-            return;
-          }
-          const action: { type: 'hover'; ref?: string; text?: string } = { type: 'hover' };
-          if (parsed.ref) action.ref = normalizeRef(parsed.ref);
-          if (parsed.text) action.text = parsed.text;
-          const result = await client.executeAction(sessionId, action);
-          if (result.success) {
-            const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
-            console.log(success(`Hovering ${target}`));
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Hover failed'));
-          }
-        },
-        focus: async (args, client, sessionId) => {
-          const parsed = parseTextOption(args);
-          if (!parsed.ref && !parsed.text) {
-            console.log(error('Usage: focus <ref> or focus -t "description"'));
-            return;
-          }
-          const action: { type: 'focus'; ref?: string; text?: string } = { type: 'focus' };
-          if (parsed.ref) action.ref = normalizeRef(parsed.ref);
-          if (parsed.text) action.text = parsed.text;
-          const result = await client.executeAction(sessionId, action);
-          if (result.success) {
-            const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
-            console.log(success(`Focused ${target}`));
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Focus failed'));
-          }
-        },
-        blur: async (args, client, sessionId) => {
-          const parsed = parseTextOption(args);
-          if (!parsed.ref && !parsed.text) {
-            console.log(error('Usage: blur <ref> or blur -t "description"'));
-            return;
-          }
-          const action: { type: 'blur'; ref?: string; text?: string } = { type: 'blur' };
-          if (parsed.ref) action.ref = normalizeRef(parsed.ref);
-          if (parsed.text) action.text = parsed.text;
-          const result = await client.executeAction(sessionId, action);
-          if (result.success) {
-            const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
-            console.log(success(`Blurred ${target}`));
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Blur failed'));
-          }
-        },
-        scroll: async (args, client, sessionId) => {
-          if (args.length === 0) {
-            console.log(error('Usage: scroll <direction> [amount] [--ref <ref>] [-t "text"]'));
-            return;
-          }
-          // Parse --ref/-r and -t/--text options from args
-          const refIdx = args.findIndex((a) => a === '-r' || a === '--ref');
-          const textIdx = args.findIndex((a) => a === '-t' || a === '--text');
-
-          let ref: string | undefined;
-          let text: string | undefined;
-          let filteredArgs = [...args];
-
-          if (refIdx !== -1 && args[refIdx + 1]) {
-            ref = normalizeRef(args[refIdx + 1]);
-            filteredArgs = [...args.slice(0, refIdx), ...args.slice(refIdx + 2)];
-          }
-          if (textIdx !== -1 && args[textIdx + 1]) {
-            text = args[textIdx + 1];
-            const adjustedIdx = filteredArgs.findIndex((a) => a === '-t' || a === '--text');
-            if (adjustedIdx !== -1) {
-              filteredArgs = [
-                ...filteredArgs.slice(0, adjustedIdx),
-                ...filteredArgs.slice(adjustedIdx + 2),
-              ];
-            }
-          }
-
-          const direction = filteredArgs[0]?.toLowerCase() as ScrollDirection;
-          const amount = filteredArgs[1] ? parseInt(filteredArgs[1], 10) : 500;
-          const action: {
-            type: 'scroll';
-            direction: ScrollDirection;
-            amount: number;
-            ref?: string;
-            text?: string;
-          } = { type: 'scroll', direction, amount };
-          if (ref) action.ref = ref;
-          if (text) action.text = text;
-
-          const result = await client.executeAction(sessionId, action);
-          if (result.success) {
-            const scope = ref ? ` (element ${ref})` : text ? ` (${text})` : '';
-            console.log(success(`Scrolled ${direction} ${amount}px${scope}`));
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Scroll failed'));
-          }
-        },
-        'scroll-into-view': async (args, client, sessionId) => {
-          const parsed = parseTextOption(args);
-          if (!parsed.ref && !parsed.text) {
-            console.log(
-              error('Usage: scroll-into-view <ref> or scroll-into-view -t "description"')
-            );
-            return;
-          }
-          const action: { type: 'scroll_into_view'; ref?: string; text?: string } = {
-            type: 'scroll_into_view',
-          };
-          if (parsed.ref) action.ref = normalizeRef(parsed.ref);
-          if (parsed.text) action.text = parsed.text;
-          const result = await client.executeAction(sessionId, action);
-          if (result.success) {
-            const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
-            console.log(success(`Scrolled ${target} into view`));
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Scroll into view failed'));
-          }
-        },
-        select: async (args, client, sessionId) => {
-          const parsed = parseTextOption(args);
-          if ((!parsed.ref && !parsed.text) || parsed.remaining.length === 0) {
-            console.log(error('Usage: select <ref> <value> or select -t "description" <value>'));
-            return;
-          }
-          const value = parsed.remaining.join(' ');
-          const action: { type: 'select'; ref?: string; text?: string; value: string } = {
-            type: 'select',
-            value,
-          };
-          if (parsed.ref) action.ref = normalizeRef(parsed.ref);
-          if (parsed.text) action.text = parsed.text;
-          const result = await client.executeAction(sessionId, action);
-          if (result.success) {
-            const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
-            console.log(success(`Selected "${value}" in ${target}`));
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Select failed'));
-          }
-        },
-        check: async (args, client, sessionId) => {
-          const parsed = parseTextOption(args);
-          if (!parsed.ref && !parsed.text) {
-            console.log(error('Usage: check <ref> or check -t "description"'));
-            return;
-          }
-          const action: { type: 'check'; ref?: string; text?: string } = { type: 'check' };
-          if (parsed.ref) action.ref = normalizeRef(parsed.ref);
-          if (parsed.text) action.text = parsed.text;
-          const result = await client.executeAction(sessionId, action);
-          if (result.success) {
-            const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
-            console.log(success(`Checked ${target}`));
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Check failed'));
-          }
-        },
-        uncheck: async (args, client, sessionId) => {
-          const parsed = parseTextOption(args);
-          if (!parsed.ref && !parsed.text) {
-            console.log(error('Usage: uncheck <ref> or uncheck -t "description"'));
-            return;
-          }
-          const action: { type: 'uncheck'; ref?: string; text?: string } = { type: 'uncheck' };
-          if (parsed.ref) action.ref = normalizeRef(parsed.ref);
-          if (parsed.text) action.text = parsed.text;
-          const result = await client.executeAction(sessionId, action);
-          if (result.success) {
-            const target = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
-            console.log(success(`Unchecked ${target}`));
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Uncheck failed'));
-          }
-        },
-        wait: async (args, client, sessionId) => {
-          if (args.length === 0) {
-            console.log(error('Usage: wait <ms>'));
-            return;
-          }
-          const duration_ms = parseInt(args[0], 10);
-          const result = await client.executeAction(sessionId, { type: 'wait', duration_ms });
-          if (result.success) {
-            console.log(success(`Waited ${duration_ms}ms`));
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Wait failed'));
-          }
-        },
-        'wait-for-selector': async (args, client, sessionId) => {
-          if (args.length === 0) {
-            console.log(
-              error(
-                'Usage: wait-for-selector <selector> [--state visible|hidden|attached|detached]'
-              )
-            );
-            return;
-          }
-          const selector = args[0];
-          let state: 'visible' | 'hidden' | 'attached' | 'detached' = 'visible';
-          const stateIdx = args.indexOf('--state');
-          if (stateIdx !== -1 && args[stateIdx + 1]) {
-            state = args[stateIdx + 1] as typeof state;
-          }
-          const result = await client.executeAction(sessionId, {
-            type: 'wait_for_selector',
-            selector,
-            state,
-          });
-          if (result.success) {
-            console.log(success(`Selector "${selector}" is ${state}`));
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Wait for selector failed'));
-          }
-        },
-        'wait-for-load': async (args, client, sessionId) => {
-          let state: 'load' | 'domcontentloaded' | 'networkidle' = 'load';
-          const stateIdx = args.indexOf('--state');
-          if (stateIdx !== -1 && args[stateIdx + 1]) {
-            state = args[stateIdx + 1] as typeof state;
-          } else if (args.length > 0 && !args[0].startsWith('--')) {
-            state = args[0] as typeof state;
-          }
-          const result = await client.executeAction(sessionId, {
-            type: 'wait_for_load',
-            state,
-          });
-          if (result.success) {
-            console.log(success(`Page reached ${state} state`));
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Wait for load failed'));
-          }
-        },
-        snapshot: async (args, client, sessionId) => {
-          // Parse flags from args
-          const interactive = args.includes('--interactive') || args.includes('-i');
-          const compact = args.includes('--compact') || args.includes('-c');
-          const depthIdx = args.findIndex((a) => a === '--max-depth' || a === '-d');
-          const max_depth = depthIdx !== -1 ? parseInt(args[depthIdx + 1], 10) : undefined;
-          const scopeIdx = args.indexOf('--scope');
-          const scope = scopeIdx !== -1 ? args[scopeIdx + 1] : undefined;
-
-          const snapshot = await client.getSnapshot(sessionId, {
-            interactive,
-            compact,
-            max_depth,
-            scope,
-          });
-
-          if (snapshot.url) {
-            console.log(`URL: ${snapshot.url}\n`);
-          }
-          if (snapshot.filter_stats) {
-            console.log(
-              `Filtered: ${snapshot.filter_stats.filtered_lines}/${snapshot.filter_stats.original_lines} lines (${snapshot.filter_stats.reduction_percent}% reduction)\n`
-            );
-          }
-          console.log(snapshot.snapshot);
-        },
-        screenshot: async (args, client, sessionId) => {
-          const urlMode = args.includes('--url');
-
-          if (urlMode) {
-            const url = await client.getScreenshot(sessionId, { returnUrl: true });
-            console.log(url);
-            return;
-          }
-
-          const buffer = (await client.getScreenshot(sessionId)) as Buffer;
-          const filteredArgs = args.filter((a) => a !== '--url');
-          const filename = filteredArgs[0] || `screenshot-${Date.now()}.png`;
-          const fs = await import('node:fs');
-          fs.writeFileSync(filename, buffer);
-          console.log(success(`Screenshot saved to ${filename}`));
-        },
-        url: async (_args, client, sessionId) => {
-          const url = await client.getUrl(sessionId);
-          console.log(url);
-        },
-        evaluate: async (args, client, sessionId) => {
-          if (args.length === 0) {
-            console.log(error('Usage: evaluate <expression> [-r <ref>] [-t "description"]'));
-            return;
-          }
-
-          // Parse options
-          const refIdx = args.findIndex((a) => a === '-r' || a === '--ref');
-          const textIdx = args.findIndex((a) => a === '-t' || a === '--text');
-
-          let ref: string | undefined;
-          let text: string | undefined;
-          let expressionParts: string[] = [...args];
-
-          if (refIdx !== -1 && args[refIdx + 1]) {
-            ref = normalizeRef(args[refIdx + 1]);
-            expressionParts = [...args.slice(0, refIdx), ...args.slice(refIdx + 2)];
-          }
-          if (textIdx !== -1 && args[textIdx + 1]) {
-            text = args[textIdx + 1];
-            const adjustedTextIdx = expressionParts.findIndex((a) => a === '-t' || a === '--text');
-            if (adjustedTextIdx !== -1) {
-              expressionParts = [
-                ...expressionParts.slice(0, adjustedTextIdx),
-                ...expressionParts.slice(adjustedTextIdx + 2),
-              ];
-            }
-          }
-
-          const expression = expressionParts.join(' ');
-          if (!expression) {
-            console.log(error('Expression is required'));
-            return;
-          }
-
-          const action: {
-            type: 'evaluate';
-            expression: string;
-            ref?: string;
-            text?: string;
-          } = { type: 'evaluate', expression };
-
-          if (ref) action.ref = ref;
-          if (text) action.text = text;
-
-          const result = await client.executeAction(sessionId, action);
-          if (result.success) {
-            const data = result.data as { result?: unknown };
-            const value = data.result;
-            if (typeof value === 'string') {
-              console.log(value);
-            } else if (value === null || value === undefined) {
-              console.log(String(value));
-            } else {
-              console.log(JSON.stringify(value, null, 2));
-            }
-          } else {
-            console.log(error(result.error || 'Evaluation failed'));
-          }
-        },
-        'get-blocks': async (_args, client, sessionId) => {
-          const blocks = await client.getBlocks(sessionId);
-          console.log(JSON.stringify(blocks, null, 2));
-        },
-        status: async (_args, client, sessionId) => {
-          const session = await client.getSession(sessionId);
-          console.log(`ID: ${session.id}`);
-          console.log(`Status: ${session.status}`);
-          console.log(`URL: ${session.current_url || 'none'}`);
-          if (session.app_url) {
-            console.log(`App URL: ${session.app_url}`);
-          }
-          if (session.cdp_url) {
-            console.log(`CDP URL: ${session.cdp_url}`);
-          }
-          if (session.last_action_at) {
-            console.log(`Last Action: ${session.last_action_at}`);
-          }
-          if (session.error_message) {
-            console.log(`Error: ${session.error_message}`);
-          }
-        },
-        'logs-console': async (args, client, sessionId) => {
-          const levelIdx = args.indexOf('--level');
-          const limitIdx = args.indexOf('--limit');
-          const level = levelIdx !== -1 ? args[levelIdx + 1] : undefined;
-          const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
-
-          const result = await client.getConsoleLogs(sessionId, {
-            level: level as 'log' | 'warn' | 'error' | 'info' | 'debug' | undefined,
-            limit,
-          });
-
-          console.log(`Console logs (${result.total} total):\n`);
-          for (const log of result.logs) {
-            const prefix = log.level.toUpperCase().padEnd(5);
-            console.log(`[${prefix}] ${log.text}`);
-            if (log.url) console.log(`        at ${log.url}`);
-          }
-        },
-        'logs-network': async (args, client, sessionId) => {
-          const statusIdx = args.indexOf('--status');
-          const patternIdx = args.indexOf('--url-pattern');
-          const limitIdx = args.indexOf('--limit');
-          const status = statusIdx !== -1 ? args[statusIdx + 1] : undefined;
-          const url_pattern = patternIdx !== -1 ? args[patternIdx + 1] : undefined;
-          const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
-
-          const result = await client.getNetworkLogs(sessionId, { status, url_pattern, limit });
-
-          console.log(`Network requests (${result.total} total):\n`);
-          for (const req of result.requests) {
-            const statusColor = req.status >= 400 ? '!' : ' ';
-            console.log(
-              `${statusColor}${req.method.padEnd(6)} ${req.status} ${req.url} (${req.duration_ms}ms)`
-            );
-          }
-        },
-        'generate-test': async (args, client, sessionId) => {
-          const nameIdx = args.indexOf('--name');
-          const configIdx = args.indexOf('--app-config');
-          const outputIdx = args.indexOf('--output');
-
-          if (nameIdx === -1 || !args[nameIdx + 1]) {
-            console.log(
-              error('Usage: generate-test --name <name> [--app-config <id>] [--output <file>]')
-            );
-            return;
-          }
-
-          const name = args[nameIdx + 1];
-          const app_config = configIdx !== -1 ? args[configIdx + 1] : undefined;
-          const outputFile = outputIdx !== -1 ? args[outputIdx + 1] : undefined;
-
-          const result = await client.generateTest(sessionId, { name, app_config });
-
-          if (outputFile) {
-            const fs = await import('node:fs');
-            fs.writeFileSync(outputFile, result.yaml);
-            console.log(success(`Test written to ${outputFile} (${result.block_count} blocks)`));
-          } else {
-            console.log(result.yaml);
-          }
-        },
-        drag: async (args, client, sessionId) => {
-          // Parse: drag <ref> --target <target-ref> or --target-selector <sel>
-          // Also support: drag <ref> --delta-x <px> --delta-y <px>
-          // Also support: drag -t "text" --target <ref>
-          const noDiffIdx = args.indexOf('--no-diff');
-          const disableDiff = noDiffIdx !== -1;
-          const filteredArgs = disableDiff ? args.filter((a) => a !== '--no-diff') : args;
-
-          const parsed = parseTextOption(filteredArgs);
-          if (!parsed.ref && !parsed.text) {
-            console.log(
-              error(
-                'Usage: drag <ref> --target <ref> OR drag <ref> --delta-x <px> --delta-y <px> [--no-diff]'
-              )
-            );
-            return;
-          }
-
-          // Check for relative drag options
-          const deltaXIdx = parsed.remaining.indexOf('--delta-x');
-          const deltaYIdx = parsed.remaining.indexOf('--delta-y');
-          const isRelativeDrag = deltaXIdx !== -1 || deltaYIdx !== -1;
-
-          if (isRelativeDrag) {
-            const deltaX = deltaXIdx !== -1 ? parseInt(parsed.remaining[deltaXIdx + 1], 10) : 0;
-            const deltaY = deltaYIdx !== -1 ? parseInt(parsed.remaining[deltaYIdx + 1], 10) : 0;
-
-            const action: {
-              type: 'relative_drag_and_drop';
-              ref?: string;
-              text?: string;
-              delta_x: number;
-              delta_y: number;
-              include_snapshot_diff?: boolean;
-            } = {
-              type: 'relative_drag_and_drop',
-              delta_x: deltaX,
-              delta_y: deltaY,
-            };
-
-            if (parsed.ref) action.ref = normalizeRef(parsed.ref);
-            if (parsed.text) action.text = parsed.text;
-            if (!disableDiff) action.include_snapshot_diff = true;
-
-            const result = await client.executeAction(sessionId, action);
-            if (result.success) {
-              const source = parsed.ref
-                ? `element ${normalizeRef(parsed.ref)}`
-                : `"${parsed.text}"`;
-              console.log(success(`Dragged ${source} by (${deltaX}, ${deltaY}) pixels`));
-
-              if (result.snapshot_diff) {
-                console.log('');
-                console.log(formatSnapshotDiff(result.snapshot_diff));
-              }
-
-              if (result.downloads?.length) {
-                console.log('');
-                console.log(formatDownloads(result.downloads));
-              }
-            } else {
-              console.log(error(result.error || 'Relative drag failed'));
-            }
-            return;
-          }
-
-          // Standard drag (existing code)
-          const targetIdx = parsed.remaining.indexOf('--target');
-          const targetSelectorIdx = parsed.remaining.indexOf('--target-selector');
-
-          if (targetIdx === -1 && targetSelectorIdx === -1) {
-            console.log(
-              error(
-                'Either --target <ref>, --target-selector <selector>, or --delta-x/--delta-y is required'
-              )
-            );
-            return;
-          }
-
-          const targetRef =
-            targetIdx !== -1 && parsed.remaining[targetIdx + 1]
-              ? normalizeRef(parsed.remaining[targetIdx + 1])
-              : undefined;
-          const targetSelector =
-            targetSelectorIdx !== -1 && parsed.remaining[targetSelectorIdx + 1]
-              ? parsed.remaining[targetSelectorIdx + 1]
-              : undefined;
-
-          const action: {
-            type: 'drag_and_drop';
-            ref?: string;
-            text?: string;
-            target_ref?: string;
-            target_selector?: string;
-            include_snapshot_diff?: boolean;
-          } = { type: 'drag_and_drop' };
-
-          if (parsed.ref) action.ref = normalizeRef(parsed.ref);
-          if (parsed.text) action.text = parsed.text;
-          if (targetRef) action.target_ref = targetRef;
-          if (targetSelector) action.target_selector = targetSelector;
-          if (!disableDiff) action.include_snapshot_diff = true;
-
-          const result = await client.executeAction(sessionId, action);
-          if (result.success) {
-            const source = parsed.ref ? normalizeRef(parsed.ref) : `"${parsed.text}"`;
-            const target = targetRef ? targetRef : `selector "${targetSelector}"`;
-            console.log(success(`Dragged ${source} to ${target}`));
-
-            if (result.snapshot_diff) {
-              console.log('');
-              console.log(formatSnapshotDiff(result.snapshot_diff));
-            }
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Drag failed'));
-          }
-        },
-        'mfa-totp': async (args, client, sessionId) => {
-          // Parse: mfa-totp [ref] <secret> or mfa-totp -t "text" <secret>
-          // Also support: mfa-totp <secret> (generate only)
-          const parsed = parseTextOption(args);
-
-          let ref: string | undefined;
-          let secret: string;
-
-          if (parsed.text) {
-            // Using -t "text" <secret>
-            if (parsed.remaining.length === 0) {
-              console.log(error('Usage: mfa-totp -t "description" <secret>'));
-              return;
-            }
-            secret = parsed.remaining[0];
-          } else if (parsed.ref) {
-            // Could be <ref> <secret> or just <secret>
-            if (parsed.remaining.length > 0) {
-              // <ref> <secret>
-              ref = normalizeRef(parsed.ref);
-              secret = parsed.remaining[0];
-            } else {
-              // Just <secret> (generate only)
-              secret = parsed.ref;
-            }
-          } else {
-            console.log(
-              error(
-                'Usage: mfa-totp <secret> or mfa-totp <ref> <secret> or mfa-totp -t "text" <secret>'
-              )
-            );
-            return;
-          }
-
-          const action: {
-            type: 'mfa_totp';
-            secret: string;
-            ref?: string;
-            text?: string;
-          } = { type: 'mfa_totp', secret };
-
-          if (ref) action.ref = ref;
-          if (parsed.text) action.text = parsed.text;
-
-          const result = await client.executeAction(sessionId, action);
-          if (result.success) {
-            const code =
-              result.data && typeof result.data === 'object' && 'code' in result.data
-                ? (result.data as { code: string }).code
-                : undefined;
-
-            if (ref || parsed.text) {
-              const target = ref ? `element ${ref}` : `"${parsed.text}"`;
-              if (code) {
-                console.log(success(`Generated TOTP code ${code} and filled into ${target}`));
-              } else {
-                console.log(success(`Generated TOTP code and filled into ${target}`));
-              }
-            } else {
-              if (code) {
-                console.log(info(`Generated TOTP code: ${code}`));
-              } else {
-                console.log(success('Generated TOTP code'));
-              }
-            }
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'MFA TOTP failed'));
-          }
-        },
-        upload: async (args, client, sessionId) => {
-          // Parse: upload <ref> <file>... or upload -t "text" <file>...
-          const parsed = parseTextOption(args);
-
-          let ref: string | undefined;
-          let files: string[];
-
-          if (parsed.text) {
-            // Using -t "text" <file>...
-            if (parsed.remaining.length === 0) {
-              console.log(error('Usage: upload -t "description" <file>...'));
-              return;
-            }
-            files = parsed.remaining;
-          } else if (parsed.ref) {
-            // <ref> <file>...
+          secret = parsed.remaining[0];
+        } else if (parsed.ref) {
+          // Could be <ref> <secret> or just <secret>
+          if (parsed.remaining.length > 0) {
+            // <ref> <secret>
             ref = normalizeRef(parsed.ref);
-            if (parsed.remaining.length === 0) {
-              console.log(error('Usage: upload <ref> <file>...'));
-              return;
-            }
-            files = parsed.remaining;
+            secret = parsed.remaining[0];
           } else {
-            console.log(error('Usage: upload <ref> <file>... or upload -t "text" <file>...'));
+            // Just <secret> (generate only)
+            secret = parsed.ref;
+          }
+        } else {
+          console.log(
+            error(
+              'Usage: mfa-totp <secret> or mfa-totp <ref> <secret> or mfa-totp -t "text" <secret>'
+            )
+          );
+          return;
+        }
+
+        const action: {
+          type: 'mfa_totp';
+          secret: string;
+          ref?: string;
+          text?: string;
+        } = { type: 'mfa_totp', secret };
+
+        if (ref) action.ref = ref;
+        if (parsed.text) action.text = parsed.text;
+
+        const result = await client.executeAction(sessionId, action);
+        if (result.success) {
+          const code =
+            result.data && typeof result.data === 'object' && 'code' in result.data
+              ? (result.data as { code: string }).code
+              : undefined;
+
+          if (ref || parsed.text) {
+            const target = ref ? `element ${ref}` : `"${parsed.text}"`;
+            if (code) {
+              console.log(success(`Generated TOTP code ${code} and filled into ${target}`));
+            } else {
+              console.log(success(`Generated TOTP code and filled into ${target}`));
+            }
+          } else {
+            if (code) {
+              console.log(info(`Generated TOTP code: ${code}`));
+            } else {
+              console.log(success('Generated TOTP code'));
+            }
+          }
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'MFA TOTP failed'));
+        }
+      },
+      upload: async (args, client, sessionId) => {
+        // Parse: upload <ref> <file>... or upload -t "text" <file>...
+        const parsed = parseTextOption(args);
+
+        let ref: string | undefined;
+        let files: string[];
+
+        if (parsed.text) {
+          // Using -t "text" <file>...
+          if (parsed.remaining.length === 0) {
+            console.log(error('Usage: upload -t "description" <file>...'));
+            return;
+          }
+          files = parsed.remaining;
+        } else if (parsed.ref) {
+          // <ref> <file>...
+          ref = normalizeRef(parsed.ref);
+          if (parsed.remaining.length === 0) {
+            console.log(error('Usage: upload <ref> <file>...'));
+            return;
+          }
+          files = parsed.remaining;
+        } else {
+          console.log(error('Usage: upload <ref> <file>... or upload -t "text" <file>...'));
+          return;
+        }
+
+        // Resolve file paths and encode as base64
+        const pathMod = await import('node:path');
+        const fsMod = await import('node:fs');
+        const encodedFiles: FileUploadData[] = [];
+        for (const filePath of files) {
+          const resolved = pathMod.resolve(filePath);
+          if (!fsMod.existsSync(resolved)) {
+            console.log(error(`File not found: ${filePath}`));
+            return;
+          }
+          encodedFiles.push({
+            name: pathMod.basename(resolved),
+            mimeType: getMimeType(resolved),
+            content: fsMod.readFileSync(resolved).toString('base64'),
+          });
+        }
+
+        const action: {
+          type: 'set_input_files';
+          ref?: string;
+          text?: string;
+          files: FileUploadData[];
+        } = { type: 'set_input_files', files: encodedFiles };
+
+        if (ref) action.ref = ref;
+        if (parsed.text) action.text = parsed.text;
+
+        const result = await client.executeAction(sessionId, action);
+        if (result.success) {
+          const target = ref ? `element ${ref}` : `"${parsed.text}"`;
+          const fileNames = encodedFiles.map((f) => f.name).join(', ');
+          console.log(success(`Uploaded ${fileNames} to ${target}`));
+
+          if (result.downloads?.length) {
+            console.log('');
+            console.log(formatDownloads(result.downloads));
+          }
+        } else {
+          console.log(error(result.error || 'Upload failed'));
+        }
+      },
+      downloads: async (args, client, sessionId) => {
+        const jsonMode = args.includes('--json');
+        const saveIdx = args.indexOf('--save');
+        const saveDir = saveIdx !== -1 ? args[saveIdx + 1] : undefined;
+
+        try {
+          // Try action endpoint first (works for active sessions),
+          // fall back to GET endpoint (works for closed sessions)
+          let downloads: import('../../../../lib/api/browser-types.js').DownloadInfo[];
+          let total: number;
+          try {
+            const actionResult = await client.executeAction(sessionId, {
+              type: 'downloads' as const,
+            });
+            const data = actionResult.data as
+              | {
+                  downloads?: import('../../../../lib/api/browser-types.js').DownloadInfo[];
+                  count?: number;
+                }
+              | undefined;
+            downloads = data?.downloads || [];
+            total = data?.count || downloads.length;
+          } catch {
+            const result = await client.getDownloads(sessionId);
+            downloads = result.downloads;
+            total = result.total;
+          }
+
+          if (jsonMode) {
+            console.log(JSON.stringify({ downloads, total }, null, 2));
             return;
           }
 
-          // Resolve file paths and encode as base64
-          const pathMod = await import('node:path');
-          const fsMod = await import('node:fs');
-          const encodedFiles: FileUploadData[] = [];
-          for (const filePath of files) {
-            const resolved = pathMod.resolve(filePath);
-            if (!fsMod.existsSync(resolved)) {
-              console.log(error(`File not found: ${filePath}`));
-              return;
-            }
-            encodedFiles.push({
-              name: pathMod.basename(resolved),
-              mimeType: getMimeType(resolved),
-              content: fsMod.readFileSync(resolved).toString('base64'),
-            });
+          if (downloads.length === 0) {
+            console.log('No downloads.');
+            return;
           }
 
-          const action: {
-            type: 'set_input_files';
-            ref?: string;
-            text?: string;
-            files: FileUploadData[];
-          } = { type: 'set_input_files', files: encodedFiles };
+          if (saveDir) {
+            const pathMod = await import('node:path');
+            const fsMod = await import('node:fs');
+            const { downloadFile } = await import('../../lib/download.js');
+            const resolved = pathMod.resolve(saveDir);
+            fsMod.mkdirSync(resolved, { recursive: true });
 
-          if (ref) action.ref = ref;
-          if (parsed.text) action.text = parsed.text;
-
-          const result = await client.executeAction(sessionId, action);
-          if (result.success) {
-            const target = ref ? `element ${ref}` : `"${parsed.text}"`;
-            const fileNames = encodedFiles.map((f) => f.name).join(', ');
-            console.log(success(`Uploaded ${fileNames} to ${target}`));
-
-            if (result.downloads?.length) {
-              console.log('');
-              console.log(formatDownloads(result.downloads));
-            }
-          } else {
-            console.log(error(result.error || 'Upload failed'));
-          }
-        },
-        downloads: async (args, client, sessionId) => {
-          const jsonMode = args.includes('--json');
-          const saveIdx = args.indexOf('--save');
-          const saveDir = saveIdx !== -1 ? args[saveIdx + 1] : undefined;
-
-          try {
-            // Try action endpoint first (works for active sessions),
-            // fall back to GET endpoint (works for closed sessions)
-            let downloads: import('../../../../lib/api/browser-types.js').DownloadInfo[];
-            let total: number;
-            try {
-              const actionResult = await client.executeAction(sessionId, {
-                type: 'downloads' as const,
-              });
-              const data = actionResult.data as
-                | {
-                    downloads?: import('../../../../lib/api/browser-types.js').DownloadInfo[];
-                    count?: number;
-                  }
-                | undefined;
-              downloads = data?.downloads || [];
-              total = data?.count || downloads.length;
-            } catch {
-              const result = await client.getDownloads(sessionId);
-              downloads = result.downloads;
-              total = result.total;
-            }
-
-            if (jsonMode) {
-              console.log(JSON.stringify({ downloads, total }, null, 2));
-              return;
-            }
-
-            if (downloads.length === 0) {
-              console.log('No downloads.');
-              return;
-            }
-
-            if (saveDir) {
-              const pathMod = await import('node:path');
-              const fsMod = await import('node:fs');
-              const { downloadFile } = await import('../../lib/download.js');
-              const resolved = pathMod.resolve(saveDir);
-              fsMod.mkdirSync(resolved, { recursive: true });
-
-              console.log(`Downloads (${total}):`);
-              for (let i = 0; i < downloads.length; i++) {
-                const dl = downloads[i];
-                const destPath = pathMod.join(resolved, dl.filename);
-                try {
-                  await downloadFile(dl.url, destPath);
-                  const size =
-                    dl.size < 1024
-                      ? `${dl.size} B`
-                      : dl.size < 1024 * 1024
-                        ? `${(dl.size / 1024).toFixed(1)} KB`
-                        : `${(dl.size / (1024 * 1024)).toFixed(1)} MB`;
-                  console.log(`  ${i + 1}. ${dl.filename}  ${size}  → ${destPath}`);
-                } catch (dlErr) {
-                  console.log(
-                    error(
-                      `  ${i + 1}. ${dl.filename}  Failed: ${dlErr instanceof Error ? dlErr.message : 'download error'}`
-                    )
-                  );
-                }
-              }
-              console.log('');
-              console.log(success(`Saved to ${resolved}`));
-            } else {
-              console.log(`Downloads (${total}):`);
-              for (let i = 0; i < downloads.length; i++) {
-                const dl = downloads[i];
+            console.log(`Downloads (${total}):`);
+            for (let i = 0; i < downloads.length; i++) {
+              const dl = downloads[i];
+              const destPath = pathMod.join(resolved, dl.filename);
+              try {
+                await downloadFile(dl.url, destPath);
                 const size =
                   dl.size < 1024
                     ? `${dl.size} B`
                     : dl.size < 1024 * 1024
                       ? `${(dl.size / 1024).toFixed(1)} KB`
                       : `${(dl.size / (1024 * 1024)).toFixed(1)} MB`;
-                console.log(`  ${i + 1}. ${dl.filename}  ${size}  ${dl.url}`);
+                console.log(`  ${i + 1}. ${dl.filename}  ${size}  → ${destPath}`);
+              } catch (dlErr) {
+                console.log(
+                  error(
+                    `  ${i + 1}. ${dl.filename}  Failed: ${dlErr instanceof Error ? dlErr.message : 'download error'}`
+                  )
+                );
               }
             }
-          } catch (err) {
-            console.log(error(err instanceof Error ? err.message : 'Failed to get downloads'));
+            console.log('');
+            console.log(success(`Saved to ${resolved}`));
+          } else {
+            console.log(`Downloads (${total}):`);
+            for (let i = 0; i < downloads.length; i++) {
+              const dl = downloads[i];
+              const size =
+                dl.size < 1024
+                  ? `${dl.size} B`
+                  : dl.size < 1024 * 1024
+                    ? `${(dl.size / 1024).toFixed(1)} KB`
+                    : `${(dl.size / (1024 * 1024)).toFixed(1)} MB`;
+              console.log(`  ${i + 1}. ${dl.filename}  ${size}  ${dl.url}`);
+            }
           }
-        },
-      };
-
-      // Handle input
-      rl.prompt();
-      rl.on('line', async (line) => {
-        const trimmed = line.trim();
-
-        if (!trimmed) {
-          rl.prompt();
-          return;
-        }
-
-        // Parse command and args
-        const parts = parseCommandLine(trimmed);
-        const cmd = parts[0].toLowerCase();
-        const args = parts.slice(1);
-
-        // Handle exit
-        if (cmd === 'exit' || cmd === 'quit') {
-          await handleExit(rl, client, sessionId, sessionOwned);
-          return;
-        }
-
-        // Handle command
-        const handler = commands[cmd];
-        if (!handler) {
-          console.log(error(`Unknown command: ${cmd}. Type "help" for available commands.`));
-          rl.prompt();
-          return;
-        }
-
-        try {
-          await handler(args, client, sessionId);
-          await touchSession(sessionId);
         } catch (err) {
-          console.log(error(err instanceof Error ? err.message : 'Command failed'));
+          console.log(error(err instanceof Error ? err.message : 'Failed to get downloads'));
         }
+      },
+    };
 
+    // Handle input
+    rl.prompt();
+    rl.on('line', async (line) => {
+      const trimmed = line.trim();
+
+      if (!trimmed) {
         rl.prompt();
-      });
+        return;
+      }
 
-      // Handle Ctrl+C
-      rl.on('SIGINT', async () => {
-        console.log('');
+      // Parse command and args
+      const parts = parseCommandLine(trimmed);
+      const cmd = parts[0].toLowerCase();
+      const args = parts.slice(1);
+
+      // Handle exit
+      if (cmd === 'exit' || cmd === 'quit') {
         await handleExit(rl, client, sessionId, sessionOwned);
-      });
+        return;
+      }
 
-      rl.on('close', () => {
-        process.exit(0);
-      });
-    } catch (err) {
-      console.log(error(err instanceof Error ? err.message : 'Failed to start REPL'));
-      process.exit(1);
-    }
-  });
+      // Handle command
+      const handler = commands[cmd];
+      if (!handler) {
+        console.log(error(`Unknown command: ${cmd}. Type "help" for available commands.`));
+        rl.prompt();
+        return;
+      }
+
+      try {
+        await handler(args, client, sessionId);
+        await touchSession(sessionId);
+      } catch (err) {
+        console.log(error(err instanceof Error ? err.message : 'Command failed'));
+      }
+
+      rl.prompt();
+    });
+
+    // Handle Ctrl+C
+    rl.on('SIGINT', async () => {
+      console.log('');
+      await handleExit(rl, client, sessionId, sessionOwned);
+    });
+
+    rl.on('close', () => {
+      process.exit(0);
+    });
+  } catch (err) {
+    console.log(error(err instanceof Error ? err.message : 'Failed to start REPL'));
+    process.exit(1);
+  }
+});
 
 /**
  * Parse -t/--text option from args

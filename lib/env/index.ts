@@ -11,11 +11,24 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+export { getPortFromUrl, isLocalhostUrl } from './localhost.js';
+
+/**
+ * Tunnel mode stored in ~/.qa-use.json.
+ * Kept as a string literal here (instead of importing `TunnelMode` from
+ * `src/cli/lib/tunnel-option.ts`) to avoid pulling CLI code into the
+ * shared env loader.
+ */
+export type QaUseTunnelMode = 'auto' | 'on' | 'off';
+
+const VALID_TUNNEL_MODES: readonly QaUseTunnelMode[] = ['auto', 'on', 'off'] as const;
+
 interface QaUseConfig {
   api_key?: string;
   api_url?: string;
   app_url?: string;
   region?: string;
+  tunnel?: QaUseTunnelMode;
   env?: Record<string, string>;
 }
 
@@ -213,6 +226,44 @@ export function getCustomHeaders(): Record<string, string> | null {
   }
 
   return Object.keys(headers).length > 0 ? headers : null;
+}
+
+/**
+ * Read the `tunnel` key from `~/.qa-use.json`.
+ *
+ * Returns one of `'auto' | 'on' | 'off'`, or `undefined` if unset.
+ * On an invalid value, logs a one-line stderr warning and returns `undefined`
+ * (caller will fall back to the default, typically `'auto'`).
+ *
+ * Phase 1: config-only (no env-var override layer for tunnel mode).
+ */
+let tunnelWarningLogged = false;
+export function getTunnelModeFromConfig(): QaUseTunnelMode | undefined {
+  const config = loadConfig();
+  if (!config) return undefined;
+
+  const raw = config.tunnel;
+  if (raw === undefined || raw === null) return undefined;
+
+  if (typeof raw === 'string' && VALID_TUNNEL_MODES.includes(raw as QaUseTunnelMode)) {
+    return raw as QaUseTunnelMode;
+  }
+
+  if (!tunnelWarningLogged) {
+    console.error(
+      `qa-use: invalid "tunnel" value in ~/.qa-use.json: ${JSON.stringify(raw)}. ` +
+        `Expected one of: ${VALID_TUNNEL_MODES.join(', ')}. Falling back to "auto".`
+    );
+    tunnelWarningLogged = true;
+  }
+  return undefined;
+}
+
+/**
+ * Reset the tunnel-warning latch (for tests).
+ */
+export function clearTunnelWarningLatch(): void {
+  tunnelWarningLogged = false;
 }
 
 /**

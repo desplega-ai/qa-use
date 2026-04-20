@@ -5,10 +5,15 @@
  * and browser WebSocket connection for remote test execution.
  */
 
-import { URL } from 'node:url';
 import { BrowserManager } from '../../../lib/browser/index.js';
+import { getPortFromUrl, isLocalhostUrl } from '../../../lib/env/localhost.js';
 import { TunnelManager } from '../../../lib/tunnel/index.js';
 import { error } from './output.js';
+
+// Re-export shim: canonical home is `lib/env/localhost.ts`. This shim is
+// kept for Phase 1 so existing imports don't break in the same commit
+// that relocates the helpers; it will be removed in Phase 2.
+export { getPortFromUrl, isLocalhostUrl };
 
 export interface BrowserTunnelSession {
   browser: BrowserManager;
@@ -22,23 +27,6 @@ export interface BrowserTunnelOptions {
   headless?: boolean;
   apiKey?: string;
   sessionIndex?: number;
-}
-
-/**
- * Check if a URL points to localhost
- */
-export function isLocalhostUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.hostname === 'localhost' ||
-      parsed.hostname === '127.0.0.1' ||
-      parsed.hostname === '::1' ||
-      parsed.hostname.endsWith('.localhost')
-    );
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -56,22 +44,6 @@ export function ensureBrowsersInstalled(): void {
     console.log('    qa-use install-deps');
     console.log('');
     process.exit(1);
-  }
-}
-
-/**
- * Get the port from a URL
- */
-export function getPortFromUrl(url: string): number {
-  try {
-    const parsed = new URL(url);
-    if (parsed.port) {
-      return parseInt(parsed.port, 10);
-    }
-    // Default ports
-    return parsed.protocol === 'https:' ? 443 : 80;
-  } catch {
-    return 80;
   }
 }
 
