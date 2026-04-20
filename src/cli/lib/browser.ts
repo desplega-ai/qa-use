@@ -6,14 +6,13 @@
  */
 
 import { BrowserManager } from '../../../lib/browser/index.js';
-import { getPortFromUrl, isLocalhostUrl } from '../../../lib/env/localhost.js';
+import { getPortFromUrl } from '../../../lib/env/localhost.js';
+import { classifyTunnelFailure, TunnelError } from '../../../lib/tunnel/errors.js';
 import { TunnelManager } from '../../../lib/tunnel/index.js';
 import { error } from './output.js';
-
-// Re-export shim: canonical home is `lib/env/localhost.ts`. This shim is
-// kept for Phase 1 so existing imports don't break in the same commit
-// that relocates the helpers; it will be removed in Phase 2.
-export { getPortFromUrl, isLocalhostUrl };
+import { printTunnelStartBanner } from './tunnel-banner.js';
+import { formatTunnelFailure } from './tunnel-error-hint.js';
+import { resolveTunnelMode, type TunnelMode } from './tunnel-resolve.js';
 
 export interface BrowserTunnelSession {
   browser: BrowserManager;
@@ -27,6 +26,21 @@ export interface BrowserTunnelOptions {
   headless?: boolean;
   apiKey?: string;
   sessionIndex?: number;
+  /**
+   * Effective tri-state tunnel mode after CLI/config resolution.
+   * Defaults to `'auto'` so callers that don't care about the flag
+   * still pick up the Phase-2 auto-inference.
+   */
+  tunnelMode?: TunnelMode;
+  /**
+   * API URL used to detect dev mode. When the API URL is itself
+   * localhost, `'auto'` skips the tunnel.
+   */
+  apiUrl?: string;
+  /**
+   * Suppress the stderr auto-tunnel banner (e.g. for `--json` callers).
+   */
+  quiet?: boolean;
 }
 
 /**
@@ -72,25 +86,41 @@ export async function startBrowserWithTunnel(
   });
 
   const wsUrl = browserSession.wsEndpoint;
-  const isLocalhost = testUrl ? isLocalhostUrl(testUrl) : false;
 
-  // If testing localhost, set up tunnel for browser WebSocket
-  if (isLocalhost || !testUrl) {
-    console.error('Localhost URL detected - starting tunnel for browser connection...');
+  // Resolve the on/off decision. Default mode is 'auto' — that way
+  // callers that don't pass `tunnelMode` still get Phase-2 behaviour.
+  const mode: TunnelMode = options.tunnelMode ?? 'auto';
+  const decision = resolveTunnelMode(mode, testUrl, options.apiUrl);
+  const isLocalhost = decision === 'on';
+
+  if (decision === 'on') {
+    const target = testUrl ?? wsUrl;
 
     tunnel = new TunnelManager();
 
     // Extract port from WebSocket URL
     const wsPort = getPortFromUrl(wsUrl);
 
-    const tunnelSession = await tunnel.startTunnel(wsPort, {
-      apiKey: options.apiKey,
-      sessionIndex: options.sessionIndex,
-    });
+    try {
+      const tunnelSession = await tunnel.startTunnel(wsPort, {
+        apiKey: options.apiKey,
+        sessionIndex: options.sessionIndex,
+      });
 
-    publicWsUrl = tunnel.getWebSocketUrl(wsUrl);
-    console.error(`Tunnel established: ${tunnelSession.publicUrl}`);
-    console.error(`Public WebSocket URL: ${publicWsUrl}\n`);
+      publicWsUrl = tunnel.getWebSocketUrl(wsUrl);
+
+      // Print the auto-tunnel banner on successful start. Banner prints
+      // to stderr and self-suppresses on non-TTY / quiet contexts.
+      printTunnelStartBanner({
+        target,
+        publicUrl: tunnelSession.publicUrl,
+        quiet: options.quiet,
+      });
+    } catch (err) {
+      const classified = err instanceof TunnelError ? err : classifyTunnelFailure(err, { target });
+      console.error(formatTunnelFailure(classified));
+      throw classified;
+    }
   }
 
   return {

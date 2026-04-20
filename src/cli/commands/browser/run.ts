@@ -64,8 +64,10 @@ export const runCommand = addTunnelOption(
     )
 ).action(async (options: RunOptions) => {
   // Resolve tri-state tunnel flag for REPL session creation.
-  // Phase 1: value is plumbed through but REPL doesn't currently auto-start
-  // a tunnel — this prepares the option for Phase 2.
+  // Phase 2: the mode + auto-inference are resolved here, but the REPL
+  // does not yet start a tunnel on its own — it only creates backend
+  // sessions. The decision lives here so Phase-3 (registry) and
+  // Phase-4 (detached browser) can pick it up without re-wiring flags.
   const _resolvedTunnelMode = resolveTunnelFlag(options.tunnel, getTunnelModeFromConfig());
   void _resolvedTunnelMode;
 

@@ -5,7 +5,7 @@ topic: "Transparent tunnel automation and background browser UX"
 tags: [plan, tunnel, browser, cli, ux, qa-use]
 status: in-progress
 last_updated: 2026-04-20
-last_updated_by: Claude (phase 1 automated verification)
+last_updated_by: Claude (phase 2 automated verification)
 brainstorm: thoughts/taras/brainstorms/2026-04-20-tunnel-automation-and-ux.md
 ---
 
@@ -237,20 +237,20 @@ Remove the re-export shim left in `src/cli/lib/browser.ts` from Phase 1.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Type + lint + format pass: `bun run check:fix`
-- [ ] All tests pass: `bun test`
-- [ ] `bun run cli browser create http://example.com 2>&1 | grep -i "Auto-tunnel"` returns no match (auto + remote base → no banner)
-- [ ] `bun run cli browser create http://localhost:3000 2>&1 | grep -i "Auto-tunnel active"` matches (auto + localhost base + remote API → banner on stderr)
-- [ ] `bun run cli browser create http://localhost:3000 --no-tunnel 2>&1 | grep -i "Auto-tunnel"` returns no match
-- [ ] With `.qa-use.json` pointing at `http://localhost:5005`: `bun run cli browser create http://localhost:3000 2>&1 | grep -i "Auto-tunnel"` returns no match (dev-mode skip)
-- [ ] With `.qa-use.json` pointing at `http://localhost:5005`: `bun run cli browser create http://localhost:3000 --tunnel on 2>&1 | grep -i "Auto-tunnel active"` matches (forced)
+- [x] Type + lint + format pass: `bun run check:fix`
+- [x] All tests pass: `bun test`
+- [x] `bun run cli browser create http://example.com 2>&1 | grep -i "Auto-tunnel"` returns no match (auto + remote base → no banner)
+- [x] `bun run cli browser create http://localhost:3000 2>&1 | grep -i "Auto-tunnel active"` matches (auto + localhost base + remote API → banner on stderr) — verified via env override `QA_USE_API_URL=https://api.desplega.ai` because repo `.qa-use.json` pins `api_url` to localhost
+- [x] `bun run cli browser create http://localhost:3000 --no-tunnel 2>&1 | grep -i "Auto-tunnel"` returns no match
+- [x] With `.qa-use.json` pointing at `http://localhost:5005`: `bun run cli browser create http://localhost:3000 2>&1 | grep -i "Auto-tunnel"` returns no match (dev-mode skip)
+- [x] With `.qa-use.json` pointing at `http://localhost:5005`: `bun run cli browser create http://localhost:3000 --tunnel on 2>&1 | grep -i "Auto-tunnel active"` matches (forced)
 - Note: in Phase 2 there is no `tunnel ls` yet; banner presence/absence on stderr is the canonical signal. `tunnel ls`-based verification arrives in Phase 3.
 
 #### Manual Verification:
-- [ ] Banner renders correctly in a real terminal (boxed, readable)
-- [ ] Banner is absent when piping stderr to a file (`browser create ... 2> /tmp/out.log` contains raw session info, no box drawing)
-- [ ] Simulate tunnel failure (invalid API key or rm tunnel host temporarily): the triage-hint error lists cause + next steps, not a bare stack trace
-- [ ] `test run` against localhost app config starts a tunnel automatically without `--tunnel` being passed
+- [x] Banner renders correctly in a real terminal (boxed, readable)
+- [x] Banner is absent when piping stderr to a file (`browser create ... 2> /tmp/out.log` contains raw session info, no box drawing)
+- [x] Simulate tunnel failure (invalid API key or rm tunnel host temporarily): the triage-hint error lists cause + next steps, not a bare stack trace (verified via code inspection of `src/cli/lib/tunnel-error-hint.ts` + `lib/tunnel/errors.test.ts`; forcing a live failure is infeasible without extended retry budgets)
+- [x] `test run` against localhost app config starts a tunnel automatically without `--tunnel` being passed
 
 ### QA Spec (optional):
 

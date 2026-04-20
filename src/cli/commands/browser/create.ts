@@ -7,6 +7,7 @@ import type { BrowserApiClient } from '../../../../lib/api/browser.js';
 import type { ViewportType } from '../../../../lib/api/browser-types.js';
 import { BrowserManager } from '../../../../lib/browser/index.js';
 import { getAgentSessionId, getTunnelModeFromConfig } from '../../../../lib/env/index.js';
+import { classifyTunnelFailure, TunnelError } from '../../../../lib/tunnel/errors.js';
 import { TunnelManager } from '../../../../lib/tunnel/index.js';
 import { ensureBrowsersInstalled } from '../../lib/browser.js';
 import {
@@ -16,8 +17,10 @@ import {
 } from '../../lib/browser-sessions.js';
 import { createBrowserClient, loadConfig } from '../../lib/config.js';
 import { error, info, success, warning } from '../../lib/output.js';
+import { printTunnelStartBanner } from '../../lib/tunnel-banner.js';
+import { formatTunnelFailure } from '../../lib/tunnel-error-hint.js';
 import { addTunnelOption, type TunnelMode } from '../../lib/tunnel-option.js';
-import { resolveTunnelFlag } from '../../lib/tunnel-resolve.js';
+import { resolveTunnelFlag, resolveTunnelMode } from '../../lib/tunnel-resolve.js';
 
 interface CreateOptions {
   headless?: boolean;
@@ -64,10 +67,19 @@ export const createCommand = addTunnelOption(
   options.startUrl = startUrl;
 
   // Resolve tri-state tunnel flag: CLI > config > default 'auto'.
-  // Phase 1 note: 'on' behaves like the old --tunnel boolean; 'auto' and
-  // 'off' both mean "no tunnel" (preserves pre-Phase-2 behaviour).
   const resolvedTunnelMode = resolveTunnelFlag(options.tunnel, getTunnelModeFromConfig());
-  const tunnelOn = resolvedTunnelMode === 'on';
+
+  // Load configuration (needed to resolve `auto` against the API URL).
+  const config = await loadConfig();
+  if (!config.api_key) {
+    console.log(error('API key not configured. Run `qa-use setup` first.'));
+    process.exit(1);
+  }
+
+  // Phase 2: resolve `auto` against the target + API URL. Auto-tunnel
+  // kicks in when the start URL is localhost and the API URL isn't.
+  const tunnelDecision = resolveTunnelMode(resolvedTunnelMode, startUrl, config.api_url);
+  const tunnelOn = tunnelDecision === 'on';
 
   // Validate mutually exclusive options
   if (tunnelOn && options.wsUrl) {
@@ -77,13 +89,6 @@ export const createCommand = addTunnelOption(
 
   if (options.subdomain && !tunnelOn) {
     console.log(error('--subdomain can only be used with --tunnel on'));
-    process.exit(1);
-  }
-
-  // Load configuration
-  const config = await loadConfig();
-  if (!config.api_key) {
-    console.log(error('API key not configured. Run `qa-use setup` first.'));
     process.exit(1);
   }
 
@@ -315,12 +320,29 @@ async function runTunnelMode(
     const wsUrl = new URL(wsEndpoint);
     const browserPort = parseInt(wsUrl.port, 10);
 
-    await tunnel.startTunnel(browserPort, {
-      subdomain: options.subdomain,
-      apiKey: apiKey,
-      sessionIndex: 0,
-    });
+    let tunnelSession: Awaited<ReturnType<TunnelManager['startTunnel']>>;
+    try {
+      tunnelSession = await tunnel.startTunnel(browserPort, {
+        subdomain: options.subdomain,
+        apiKey: apiKey,
+        sessionIndex: 0,
+      });
+    } catch (err) {
+      const classified =
+        err instanceof TunnelError
+          ? err
+          : classifyTunnelFailure(err, { target: options.startUrl ?? wsEndpoint });
+      console.error(formatTunnelFailure(classified));
+      await cleanup(1);
+      return;
+    }
     console.log(success('Tunnel created'));
+
+    // Auto-tunnel banner (stderr, TTY-aware).
+    printTunnelStartBanner({
+      target: options.startUrl ?? wsEndpoint,
+      publicUrl: tunnelSession.publicUrl,
+    });
 
     // Step 3: Get tunneled WebSocket URL
     const localWsUrl = browser.getWebSocketEndpoint();

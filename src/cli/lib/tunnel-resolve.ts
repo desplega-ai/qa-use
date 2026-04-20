@@ -1,17 +1,19 @@
 /**
- * Resolve the effective tunnel mode from CLI flag + config file.
+ * Resolve the effective tunnel mode from CLI flag + config file, and
+ * turn that mode into a concrete on/off decision using the base URL
+ * and API URL.
  *
- * Precedence:
+ * Precedence for `resolveTunnelFlag`:
  *   1. CLI flag (if the user explicitly passed --tunnel / --no-tunnel)
  *   2. Config file (`tunnel` key in ~/.qa-use.json)
  *   3. Default: 'auto'
  *
- * Phase 1 note: this module only resolves the *mode*. The actual
- * on/off decision (auto-inference based on base URL + API URL) lands
- * in Phase 2. For now the caller still treats `'auto'` like the old
- * "no tunnel unless explicitly asked" behaviour.
+ * `resolveTunnelMode` is the Phase-2 auto-inference: `'auto'` maps to
+ * `'on'` iff `isLocalhostUrl(baseUrl) && !isLocalhostUrl(apiUrl)`, else
+ * `'off'`. `'on'` and `'off'` are passed through untouched.
  */
 
+import { isLocalhostUrl } from '../../../lib/env/localhost.js';
 import type { TunnelMode } from './tunnel-option.js';
 
 export type { TunnelMode } from './tunnel-option.js';
@@ -44,4 +46,35 @@ export function resolveTunnelFlag(
     return configFile;
   }
   return 'auto';
+}
+
+/**
+ * Resolve the concrete on/off decision for the tunnel.
+ *
+ * Matrix:
+ *   - `mode === 'on'`   → `'on'`  (force tunnel, even in dev mode)
+ *   - `mode === 'off'`  → `'off'` (never tunnel)
+ *   - `mode === 'auto'` → `'on'` iff base URL is localhost and API URL is
+ *                         *not* localhost; otherwise `'off'`.
+ *
+ * If either `baseUrl` or `apiUrl` is unknown in `'auto'` mode, we stay
+ * conservative and return `'off'`: without a localhost base URL there's
+ * nothing worth tunnelling, and without a known API URL we can't tell
+ * whether we're in dev mode (where auto-tunnel should be skipped).
+ */
+export function resolveTunnelMode(
+  mode: TunnelMode,
+  baseUrl: string | undefined,
+  apiUrl: string | undefined
+): 'on' | 'off' {
+  if (mode === 'on') return 'on';
+  if (mode === 'off') return 'off';
+
+  // mode === 'auto'
+  if (!baseUrl) return 'off';
+  if (!isLocalhostUrl(baseUrl)) return 'off';
+  // Dev-mode skip: if the API is itself local, the backend can reach
+  // localhost directly — no tunnel needed.
+  if (apiUrl && isLocalhostUrl(apiUrl)) return 'off';
+  return 'on';
 }

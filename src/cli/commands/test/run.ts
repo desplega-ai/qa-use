@@ -32,7 +32,7 @@ import {
 } from '../../lib/output.js';
 import { runTest } from '../../lib/runner.js';
 import { addTunnelOption } from '../../lib/tunnel-option.js';
-import { resolveTunnelFlag } from '../../lib/tunnel-resolve.js';
+import { resolveTunnelFlag, resolveTunnelMode } from '../../lib/tunnel-resolve.js';
 
 function collectVars(value: string, previous: Record<string, string>) {
   const [key, val] = value.split('=');
@@ -108,10 +108,17 @@ export const runCommand = addTunnelOption(
 
     try {
       // Resolve tri-state tunnel flag: CLI > config > default 'auto'.
-      // Phase 1: 'on' behaves like the old --tunnel boolean; 'auto' and
-      // 'off' both mean "no local browser/tunnel" (preserves behaviour).
       const resolvedTunnelMode = resolveTunnelFlag(options.tunnel, getTunnelModeFromConfig());
-      const tunnelOn = resolvedTunnelMode === 'on';
+
+      // Figure out the effective base URL for the Phase-2 auto decision:
+      // explicit --var base_url wins; otherwise the first test definition's
+      // `variables.base_url` (if any). Undefined disables auto.
+      const varBaseUrl =
+        (options.var as Record<string, string> | undefined)?.base_url ??
+        testDefinitions?.[0]?.variables?.base_url;
+
+      const tunnelDecision = resolveTunnelMode(resolvedTunnelMode, varBaseUrl, config.api_url);
+      const tunnelOn = tunnelDecision === 'on';
 
       // Validate flag combinations
       if (options.wsUrl && (tunnelOn || options.headful)) {
@@ -135,12 +142,14 @@ export const runCommand = addTunnelOption(
 
       if (tunnelOn) {
         const headless = !options.headful;
-        console.log(`Starting local browser with tunnel (${headless ? 'headless' : 'visible'})...`);
-        console.log('⏳ First run may take a moment while the tunnel establishes connection');
-        browserSession = await startBrowserWithTunnel(undefined, {
+        // Banner + triage-hint come from startBrowserWithTunnel itself;
+        // don't double-print an ad-hoc "Starting local browser..." line.
+        browserSession = await startBrowserWithTunnel(varBaseUrl, {
           headless,
           apiKey: config.api_key,
           sessionIndex: 0,
+          tunnelMode: 'on', // decision already made above
+          apiUrl: config.api_url,
         });
         wsUrl = getEffectiveWsUrl(browserSession);
         console.log(success('Browser ready, running test...'));
