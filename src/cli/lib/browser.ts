@@ -6,17 +6,39 @@
  */
 
 import { BrowserManager } from '../../../lib/browser/index.js';
-import { getPortFromUrl } from '../../../lib/env/localhost.js';
 import { classifyTunnelFailure, TunnelError } from '../../../lib/tunnel/errors.js';
-import { TunnelManager } from '../../../lib/tunnel/index.js';
+import type { TunnelManager } from '../../../lib/tunnel/index.js';
+import { type TunnelHandle, tunnelRegistry } from '../../../lib/tunnel/registry.js';
 import { error } from './output.js';
-import { printTunnelStartBanner } from './tunnel-banner.js';
+import { printTunnelReuseBanner, printTunnelStartBanner } from './tunnel-banner.js';
 import { formatTunnelFailure } from './tunnel-error-hint.js';
 import { resolveTunnelMode, type TunnelMode } from './tunnel-resolve.js';
 
+/**
+ * Mirror of `TunnelManager.getWebSocketUrl` for the cross-process
+ * attach case where we don't have a live `TunnelManager` to call.
+ * Converts the tunnel's public HTTPS URL + the local browser WS path
+ * into a `wss://.../devtools/browser/...` URL.
+ */
+function deriveCrossProcessWsUrl(publicHttpUrl: string, localWsEndpoint: string): string | null {
+  try {
+    const wsPath = new URL(localWsEndpoint).pathname;
+    return publicHttpUrl.replace('https://', 'wss://').replace('http://', 'ws://') + wsPath;
+  } catch {
+    return null;
+  }
+}
+
 export interface BrowserTunnelSession {
   browser: BrowserManager;
+  /**
+   * Back-compat shim: historical callers check `session.tunnel` for
+   * truthiness to decide "is a tunnel active?". Sourced from the
+   * registry's in-process cache; callers never construct one directly.
+   */
   tunnel: TunnelManager | null;
+  /** Registry handle owning this tunnel (null when no tunnel). */
+  tunnelHandle: TunnelHandle | null;
   wsUrl: string;
   publicWsUrl: string | null;
   isLocalhost: boolean;
@@ -77,6 +99,7 @@ export async function startBrowserWithTunnel(
 
   const browser = new BrowserManager();
   let tunnel: TunnelManager | null = null;
+  let tunnelHandle: TunnelHandle | null = null;
   let publicWsUrl: string | null = null;
 
   // Start browser
@@ -94,30 +117,52 @@ export async function startBrowserWithTunnel(
   const isLocalhost = decision === 'on';
 
   if (decision === 'on') {
-    const target = testUrl ?? wsUrl;
-
-    tunnel = new TunnelManager();
-
-    // Extract port from WebSocket URL
-    const wsPort = getPortFromUrl(wsUrl);
+    // The tunnel target is the browser WebSocket URL — that's what the
+    // remote backend needs to reach. `testUrl` is retained only for the
+    // banner copy so users see the localhost *app* URL they typed.
+    const bannerTarget = testUrl ?? wsUrl;
 
     try {
-      const tunnelSession = await tunnel.startTunnel(wsPort, {
+      tunnelHandle = await tunnelRegistry.acquire(wsUrl, {
         apiKey: options.apiKey,
         sessionIndex: options.sessionIndex,
       });
 
-      publicWsUrl = tunnel.getWebSocketUrl(wsUrl);
+      if (tunnelHandle.isCrossProcessAttach) {
+        // Another process owns the TunnelManager. We can't construct a
+        // new one (it would race for the same subdomain). Derive the
+        // public WS URL from the recorded public HTTP URL + our local
+        // ws path — mirrors `TunnelManager.getWebSocketUrl` without
+        // needing an in-process manager.
+        tunnel = null;
+        publicWsUrl = deriveCrossProcessWsUrl(tunnelHandle.publicUrl, wsUrl);
+      } else {
+        // `tunnel` field is a back-compat shim for existing callers
+        // that check `session.tunnel` and reach into
+        // `stopTunnel`/`checkHealth`. The registry owns the lifecycle
+        // now — release goes through `registry.release(handle)` in
+        // `stopBrowserWithTunnel`.
+        tunnel = tunnelRegistry.getLiveManager(wsUrl);
+        publicWsUrl = tunnel ? tunnel.getWebSocketUrl(wsUrl) : null;
+      }
 
-      // Print the auto-tunnel banner on successful start. Banner prints
-      // to stderr and self-suppresses on non-TTY / quiet contexts.
-      printTunnelStartBanner({
-        target,
-        publicUrl: tunnelSession.publicUrl,
+      // Branch banner: reuse banner when this acquire landed on an
+      // already-running tunnel (refcount > 1 after increment OR we
+      // attached to a sibling process's tunnel), else the fresh-start
+      // banner.
+      const bannerOpts = {
+        target: bannerTarget,
+        publicUrl: tunnelHandle.publicUrl,
         quiet: options.quiet,
-      });
+      };
+      if (tunnelHandle.refcount > 1 || tunnelHandle.isCrossProcessAttach) {
+        printTunnelReuseBanner(bannerOpts);
+      } else {
+        printTunnelStartBanner(bannerOpts);
+      }
     } catch (err) {
-      const classified = err instanceof TunnelError ? err : classifyTunnelFailure(err, { target });
+      const classified =
+        err instanceof TunnelError ? err : classifyTunnelFailure(err, { target: bannerTarget });
       console.error(formatTunnelFailure(classified));
       throw classified;
     }
@@ -126,6 +171,7 @@ export async function startBrowserWithTunnel(
   return {
     browser,
     tunnel,
+    tunnelHandle,
     wsUrl,
     publicWsUrl,
     isLocalhost,
@@ -136,8 +182,10 @@ export async function startBrowserWithTunnel(
  * Stop browser and tunnel
  */
 export async function stopBrowserWithTunnel(session: BrowserTunnelSession): Promise<void> {
-  if (session.tunnel) {
-    await session.tunnel.stopTunnel();
+  if (session.tunnelHandle) {
+    await tunnelRegistry.release(session.tunnelHandle);
+    session.tunnelHandle = null;
+    session.tunnel = null;
   }
   await session.browser.stopBrowser();
 }

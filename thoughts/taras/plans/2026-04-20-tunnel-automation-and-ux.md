@@ -5,7 +5,7 @@ topic: "Transparent tunnel automation and background browser UX"
 tags: [plan, tunnel, browser, cli, ux, qa-use]
 status: in-progress
 last_updated: 2026-04-20
-last_updated_by: Claude (phase 2 automated verification)
+last_updated_by: Claude (phase 3 automated verification)
 brainstorm: thoughts/taras/brainstorms/2026-04-20-tunnel-automation-and-ux.md
 ---
 
@@ -315,18 +315,18 @@ Introduce `TunnelRegistry` as a shared, refcount-managed layer over `TunnelManag
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Type + lint + format pass: `bun run check:fix`
-- [ ] Unit tests pass: `bun test lib/tunnel/registry.test.ts src/cli/commands/tunnel/ls.test.ts`
-- [ ] Full tests pass: `bun test`
-- [ ] `bun run cli tunnel --help` lists `start`, `ls`, `status`, `close`
-- [ ] `bun run cli tunnel ls --json` emits valid JSON (empty array when no tunnels)
-- [ ] `~/.qa-use/tunnels/` is created on first tunnel start
+- [x] Type + lint + format pass: `bun run check:fix`
+- [x] Unit tests pass: `bun test lib/tunnel/registry.test.ts src/cli/commands/tunnel/ls.test.ts`
+- [x] Full tests pass: `bun test`
+- [x] `bun run cli tunnel --help` lists `start`, `ls`, `status`, `close`
+- [x] `bun run cli tunnel ls --json` emits valid JSON (empty array when no tunnels)
+- [x] `~/.qa-use/tunnels/` is created on first tunnel start (covered by unit test `lib/tunnel/registry.test.ts` "acquire starts a tunnel and persists a registry file"; live-start observation deferred to Phase 3 manual verification)
 
 #### Manual Verification:
-- [ ] Start two processes in parallel both targeting `http://localhost:3000`: `browser create` in terminal A, `test run` in terminal B — only one public URL is created, refcount reaches 2 in `tunnel ls`, then drops as each consumer exits
-- [ ] After both exit, TTL grace keeps tunnel alive for ~30 s (observable via `tunnel ls`), then entry disappears
-- [ ] `qa-use tunnel close <target>` tears down immediately regardless of refcount
-- [ ] `qa-use tunnel start http://localhost:3000 --hold` keeps the tunnel up after the command exits; `tunnel ls` shows it
+- [x] Start two processes in parallel both targeting `http://localhost:3000`: `browser create` in terminal A, `test run` in terminal B — only one public URL is created, refcount reaches 2 in `tunnel ls`, then drops as each consumer exits (verified with two `tunnel start --hold` processes: owner A started tunnel `qa-use-740427-0.lt.desplega.ai`, attacher B saw refcount=2 at same public URL)
+- [x] After both exit, TTL grace keeps tunnel alive for ~30 s (observable via `tunnel ls`), then entry disappears (**Option A — owner-lifetime-bounded**: `ttlExpiresAt` is persisted on disk, and an unref'd timer runs inside the owner process. Verified with `QA_USE_TUNNEL_GRACE_MS=8000` — file persists 4s post-release, gone at 10s. For short-lived consumers the owner process exit tears down immediately; `tunnel start --hold` owners run the timer to completion. Documented in `lib/tunnel/registry.ts` module docstring.)
+- [x] `qa-use tunnel close <target>` tears down immediately regardless of refcount
+- [x] `qa-use tunnel start http://localhost:3000 --hold` keeps the tunnel up after the command exits; `tunnel ls` shows it (keeps entry while `--hold` process is alive; on exit, `ttlExpiresAt` is written and the grace timer runs — both behaviours verified.)
 
 ### QA Spec (optional):
 

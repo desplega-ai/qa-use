@@ -20,6 +20,7 @@ import { personaCommand } from './commands/persona/index.js';
 import { setupCommand } from './commands/setup.js';
 import { suiteCommand } from './commands/suite/index.js';
 import { testCommand } from './commands/test/index.js';
+import { tunnelCommand } from './commands/tunnel/index.js';
 import { updateCommand } from './commands/update.js';
 import { usageCommand } from './commands/usage.js';
 import {
@@ -48,6 +49,7 @@ program.addCommand(testCommand);
 program.addCommand(suiteCommand);
 program.addCommand(mcpCommand);
 program.addCommand(browserCommand);
+program.addCommand(tunnelCommand());
 program.addCommand(installDepsCommand);
 program.addCommand(updateCommand);
 program.addCommand(apiCommand);
