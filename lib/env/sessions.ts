@@ -74,8 +74,44 @@ export function readSessionRecord(sessionId: string): DetachedSessionRecord | nu
 export function removeSessionRecord(sessionId: string): void {
   try {
     fs.unlinkSync(sessionFilePath(sessionId));
+    return;
+  } catch (err) {
+    // Fast path missed — fall through to dir-scan fallback only on ENOENT.
+    // Any other error (EPERM, EACCES, EBUSY, etc.) is propagated by
+    // simply returning: callers treat removal as best-effort and surfacing
+    // an error here would change the public contract.
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      return;
+    }
+  }
+
+  // Fallback: filename may have drifted from the internal `id` (corrupted
+  // state, manual edits, legacy data). Scan the dir and unlink the file
+  // whose parsed content has a matching `id`.
+  const dir = sessionsDir();
+  let files: string[];
+  try {
+    files = fs.readdirSync(dir);
   } catch {
-    /* already gone */
+    return;
+  }
+  for (const name of files) {
+    if (!name.endsWith('.json') || name.endsWith('.tmp')) continue;
+    const fullPath = path.join(dir, name);
+    try {
+      const raw = fs.readFileSync(fullPath, 'utf8');
+      const parsed = JSON.parse(raw) as DetachedSessionRecord;
+      if (parsed.id === sessionId) {
+        try {
+          fs.unlinkSync(fullPath);
+        } catch {
+          /* already gone */
+        }
+        return;
+      }
+    } catch {
+      /* skip unreadable */
+    }
   }
 }
 
