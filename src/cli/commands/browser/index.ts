@@ -6,6 +6,7 @@
  */
 
 import { Command } from 'commander';
+import { detachedCommand } from './_detached.js';
 import { backCommand } from './back.js';
 import { blurCommand } from './blur.js';
 import { checkCommand } from './check.js';
@@ -92,3 +93,6 @@ browserCommand.addCommand(evaluateCommand);
 // Register advanced commands
 browserCommand.addCommand(streamCommand);
 browserCommand.addCommand(runCommand);
+
+// Register hidden detached entry point (invoked by `browser create` only).
+browserCommand.addCommand(detachedCommand, { hidden: true });

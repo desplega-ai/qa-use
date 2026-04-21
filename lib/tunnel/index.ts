@@ -3,6 +3,7 @@ import https from 'node:https';
 import { URL } from 'node:url';
 import localtunnel from '@desplega.ai/localtunnel';
 import { getEnv } from '../env/index.js';
+import { classifyTunnelFailure, TunnelError } from './errors.js';
 
 export interface TunnelSession {
   tunnel: localtunnel.Tunnel;
@@ -69,24 +70,38 @@ export class TunnelManager {
         options.apiKey,
         options.sessionIndex
       );
-      console.log(`Using deterministic subdomain: ${subdomain}`);
+      console.error(`Using deterministic subdomain: ${subdomain}`);
     } else if (!subdomain) {
       // Fallback to timestamp-based random subdomain
       subdomain = `qa-use-${Date.now().toString().slice(-6)}`;
-      console.log(`Using random subdomain: ${subdomain}`);
+      console.error(`Using random subdomain: ${subdomain}`);
     }
 
-    console.log(`Starting tunnel on port ${port} with host ${host} in region ${region}`);
+    console.error(`Starting tunnel on port ${port} with host ${host} in region ${region}`);
 
-    const tunnel = await localtunnel({
-      port,
-      host,
-      subdomain,
-      local_host: options.localHost || 'localhost',
-      auth: true,
-    });
+    let tunnel: localtunnel.Tunnel;
+    try {
+      tunnel = await localtunnel({
+        port,
+        host,
+        subdomain,
+        local_host: options.localHost || 'localhost',
+        auth: true,
+      });
+    } catch (err) {
+      // Classify provider errors into structured TunnelError subclasses so
+      // the CLI can render a triage-hint message. Zero retries here —
+      // surface the failure immediately.
+      const classified =
+        err instanceof TunnelError
+          ? err
+          : classifyTunnelFailure(err, {
+              target: `${options.localHost || 'localhost'}:${port}`,
+            });
+      throw classified;
+    }
 
-    console.log(`Tunnel started at ${tunnel.url}`);
+    console.error(`Tunnel started at ${tunnel.url}`);
 
     this.session = {
       tunnel,

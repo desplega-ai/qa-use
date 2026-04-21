@@ -1,6 +1,8 @@
 # Localhost Testing
 
-Testing applications running on `localhost` requires a tunnel because the cloud-hosted browser cannot access your local machine.
+**When your base URL is localhost and your API is remote, qa-use auto-tunnels. No flag required.**
+
+Testing applications running on `localhost` usually requires a tunnel because the cloud-hosted browser cannot reach your local machine. qa-use detects this automatically — the tri-state `--tunnel` flag only needs to be set for the edge cases.
 
 ## Why Tunnels Are Needed
 
@@ -32,78 +34,82 @@ With tunnel: Local browser accesses localhost,
              API controls browser through tunnel
 ```
 
-## Using `--tunnel` Flag
+## Auto-Tunnel (Default)
 
-The simplest approach - add `--tunnel` to your test run command:
+For the common case — your app on `http://localhost:3000`, your API at `https://api.desplega.ai` — you don't need to pass any flag:
 
 ```bash
-qa-use test run my-test --tunnel
+# Base URL is localhost, API is remote → qa-use auto-tunnels
+qa-use browser create --no-headless http://localhost:3000
+qa-use test run my-test
 ```
 
 This:
-1. Starts a local headless browser
+1. Starts a local browser (Playwright)
 2. Creates a tunnel for API control
-3. Runs the test
-4. Cleans up automatically
+3. Runs your commands/tests
+4. Cleans up automatically when the session closes
+
+## Tri-State `--tunnel` Flag
+
+Use `--tunnel` only when you need to override the auto-decision:
+
+| Flag form | Mode | When to use |
+|-----------|------|-------------|
+| _(none)_ | `auto` | Default. Tunnel iff localhost base + remote API. |
+| `--tunnel` / `--tunnel on` | `on` | Force a tunnel — e.g. dev mode where both API and app are local. |
+| `--no-tunnel` / `--tunnel off` | `off` | Never tunnel — e.g. both sides are on your machine and you want the cloud browser to stay out of it. |
+| `--tunnel auto` | `auto` | Explicit form (same as omitting). |
+
+You can also pin a project-wide default in `~/.qa-use.json`:
+
+```json
+{
+  "tunnel": "on"
+}
+```
+
+CLI flag beats config; config beats the `auto` default.
 
 ### With Visible Browser
 
-For debugging, add `--headful`:
+For debugging, add `--no-headless`:
 
 ```bash
-qa-use test run my-test --tunnel --headful
+qa-use browser create --no-headless http://localhost:3000
+qa-use test run my-test --no-headless
 ```
 
-## Persistent Tunnel Session
+## Holding a Tunnel Outside a Browser Session
 
-For running multiple tests or interactive development, create a persistent tunnel session:
-
-### Terminal 1: Start Tunnel
+If you just need a public URL (for webhook testing, sharing a dev build with a remote backend, etc.) without spinning up a browser session, use `qa-use tunnel`:
 
 ```bash
-qa-use browser create --tunnel --no-headless
+# Acquire and hold a public tunnel to localhost:3000 until Ctrl+C
+qa-use tunnel start http://localhost:3000 --hold
+
+# From another shell, inspect the registry
+qa-use tunnel ls
+qa-use tunnel status http://localhost:3000
 ```
 
-Output:
-```
-Session created: abc123
-WebSocket URL: wss://tunnel.desplega.ai/abc123
-Tunnel active. Press Ctrl+C to stop.
-```
+The tunnel registry refcounts — if a `browser create` session and `tunnel start --hold` point at the same target, they share one tunnel and the tunnel stays up as long as either holder exists.
 
-### Terminal 2: Run Tests
+## Browser Session Commands with Localhost
+
+Detached `browser create` returns immediately — the browser + tunnel run in a background child. Your terminal is free for the next command:
 
 ```bash
-# Run test against the tunneled browser
-qa-use test run my-test --ws-url wss://tunnel.desplega.ai/abc123
-
-# Or run multiple tests
-qa-use test run login --ws-url wss://tunnel.desplega.ai/abc123
-qa-use test run checkout --ws-url wss://tunnel.desplega.ai/abc123
-```
-
-### Benefits
-
-- **Reuse browser session** - no startup time between tests
-- **Watch execution** - see what's happening in real-time
-- **Debug interactively** - use browser commands between test runs
-- **Inspect state** - check page state after failures
-
-## Browser Session Commands with Tunnel
-
-You can also use browser commands directly for exploration:
-
-```bash
-# Create tunneled session
-qa-use browser create --tunnel --no-headless
-
-# Navigate to your local app
-qa-use browser goto http://localhost:3000
+# Create session — returns in < 3s, background child holds the browser
+qa-use browser create --no-headless http://localhost:3000
 
 # Explore
 qa-use browser snapshot
 qa-use browser click e3
 qa-use browser screenshot
+
+# List all active sessions (across processes)
+qa-use browser status --list
 
 # Close when done
 qa-use browser close
@@ -127,12 +133,23 @@ steps:
 Override at runtime:
 
 ```bash
-# Local development
-qa-use test run my-test --tunnel --var base_url=http://localhost:3000
+# Local development — auto-tunnels
+qa-use test run my-test --var base_url=http://localhost:3000
 
-# Staging
+# Staging — no tunnel
 qa-use test run my-test --var base_url=https://staging.example.com
 ```
+
+## Cleaning Up Stale State
+
+Detached sessions persist PID + registry files in `~/.qa-use/`. If a child crashes or is killed with `SIGKILL`, stale entries can linger. Reap them with:
+
+```bash
+qa-use doctor             # Reap stale sessions + tunnels (dead PIDs)
+qa-use doctor --dry-run   # Preview what would be cleaned
+```
+
+A bounded startup sweep also runs silently on every CLI invocation, so most stale state is cleaned opportunistically — `doctor` is the explicit escape hatch when you want to see and audit the reaping.
 
 ## Common Issues
 
@@ -149,10 +166,7 @@ curl http://localhost:3000
 
 The tunnel process was interrupted.
 
-**Fix:** Restart the tunnel:
-```bash
-qa-use browser create --tunnel
-```
+**Fix:** Re-run the command — `browser create` will acquire a fresh tunnel. If stale registry entries remain, run `qa-use doctor`.
 
 ### "localhost" resolved differently
 
@@ -175,17 +189,21 @@ qa-use browser goto http://localhost:3000
 # Test HTTPS only in staging/prod environments
 ```
 
+### Tunnel errors have triage hints
+
+Structured tunnel errors (`TunnelNetworkError`, `TunnelAuthError`, `TunnelQuotaError`, `TunnelUnknownError`) print a `Next steps:` block with the `--no-tunnel` opt-out and other recovery hints. No silent retries — failures surface immediately.
+
 ## Best Practices
 
-1. **Use `--tunnel` for all localhost tests** - Don't forget, or tests will fail with confusing network errors
+1. **Trust auto-mode** — Don't pass `--tunnel` unless you're overriding the default.
 
-2. **Keep tunnel running during development** - Create once, run many tests
+2. **Use `--tunnel on` in pure-local dev** — When both your API and app are on localhost, auto-mode skips the tunnel; add `--tunnel on` if the cloud still needs to reach you.
 
-3. **Use `--no-headless` for debugging** - Watch what's happening
+3. **Use `--no-headless` for debugging** — Watch what's happening.
 
-4. **Save WebSocket URL** - Copy it from tunnel output for reuse in `--ws-url`
+4. **`qa-use tunnel start --hold` for shared public URLs** — When a tunnel needs to outlive any single command.
 
-5. **Clean up sessions** - Run `qa-use browser close` when done to free resources
+5. **`qa-use doctor` if state feels stale** — Fast, safe, and `--dry-run` previews the plan.
 
 ---
 

@@ -93,8 +93,31 @@ qa-use browser run                     # Interactive REPL mode
 | `qa-use browser screenshot <path>` | Save screenshot |
 | `qa-use browser run` | Interactive REPL mode |
 | `qa-use browser close` | Close browser session |
+| `qa-use browser status --list` | List active sessions across processes |
 
 Run `qa-use browser --help` for the full list of 29 browser commands.
+
+### Tunnel & Maintenance Commands
+
+`browser create` auto-tunnels when your target is localhost and the API is remote. For standalone tunnels (or cross-process registry inspection) use `qa-use tunnel`:
+
+```bash
+qa-use tunnel start http://localhost:3000 --hold   # Hold a public tunnel
+qa-use tunnel ls                                   # List active tunnels
+qa-use tunnel status <target|hash>                 # Detail for one entry
+qa-use tunnel close <target|hash>                  # Force-release a tunnel
+qa-use doctor                                      # Reap stale sessions/tunnels
+qa-use doctor --dry-run                            # Preview what would be reaped
+```
+
+| Command | Description |
+|---------|-------------|
+| `qa-use tunnel ls` | List active tunnels in the registry |
+| `qa-use tunnel status <target>` | Show detail for a single tunnel |
+| `qa-use tunnel close <target>` | Force-release a tunnel (kills detached holder) |
+| `qa-use doctor` | Reap stale sessions/tunnels (dead PIDs) |
+
+> **Note:** `qa-use tunnel *` is the CLI-side cross-process tunnel registry, distinct from `qa-use mcp tunnel` which is the MCP-mode persistent tunnel wrapper (see below).
 
 ### API Commands
 

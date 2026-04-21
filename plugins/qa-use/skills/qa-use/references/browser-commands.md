@@ -16,9 +16,10 @@ qa-use browser create [url] [options]
 |------|-------------|
 | `[url]` | URL to navigate to after session is ready |
 | `--viewport <size>` | Viewport size: `desktop` (1280x720), `tablet` (768x1024), `mobile` (375x667) |
-| `--tunnel` | Run local browser with API tunnel (for localhost testing) |
-| `--headless` | Run in headless mode (default with `--tunnel`) |
-| `--no-headless` | Show browser window (use with `--tunnel` for debugging) |
+| `--tunnel [mode]` | Tunnel mode: `auto` (default — tunnel iff localhost base + remote API), `on` (force), `off` (never). Bare `--tunnel` is sugar for `on`. |
+| `--no-tunnel` | Shortcut for `--tunnel off` |
+| `--headless` | Run in headless mode (default for tunnel/local browsers) |
+| `--no-headless` | Show browser window (debugging) |
 | `--ws-url <url>` | Connect to existing WebSocket browser endpoint |
 | `--after-test-id <uuid>` | Run a test before session becomes interactive (start after login, etc.) |
 
@@ -27,8 +28,9 @@ qa-use browser create [url] [options]
 qa-use browser create                        # Remote browser, default viewport
 qa-use browser create https://example.com    # Remote browser, navigate to URL
 qa-use browser create --viewport mobile      # Remote browser, mobile viewport
-qa-use browser create --tunnel               # Local headless browser with tunnel
-qa-use browser create --tunnel --no-headless # Local visible browser for debugging
+qa-use browser create http://localhost:3000  # Auto-tunnels (localhost + remote API)
+qa-use browser create --tunnel on --no-headless  # Force tunnel + visible browser
+qa-use browser create --no-tunnel            # Opt out of auto-tunnel
 qa-use browser create --ws-url wss://...     # Connect to existing browser
 qa-use browser create --after-test-id <uuid> # Start session after running a test
 qa-use browser create --after-test-id <uuid> https://example.com/dashboard  # After login, go to dashboard
@@ -473,11 +475,11 @@ Opens interactive REPL for browser commands. Use `--after-test-id` to start the 
 
 ## Local Browser with Tunnel
 
-The `--tunnel` flag starts a real browser on your machine with a tunnel for API control:
+qa-use auto-tunnels when your target is localhost and the API is remote — no flag required. Use the tri-state `--tunnel` flag only to override:
 
 1. **Browser runs locally** - you can see it (with `--no-headless`)
 2. **API controls via tunnel** - cloud API sends commands through the tunnel
-3. **Auto-cleanup** - session closes when you press Ctrl+C or run `browser close`
+3. **Detached lifecycle** - `browser create` returns immediately; the tunnel runs in a background child until `browser close` or TTL
 
 **Use cases:**
 - Debugging tests visually
@@ -485,16 +487,21 @@ The `--tunnel` flag starts a real browser on your machine with a tunnel for API 
 - Developing tests interactively
 
 ```bash
-# Start visible local browser
-qa-use browser create --tunnel --no-headless
+# Auto-mode — localhost + remote API tunnels automatically
+qa-use browser create --no-headless http://localhost:3000
 
-# Now interact normally
-qa-use browser goto http://localhost:3000
+# Force a tunnel in dev mode (both sides local)
+qa-use browser create --tunnel on --no-headless
+
+# Opt out of tunnel entirely
+qa-use browser create --no-tunnel
+
+# Interact normally
 qa-use browser snapshot
 qa-use browser click e3
-
-# Watch the browser respond in real-time
 ```
+
+See [localhost-testing.md](localhost-testing.md) for full tunnel mode documentation, `qa-use tunnel *` commands, and `qa-use doctor`.
 
 ---
 
