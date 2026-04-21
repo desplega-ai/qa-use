@@ -9,7 +9,7 @@
  *   bun run scripts/e2e.ts --cmd qa-use # uses "qa-use" as command
  */
 
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
@@ -466,7 +466,7 @@ await section('Section 9: Tunnel — prod-mode auto-banner (gated)', () => {
 
 	const remoteApi = process.env.E2E_REMOTE_API_URL ?? 'https://api.desplega.ai';
 	const { stderr } = run(
-		['browser', 'create', 'http://localhost:1', '--timeout', '1'],
+		['browser', 'create', 'http://localhost:1', '--timeout', '60'],
 		30_000,
 		{ QA_USE_API_URL: remoteApi, QA_USE_DETACH: '0' },
 	);
@@ -490,37 +490,62 @@ await section('Section 9: Tunnel — prod-mode auto-banner (gated)', () => {
 // Refcount reuse can only be demonstrated when a tunnel is actually acquired,
 // which (per Section 9) needs a remote backend. Gate behind the same env flag.
 
-await section('Section 10: Tunnel — registry reuse refcount (gated)', () => {
+await section('Section 10: Tunnel — registry reuse refcount (gated)', async () => {
 	if (process.env.E2E_ALLOW_REMOTE_TUNNEL !== '1') {
 		console.log('  SKIP: E2E_ALLOW_REMOTE_TUNNEL=1 not set');
 		return;
 	}
 
-	// `tunnel start --hold` keeps the tunnel alive; start it twice for the
-	// same target and assert refcount grows.
 	const target = 'http://localhost:3000';
 	const remoteApi = process.env.E2E_REMOTE_API_URL ?? 'https://api.desplega.ai';
 
-	// Fire first owner in background (spawn detached, don't wait)
-	const first = spawnSync('bun', ['run', 'cli', 'tunnel', 'start', target], {
+	// Spawn `tunnel start --hold` in the background and wait for it to register.
+	// We can't use `tunnel start` without `--hold` here because (pending a fix
+	// tracked as a plan follow-up) it hangs for the full registry grace window
+	// waiting for the underlying localtunnel TCP connection to close.
+	const holder = spawn('bun', ['run', 'cli', 'tunnel', 'start', target, '--hold'], {
 		cwd: resolve(import.meta.dirname, '..'),
-		encoding: 'utf-8',
 		env: { ...process.env, QA_USE_API_URL: remoteApi },
-		timeout: 20_000,
+		detached: true,
+		stdio: 'ignore',
 	});
-	assert(first.status === 0, 'First tunnel start succeeded');
+	holder.unref();
 
-	// Second consumer: a short-lived acquire via `tunnel status` (read-only);
-	// we use `tunnel ls --json` directly and assert a single entry matches.
-	const lsOut = runOrThrow(['tunnel', 'ls', '--json']);
-	const entries = JSON.parse(lsOut);
-	const match = entries.find(
-		(e: { target?: string }) => (e.target ?? '').startsWith(target),
-	);
-	assert(!!match, 'Tunnel entry exists for target');
-
-	// Cleanup
-	run(['tunnel', 'close', target]);
+	try {
+		// Poll `tunnel ls --json` for up to ~15s until the entry shows up.
+		let match: { target?: string; refcount?: number } | undefined;
+		const deadline = Date.now() + 15_000;
+		while (Date.now() < deadline) {
+			try {
+				const lsOut = runOrThrow(['tunnel', 'ls', '--json']);
+				const entries = JSON.parse(lsOut);
+				match = entries.find(
+					(e: { target?: string }) => (e.target ?? '').startsWith(target),
+				);
+				if (match) break;
+			} catch {
+				// keep polling
+			}
+			await new Promise((r) => setTimeout(r, 500));
+		}
+		assert(!!match, 'Tunnel entry exists for target');
+		assert(
+			typeof match?.refcount === 'number' && match.refcount >= 1,
+			'Entry has refcount >= 1',
+		);
+	} finally {
+		// Cleanup: force-close the tunnel; the detached holder child will exit on
+		// its own once the registry handle is gone, but SIGTERM its pid as
+		// insurance.
+		run(['tunnel', 'close', target], 10_000);
+		if (holder.pid) {
+			try {
+				process.kill(holder.pid, 'SIGTERM');
+			} catch {
+				// already gone
+			}
+		}
+	}
 });
 
 // ---------------------------------------------------------------------------
@@ -565,7 +590,7 @@ await section('Section 12: Triage-hint error on tunnel failure (gated)', () => {
 
 	// Use an invalid API key to force an auth failure from the tunnel provider.
 	const { stderr, exitCode } = run(
-		['browser', 'create', 'http://localhost:3000', '--tunnel', 'on', '--timeout', '1'],
+		['browser', 'create', 'http://localhost:3000', '--tunnel', 'on', '--timeout', '60'],
 		20_000,
 		{
 			QA_USE_API_KEY: 'sk_qfm_invalid_for_e2e_triage_hint_test',
