@@ -3,9 +3,9 @@ date: 2026-04-21T00:00:00Z
 author: Taras
 topic: "Tunnel docs polish + --tunnel backward-compat + version bump"
 tags: [plan, tunnel, cli, docs, release, qa-use]
-status: in-progress
+status: completed
 last_updated: 2026-04-21
-last_updated_by: Claude (phase 2)
+last_updated_by: Claude (phase 3)
 parent_plan: thoughts/taras/plans/2026-04-20-tunnel-automation-and-ux.md
 parent_qa: thoughts/taras/qa/2026-04-21-tunnel-automation-and-ux.md
 ---
@@ -151,9 +151,9 @@ Bump minor version, add changelog entry, tag on merge. No publish — tag-only, 
 **Success Criteria:**
 
 Automated:
-- [ ] `jq -r .version package.json` returns `2.15.0`
-- [ ] `bun test` still green
-- [ ] `bun run build` succeeds (if build is part of release verification)
+- [x] `jq -r .version package.json` returns `2.15.0`
+- [x] `bun test` still green
+- [x] `bun run build` succeeds (if build is part of release verification)
 
 Manual:
 - [ ] CHANGELOG entry (if applicable) reads correctly and mentions: auto-tunnel decision, tunnel registry refcount, `qa-use tunnel` subcommands, `qa-use doctor`, detached `browser create`, tri-state `--tunnel` flag.
