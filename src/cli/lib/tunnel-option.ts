@@ -2,10 +2,15 @@
  * Tri-state `--tunnel` option helper for Commander commands.
  *
  * Shape:
- *   --tunnel <auto|on|off>   (default: auto)
+ *   --tunnel [auto|on|off]   (default: auto; bare --tunnel = on)
  *   --no-tunnel              (alias for --tunnel off)
  *
  * Invalid values are rejected at parse time with a clear error.
+ *
+ * Bare `--tunnel` (no value) is preserved as sugar for `--tunnel on`, which
+ * matches the pre-tri-state UX. Commander represents the bare form by passing
+ * the literal string `"true"` (or `undefined` depending on argv shape) through
+ * to the parser, so we map both to `'on'`.
  */
 
 import { type Command, InvalidArgumentError, Option } from 'commander';
@@ -15,15 +20,24 @@ export type TunnelMode = 'auto' | 'on' | 'off';
 const VALID_MODES: readonly TunnelMode[] = ['auto', 'on', 'off'] as const;
 
 /**
- * Parser for --tunnel <mode>. Accepts only 'auto' | 'on' | 'off'.
- * Handles the special Commander behaviour where `--no-tunnel` passes the
- * boolean `false` through here.
+ * Parser for --tunnel [mode]. Accepts 'auto' | 'on' | 'off'.
+ * - Bare `--tunnel` (no value) → 'on' (backward-compat sugar).
+ * - `--no-tunnel` (boolean `false`) → 'off'.
+ * - Invalid strings are rejected.
  */
 function parseTunnelMode(value: unknown): TunnelMode {
   // `--no-tunnel` arrives here as the boolean `false` (Commander's
   // --no-<flag> negation semantics). Map it to 'off'.
   if (value === false) {
     return 'off';
+  }
+
+  // Bare `--tunnel` (no value). With the `[mode]` optional-arg form,
+  // Commander substitutes the literal string `"true"` as a placeholder
+  // when the flag is present without an explicit value. Treat that and
+  // `undefined` as the backward-compat sugar → 'on'.
+  if (value === undefined || value === true || value === 'true') {
+    return 'on';
   }
 
   if (typeof value !== 'string') {
@@ -47,12 +61,13 @@ function parseTunnelMode(value: unknown): TunnelMode {
  * The option is stored under the property name `tunnel` on the options
  * object. Callers can read it as a `TunnelMode`.
  *
- * Also registers `--no-tunnel` as an alias that resolves to `'off'`.
+ * Also registers `--no-tunnel` as an alias that resolves to `'off'`, and
+ * accepts bare `--tunnel` (no value) as sugar for `--tunnel on`.
  */
 export function addTunnelOption(command: Command): Command {
   const option = new Option(
-    '--tunnel <mode>',
-    'Tunnel mode: auto (localhost-only), on (force), off (never)'
+    '--tunnel [mode]',
+    'Tunnel mode: auto (localhost-only), on (force, default when flag present without value), off (never)'
   )
     .default('auto' as TunnelMode)
     .argParser(parseTunnelMode);
@@ -69,6 +84,10 @@ export function addTunnelOption(command: Command): Command {
     const opts = cmd.opts();
     if (opts.tunnel === false) {
       cmd.setOptionValue('tunnel', 'off');
+    } else if (opts.tunnel === true || opts.tunnel === 'true') {
+      // Bare `--tunnel` with no argParser invocation path (belt-and-braces):
+      // some Commander versions skip argParser when the optional arg is absent.
+      cmd.setOptionValue('tunnel', 'on');
     }
   });
 
