@@ -5,7 +5,7 @@ topic: "Tunnel docs polish + --tunnel backward-compat + version bump"
 tags: [plan, tunnel, cli, docs, release, qa-use]
 status: in-progress
 last_updated: 2026-04-21
-last_updated_by: Claude
+last_updated_by: Claude (phase 2)
 parent_plan: thoughts/taras/plans/2026-04-20-tunnel-automation-and-ux.md
 parent_qa: thoughts/taras/qa/2026-04-21-tunnel-automation-and-ux.md
 ---
@@ -66,11 +66,11 @@ Make Commander accept `--tunnel` without a value, defaulting to `'on'`. Preserve
 **Success Criteria:**
 
 Automated:
-- [ ] `bun run check:fix` clean
-- [ ] `bun test src/cli/lib/tunnel-option.test.ts` — new cases pass
-- [ ] `bun test` — full suite green (should stay at 508+)
-- [ ] `bun run cli browser create --tunnel 2>&1 | grep -i "argument missing"` returns no match
-- [ ] `bun run cli browser create --help 2>&1 | grep -- '--tunnel'` shows `--tunnel [mode]` (brackets)
+- [x] `bun run check:fix` clean
+- [x] `bun test src/cli/lib/tunnel-option.test.ts` — new cases pass
+- [x] `bun test` — full suite green (should stay at 508+)
+- [x] `bun run cli browser create --tunnel 2>&1 | grep -i "argument missing"` returns no match
+- [x] `bun run cli browser create --help 2>&1 | grep -- '--tunnel'` shows `--tunnel [mode]` (brackets)
 
 Manual:
 - [ ] `qa-use browser create --tunnel --no-headless` (landing-site example) parses without error (session creation failure against local backend is fine — we only care about the flag parse)
@@ -116,11 +116,11 @@ Update the skill content that feeds `qa-use docs` and the `qa-use:qa-use` agent.
 **Success Criteria:**
 
 Automated:
-- [ ] `bun run check:fix` clean
-- [ ] `bun run check:docs` passes (diff exits 0 after regenerate)
-- [ ] `grep -nE "qa-use tunnel|qa-use doctor|--no-tunnel|auto-tunnel" plugins/qa-use/skills/qa-use/SKILL.md` returns ≥3 matches
-- [ ] `grep -nE "auto-tunnel|--no-tunnel|qa-use doctor" plugins/qa-use/skills/qa-use/references/localhost-testing.md` returns ≥2 matches
-- [ ] Old pattern gone: `grep -n "Press Ctrl+C to stop" plugins/qa-use/skills/qa-use/references/localhost-testing.md` returns no match
+- [x] `bun run check:fix` clean
+- [x] `bun run check:docs` passes (diff exits 0 after regenerate)
+- [x] `grep -nE "qa-use tunnel|qa-use doctor|--no-tunnel|auto-tunnel" plugins/qa-use/skills/qa-use/SKILL.md` returns ≥3 matches
+- [x] `grep -nE "auto-tunnel|--no-tunnel|qa-use doctor" plugins/qa-use/skills/qa-use/references/localhost-testing.md` returns ≥2 matches
+- [x] Old pattern gone: `grep -n "Press Ctrl+C to stop" plugins/qa-use/skills/qa-use/references/localhost-testing.md` returns no match
 
 Manual:
 - [ ] `bun run cli docs` (if the command exists) renders the updated SKILL.md content without errors — spot-check the tunnel section

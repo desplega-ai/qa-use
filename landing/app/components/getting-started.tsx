@@ -157,12 +157,12 @@ export function GettingStarted() {
               lines={[
                 {
                   type: "comment",
-                  text: "# Run against your local app (tunnel mode)",
+                  text: "# Run against your local app (auto-tunnels localhost)",
                 },
                 {
                   type: "command",
                   prompt: "$",
-                  text: "qa-use test run login --tunnel",
+                  text: "qa-use test run login",
                 },
                 { type: "blank" },
                 {

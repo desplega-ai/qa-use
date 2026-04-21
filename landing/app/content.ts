@@ -72,8 +72,8 @@ steps:
 \`\`\`
 
 \`\`\`bash
-# Run against your local app (tunnel mode)
-qa-use test run login --tunnel
+# Run against your local app (auto-tunnels when base_url is localhost)
+qa-use test run login
 \`\`\`
 
 ## MCP Integration
@@ -169,8 +169,8 @@ steps:
   - action: to_be_visible
     target: dashboard
 
-# Run against your local app (tunnel mode)
-$ qa-use test run login --tunnel
+# Run against your local app (auto-tunnels when base_url is localhost)
+$ qa-use test run login
 
 MCP INTEGRATION
 ---------------

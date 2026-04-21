@@ -51,11 +51,18 @@ qa-use info
 
 **CLI Workflow:**
 ```bash
-# Create browser session
+# Create browser session (returns immediately — runs detached in the background)
 qa-use browser create --viewport desktop
 
-# For localhost testing
-qa-use browser create --tunnel --no-headless
+# For localhost testing — auto-tunnels when base URL is localhost and API is remote.
+# No flag needed for the common case:
+qa-use browser create --no-headless http://localhost:3000
+
+# Force a tunnel even in dev mode:
+qa-use browser create --tunnel on --no-headless
+
+# Opt out of auto-tunnel (e.g. backend is also local):
+qa-use browser create --no-tunnel
 
 # Navigate
 qa-use browser goto https://example.com
@@ -69,6 +76,30 @@ qa-use browser fill e5 "text"
 
 # Close
 qa-use browser close
+```
+
+**Background session management:**
+
+`qa-use browser create` returns immediately — the actual browser + tunnel run in a detached child process so your terminal stays free. Manage sessions with:
+
+```bash
+qa-use browser status --list   # Show all active sessions across processes
+qa-use browser status           # Details for the auto-resolved session
+qa-use browser close <id>       # Close a specific session
+qa-use doctor                   # Reap stale sessions/tunnels (dead PIDs)
+qa-use doctor --dry-run         # Preview what would be cleaned
+```
+
+**Tunnel commands:**
+
+Cross-process tunnel registry — multiple commands share a single tunnel per target:
+
+```bash
+qa-use tunnel start <url>         # Acquire a tunnel (released immediately unless --hold)
+qa-use tunnel start <url> --hold  # Keep the tunnel up until Ctrl+C
+qa-use tunnel ls                  # List active tunnels (target, public URL, refcount)
+qa-use tunnel status <target>     # Detail for a single tunnel
+qa-use tunnel close <target>      # Force-release a tunnel (kills detached holders)
 ```
 
 **Plugin Shortcut:**
@@ -109,8 +140,8 @@ Blocks are atomic recorded interactions from a browser session. They are:
 **How blocks work:**
 
 ```bash
-# 1. Create session and interact
-qa-use browser create --tunnel --no-headless
+# 1. Create session and interact (auto-tunnels localhost)
+qa-use browser create --no-headless
 qa-use browser goto https://example.com
 qa-use browser snapshot        # Returns: [ref=e1] button
 qa-use browser click e1        # Records as block
@@ -213,17 +244,22 @@ local tests.
 |---------|-------------|
 | `qa-use browser create` | Create remote browser session |
 | `qa-use browser create <url>` | Create session and navigate to URL |
-| `qa-use browser create --tunnel` | Create local browser with API tunnel |
-| `qa-use browser create --no-headless` | Show browser window (tunnel mode only) |
+| `qa-use browser create --tunnel [auto\|on\|off]` | Tunnel mode — default `auto` (localhost + remote API). `--no-tunnel` is sugar for `off`. |
+| `qa-use browser create --no-headless` | Show browser window (paired with a local/tunnel browser) |
 | `qa-use browser create --viewport <size>` | Set viewport: `desktop`, `tablet`, `mobile` |
 | `qa-use browser create --ws-url <url>` | Connect to existing WebSocket browser |
 | `qa-use browser create --after-test-id <uuid>` | Run a test first, then become interactive |
 | `qa-use browser create --var <key=value>` | Override app config variables (repeatable) |
 | `qa-use browser list` | List active sessions |
 | `qa-use browser status` | Show current session details (app_url, recording_url, etc.) |
+| `qa-use browser status --list` | Show all active sessions across processes |
 | `qa-use browser close` | Close active session |
+| `qa-use browser close <id>` | Close a specific session by id |
+| `qa-use doctor` | Reap stale sessions/tunnels (dead PIDs) |
+| `qa-use tunnel ls` | List active tunnels in the registry |
+| `qa-use tunnel start <url> --hold` | Hold a public tunnel for external consumers |
 
-Sessions auto-persist in `~/.qa-use.json`. One active session = no `-s` flag needed.
+Sessions auto-persist in `~/.qa-use.json`. One active session = no `-s` flag needed. `browser create` returns immediately — the browser + tunnel run in a detached child. Use `qa-use doctor` if stale state accumulates.
 
 ### Navigation
 
@@ -279,7 +315,7 @@ Use diff output to interact with newly appeared elements directly, without runni
 |---------|-------------|
 | `qa-use test run <name>` | Run test by name |
 | `qa-use test run --all` | Run all tests |
-| `qa-use test run <name> --tunnel` | Run with local browser tunnel |
+| `qa-use test run <name> --tunnel [mode]` | Override tunnel mode (`auto`, `on`, `off`). `--no-tunnel` is sugar for `off`. Bare `--tunnel` is sugar for `on`. |
 | `qa-use test run <name> --download` | Download assets to `/tmp/qa-use/downloads/` |
 | `qa-use test run <name> --var key=value` | Override variable |
 | `qa-use test validate <name>` | Validate test syntax |
@@ -394,8 +430,8 @@ qa-use browser logs console
 
 **CLI Workflow:**
 ```bash
-# 1. Create session
-qa-use browser create --tunnel --no-headless
+# 1. Create session (auto-tunnels localhost targets)
+qa-use browser create --no-headless
 
 # 2. Navigate and interact
 qa-use browser goto https://example.com
@@ -461,7 +497,7 @@ qa-use test run login
 **CLI Workflow:**
 ```bash
 # Create session and navigate
-qa-use browser create --tunnel --no-headless
+qa-use browser create --no-headless
 qa-use browser goto https://evals.desplega.ai/checkboxes
 
 # goto shows diff — initial page load shows all elements:
@@ -550,32 +586,28 @@ jobs:
 
 ## Advanced Topics
 
-### Localhost Testing (Tunnel Mode)
+### Localhost Testing (Auto-Tunnel)
 
-**When to use tunnel mode:**
+**qa-use auto-tunnels localhost targets when the API is remote.** No flag required for the common case:
+
+```bash
+qa-use browser create --no-headless http://localhost:3000
+qa-use test run my_test   # auto-tunnels if base_url is localhost
+```
+
+**Tri-state `--tunnel` flag:**
+
+| Value | Behavior |
+|-------|----------|
+| `auto` (default) | Tunnel iff base URL is localhost AND API URL is remote |
+| `on` (or bare `--tunnel`) | Force a tunnel even in dev mode |
+| `off` (or `--no-tunnel`) | Never tunnel |
 
 ```
 Testing localhost (http://localhost:3000)?
-  ├─ YES → Use --tunnel
-  │   └─ qa-use browser create --tunnel [--no-headless]
-  │       (Starts local Playwright, creates localtunnel, keeps running)
-  │
-  └─ NO (Public URL) → Use remote browser (default)
-      └─ qa-use browser create
-          (Uses desplega.ai cloud browser via WebSocket)
-```
-
-**The `--tunnel` flag is a binary choice:**
-- **Local tunnel mode**: Playwright on your machine + localtunnel
-- **Remote mode**: WebSocket URL to cloud-hosted browser
-
-**For test execution:**
-```bash
-# Local app
-qa-use test run my_test --tunnel [--headful]
-
-# Public app
-qa-use test run my_test
+  ├─ API remote (default)  → auto-tunnels. No flag needed.
+  ├─ API also local (dev)  → no tunnel by default. Use --tunnel on to force.
+  └─ Public URL target     → no tunnel (remote cloud browser)
 ```
 
 **Plugin shortcuts handle tunnel detection automatically:**
@@ -610,8 +642,8 @@ Sessions are stored in `~/.qa-use.json` and have:
 
 **Sharing sessions across processes:**
 ```bash
-# Process 1: Create session
-qa-use browser create --tunnel
+# Process 1: Create session (auto-tunnels if target is localhost + API remote)
+qa-use browser create http://localhost:3000
 # Output: ws://localhost:12345/browser/abc123
 
 # Process 2: Connect to session
@@ -676,7 +708,7 @@ See [references/test-format.md](references/test-format.md) for complete specific
 | `browser close <session-id>` | `browser close` |
 | Guessing element refs | Use refs from diff output or `snapshot` |
 | Running `snapshot` after every action | Use diff output; only `snapshot` when needed |
-| Testing localhost without `--tunnel` | Use `--tunnel` flag |
+| Forcing `--tunnel` in dev (both local) | Rely on auto-mode, or use `--tunnel on` explicitly |
 | `test sync --pull` | `test sync pull` (subcommand, not flag) |
 | `test sync --push` | `test sync push` (subcommand, not flag) |
 
