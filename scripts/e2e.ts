@@ -686,6 +686,104 @@ await section('Section 13: Doctor reap of stale sessions', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Section 14: SSE-exit-time — `test run` exits within 5s of [complete]
+// ---------------------------------------------------------------------------
+//
+// Regression coverage for DES-275: the CLI used to hang ~80s after the SSE
+// `complete` event because `runCliTest` waited for the backend to close the
+// stream. Phases 1-3 wired `AbortSignal` through `streamSSE` + `runCliTest`
+// and made the loop break+abort on the terminal event. This section spawns
+// `test run --verbose`, timestamps each stdout line, finds the `[complete]`
+// line emitted by `printSSEProgress`, and asserts the child exits within 5s
+// without an external kill.
+//
+// Skips cleanly if the backend is unreachable (test run will exit non-zero
+// quickly without ever printing `[complete]`).
+
+await section('Section 14: SSE-exit-time', async () => {
+	const parts = cmdPrefix.split(/\s+/).concat(['test', 'run', 'e2e', '--verbose']);
+	const cmd = parts[0];
+	const spawnArgs = parts.slice(1);
+
+	const child = spawn(cmd, spawnArgs, {
+		cwd: resolve(import.meta.dirname, '..'),
+		env: process.env,
+		stdio: ['ignore', 'pipe', 'pipe'],
+	});
+
+	let completeTs: number | null = null;
+	let exitTs: number | null = null;
+	let killedExternally = false;
+	let stdoutBuf = '';
+	let stderrBuf = '';
+
+	child.stdout.setEncoding('utf-8');
+	child.stderr.setEncoding('utf-8');
+
+	child.stdout.on('data', (chunk: string) => {
+		stdoutBuf += chunk;
+		// Process complete lines only; partial trailing line stays in buffer.
+		let nl = stdoutBuf.indexOf('\n');
+		while (nl !== -1) {
+			const line = stripAnsi(stdoutBuf.slice(0, nl));
+			stdoutBuf = stdoutBuf.slice(nl + 1);
+			if (completeTs === null && /^\[complete\]/.test(line.trim())) {
+				completeTs = Date.now();
+			}
+			nl = stdoutBuf.indexOf('\n');
+		}
+	});
+
+	child.stderr.on('data', (chunk: string) => {
+		stderrBuf += chunk;
+	});
+
+	// Hard safety net: if the child hangs longer than 120s, kill it and fail
+	// the section. The pre-fix bug hung ~80s, so 120s is enough headroom to
+	// catch a regression while not letting the script wedge forever.
+	const hardKillTimer = setTimeout(() => {
+		killedExternally = true;
+		try {
+			child.kill('SIGTERM');
+		} catch {
+			// already gone
+		}
+	}, 120_000);
+
+	const exitCode: number | null = await new Promise((resolveExit) => {
+		child.on('exit', (code) => {
+			exitTs = Date.now();
+			clearTimeout(hardKillTimer);
+			resolveExit(code);
+		});
+	});
+
+	// If the child exited non-zero AND we never saw [complete], the backend is
+	// likely unreachable. Skip cleanly per the existing convention.
+	if (completeTs === null) {
+		const reason =
+			exitCode === 0
+				? 'no [complete] line observed (test passed without verbose marker?)'
+				: `child exited ${exitCode} before [complete] (backend likely unreachable)`;
+		console.log(`  SKIP: ${reason}`);
+		if (stderrBuf) {
+			console.log(`  (stderr tail: ${stderrBuf.split('\n').slice(-3).join(' | ')})`);
+		}
+		return;
+	}
+
+	assert(!killedExternally, 'Child exited on its own (no SIGTERM needed)');
+
+	if (exitTs !== null && completeTs !== null) {
+		const delta = exitTs - completeTs;
+		assert(
+			delta < 5_000,
+			`Exited ${delta}ms after [complete] (must be < 5000ms — pre-fix hung ~80s)`,
+		);
+	}
+});
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 

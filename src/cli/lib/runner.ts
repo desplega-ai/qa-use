@@ -18,6 +18,12 @@ export interface RunTestOptions {
   testId?: string;
   /** Run ID for organizing downloads (set automatically) */
   runId?: string;
+  /**
+   * Idle timeout in seconds. If no SSE events arrive for this long, the
+   * underlying fetch is aborted and `runCliTest` rejects with a `timed out`
+   * error. `0` (or undefined) disables the watchdog.
+   */
+  idleTimeoutSec?: number;
 }
 
 /**
@@ -35,21 +41,33 @@ export async function runTest(
   runOptions: RunTestOptions = {},
   onEvent?: (event: SSEEvent) => void
 ): Promise<RunCliTestResult> {
-  const { verbose = false, sourceFile, download, downloadBaseDir, testId, runId } = runOptions;
+  const {
+    verbose = false,
+    sourceFile,
+    download,
+    downloadBaseDir,
+    testId,
+    runId,
+    idleTimeoutSec,
+  } = runOptions;
 
   // Build context for SSE progress handler
   const context: SSEProgressContext | undefined =
     sourceFile || download ? { sourceFile, download, downloadBaseDir, testId, runId } : undefined;
 
-  return await client.runCliTest(options, (event) => {
-    // Print progress to console
-    printSSEProgress(event, verbose, context);
+  return await client.runCliTest(
+    options,
+    (event) => {
+      // Print progress to console
+      printSSEProgress(event, verbose, context);
 
-    // Call additional callback if provided
-    if (onEvent) {
-      onEvent(event);
-    }
-  });
+      // Call additional callback if provided
+      if (onEvent) {
+        onEvent(event);
+      }
+    },
+    { idleTimeoutSec }
+  );
 }
 
 /**

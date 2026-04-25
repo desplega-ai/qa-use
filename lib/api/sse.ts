@@ -74,24 +74,114 @@ export function parseSSE(chunk: string): SSEEvent[] {
 }
 
 /**
+ * Options for SSE consumption helpers
+ */
+export interface StreamSSEOptions {
+  /**
+   * Optional abort signal. When the signal is aborted, the read loop exits
+   * cleanly (the generator returns without throwing) so callers using
+   * `for await` can rely on graceful termination.
+   */
+  signal?: AbortSignal;
+  /**
+   * Optional callback invoked once per successful `reader.read()` chunk —
+   * BEFORE parsing. This fires even for SSE comment pings (which produce
+   * zero parsed events) so callers can use it as a heartbeat / idle-timeout
+   * reset hook. Wired from `runCliTest` to reset the idle-timeout watchdog.
+   */
+  onChunk?: () => void;
+}
+
+/**
  * Stream SSE events from a Response object
  *
  * @param response - Fetch Response with SSE stream
+ * @param options - Optional configuration (e.g. abort signal)
  * @yields SSE events as they arrive
  */
-export async function* streamSSE(response: Response): AsyncGenerator<SSEEvent, void, unknown> {
+export async function* streamSSE(
+  response: Response,
+  options: StreamSSEOptions = {}
+): AsyncGenerator<SSEEvent, void, unknown> {
   if (!response.body) {
     throw new Error('Response body is null');
+  }
+
+  const { signal, onChunk } = options;
+
+  // Fast-path: if the signal is already aborted, return immediately without
+  // touching the response body.
+  if (signal?.aborted) {
+    return;
   }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
 
+  // Wire the signal to a Promise that resolves on abort so we can race it
+  // against `reader.read()`. This is needed because a generic ReadableStream
+  // (e.g. one not backed by `fetch`) won't surface the AbortSignal on its own
+  // — the reader will simply keep awaiting. For `fetch`-backed streams, the
+  // race is still safe: the read will reject with AbortError (caught below)
+  // at roughly the same time as the abort fires.
+  const ABORTED = Symbol('aborted');
+  let abortListener: (() => void) | null = null;
+  const abortPromise = signal
+    ? new Promise<typeof ABORTED>((resolve) => {
+        abortListener = () => resolve(ABORTED);
+        signal.addEventListener('abort', abortListener, { once: true });
+      })
+    : null;
+
   try {
     while (true) {
-      const { done, value } = await reader.read();
+      // Check for abort before each read so we exit promptly even if the
+      // underlying socket hasn't surfaced the AbortError yet.
+      if (signal?.aborted) {
+        return;
+      }
+
+      let chunk: { done: boolean; value: Uint8Array | undefined };
+      try {
+        const readPromise = reader.read();
+        const raceResult = abortPromise
+          ? await Promise.race([readPromise, abortPromise])
+          : await readPromise;
+
+        if (raceResult === ABORTED) {
+          // Cancel the underlying reader so it doesn't keep the stream alive.
+          // `cancel()` may reject if already errored — swallow it.
+          reader.cancel().catch(() => {});
+          return;
+        }
+
+        chunk = raceResult as { done: boolean; value: Uint8Array | undefined };
+      } catch (err) {
+        // `fetch`'s reader rejects with an AbortError (DOMException) when the
+        // associated signal is aborted. Swallow it and exit cleanly so callers
+        // see the generator finish without an exception.
+        if (err instanceof Error && err.name === 'AbortError') {
+          return;
+        }
+        throw err;
+      }
+
+      const { done, value } = chunk;
       if (done) break;
+
+      // Fire onChunk on every successful read — BEFORE parsing — so callers
+      // can use it as an idle-timeout heartbeat. SSE comment pings produce
+      // zero parsed events but DO arrive as byte chunks here, which is the
+      // whole point: keep the watchdog alive even when only pings flow.
+      if (onChunk) {
+        try {
+          onChunk();
+        } catch {
+          // Defensively swallow — a misbehaving onChunk must not break the
+          // read loop. Hook is "best effort" by design.
+        }
+      }
 
       buffer += decoder.decode(value, { stream: true });
 
@@ -120,7 +210,15 @@ export async function* streamSSE(response: Response): AsyncGenerator<SSEEvent, v
       }
     }
   } finally {
-    reader.releaseLock();
+    if (signal && abortListener) {
+      signal.removeEventListener('abort', abortListener);
+    }
+    try {
+      reader.releaseLock();
+    } catch {
+      // releaseLock can throw if the reader was already canceled by an abort;
+      // safe to ignore — we're already on the cleanup path.
+    }
   }
 }
 
@@ -129,13 +227,15 @@ export async function* streamSSE(response: Response): AsyncGenerator<SSEEvent, v
  *
  * @param response - Fetch Response with SSE stream
  * @param onEvent - Callback to handle each event
+ * @param options - Optional configuration (e.g. abort signal); forwarded to streamSSE
  * @returns Promise that resolves when stream ends
  */
 export async function consumeSSE(
   response: Response,
-  onEvent: (event: SSEEvent) => void | Promise<void>
+  onEvent: (event: SSEEvent) => void | Promise<void>,
+  options: StreamSSEOptions = {}
 ): Promise<void> {
-  for await (const event of streamSSE(response)) {
+  for await (const event of streamSSE(response, options)) {
     await onEvent(event);
   }
 }

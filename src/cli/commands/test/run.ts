@@ -55,7 +55,12 @@ export const runCommand = addTunnelOption(
     )
     .option('--var <key=value...>', 'Variable overrides', collectVars, {})
     .option('--app-config-id <uuid>', 'App config ID to use')
-    .option('--timeout <seconds>', 'Timeout in seconds', '300')
+    .option(
+      '--timeout <seconds>',
+      'Idle timeout in seconds — abort if no SSE events for this long (0 disables)',
+      (v) => Number.parseInt(v, 10),
+      300
+    )
     .option('--verbose', 'Output raw SSE event data for debugging')
 ).action(async (test, options) => {
   try {
@@ -185,6 +190,10 @@ export const runCommand = addTunnelOption(
           download: options.download || false,
           downloadBaseDir: '/tmp/qa-use/downloads',
           testId: testDefinitions?.[0]?.id || undefined,
+          idleTimeoutSec:
+            typeof options.timeout === 'number' && Number.isFinite(options.timeout)
+              ? options.timeout
+              : undefined,
         }
       );
 

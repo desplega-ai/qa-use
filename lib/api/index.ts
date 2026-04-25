@@ -840,9 +840,89 @@ export class ApiClient {
    * Run test definitions with SSE streaming progress
    * @param options - Test execution options
    * @param onEvent - Optional callback for SSE events
+   * @param runtimeOptions - Optional runtime controls (idle timeout, external signal)
    * @returns Promise resolving to test result
    */
-  async runCliTest(options: RunCliTestOptions, onEvent?: SSECallback): Promise<RunCliTestResult> {
+  async runCliTest(
+    options: RunCliTestOptions,
+    onEvent?: SSECallback,
+    runtimeOptions?: { idleTimeoutSec?: number; signal?: AbortSignal }
+  ): Promise<RunCliTestResult> {
+    // Internal AbortController is wired into both `fetch` and `streamSSE` so
+    // we can deterministically tear down the underlying TCP socket on every
+    // exit path. Phase 2 actively aborts on terminal SSE events (`complete` /
+    // `error`) so we don't wait for the backend to close the stream.
+    // Phase 3 widens the public signature to accept a caller signal and an
+    // idle-timeout watchdog (`--timeout` end-to-end).
+    const controller = new AbortController();
+
+    // Tracks why the loop terminated so the catch block can distinguish
+    // "we aborted on purpose because of `complete`/`error`" (swallow the
+    // AbortError, return result) from "real network error or external abort"
+    // (re-throw), or from "idle timeout fired" (throw a typed timeout error).
+    //
+    // The reason is mutated from inside async callbacks (idle watchdog
+    // setTimeout, caller signal abort listener) which TS can't see during
+    // control-flow analysis. We use a small wrapper object so TS doesn't
+    // narrow the type to the literal assigned in the synchronous flow.
+    type TerminationReason = 'complete' | 'idle-timeout' | 'external' | null;
+    const reasonRef: { current: TerminationReason } = { current: null };
+    let result: RunCliTestResult | null = null;
+
+    const idleTimeoutSec = runtimeOptions?.idleTimeoutSec;
+    const idleTimeoutMs =
+      idleTimeoutSec && idleTimeoutSec > 0 ? Math.round(idleTimeoutSec * 1000) : 0;
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearIdleTimer = () => {
+      if (idleTimer !== null) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+      }
+    };
+
+    const armIdleTimer = () => {
+      if (idleTimeoutMs <= 0) return;
+      clearIdleTimer();
+      idleTimer = setTimeout(() => {
+        // Idle watchdog fired — no SSE bytes for `idleTimeoutSec` seconds.
+        // Mark the reason BEFORE aborting so the catch block can throw a
+        // typed timeout error instead of swallowing the AbortError.
+        reasonRef.current = 'idle-timeout';
+        controller.abort();
+      }, idleTimeoutMs);
+      // Don't keep the event loop alive just for the watchdog.
+      if (typeof idleTimer === 'object' && idleTimer && 'unref' in idleTimer) {
+        (idleTimer as { unref: () => void }).unref();
+      }
+    };
+
+    // Wire caller-provided signal: if it aborts, mark `terminationReason` so
+    // the catch block re-throws (instead of swallowing) with the abort error.
+    const callerSignal = runtimeOptions?.signal;
+    let callerAbortListener: (() => void) | null = null;
+    if (callerSignal) {
+      if (callerSignal.aborted) {
+        reasonRef.current = 'external';
+        controller.abort();
+      } else {
+        callerAbortListener = () => {
+          if (reasonRef.current === null) {
+            reasonRef.current = 'external';
+          }
+          controller.abort();
+        };
+        callerSignal.addEventListener('abort', callerAbortListener, { once: true });
+      }
+    }
+
+    // Merge caller signal with internal controller.signal so `fetch` and
+    // `streamSSE` see whichever fires first. `AbortSignal.any` is Node 20.3+
+    // and the project requires Node 20+.
+    const mergedSignal: AbortSignal = callerSignal
+      ? AbortSignal.any([callerSignal, controller.signal])
+      : controller.signal;
+
     try {
       const response = await fetch(`${this.getApiUrl()}/vibe-qa/cli/run`, {
         method: 'POST',
@@ -853,6 +933,7 @@ export class ApiClient {
           Accept: 'text/event-stream',
         },
         body: JSON.stringify(options),
+        signal: mergedSignal,
       });
 
       if (!response.ok) {
@@ -863,28 +944,77 @@ export class ApiClient {
         throw new Error(formatApiError(errorData, `HTTP ${response.status}: Failed to run test`));
       }
 
-      let result: RunCliTestResult | null = null;
+      // Arm the idle watchdog AFTER headers arrive — first event may take
+      // a while on a cold backend / large test. We don't punish slow first
+      // bytes; we punish silence between bytes.
+      armIdleTimer();
 
-      // Stream SSE events
-      for await (const event of streamSSE(response)) {
+      // Stream SSE events. `onChunk` resets the idle watchdog on every
+      // byte chunk (so SSE comment pings — which yield zero parsed events
+      // — still keep the connection alive).
+      for await (const event of streamSSE(response, {
+        signal: mergedSignal,
+        onChunk: () => armIdleTimer(),
+      })) {
         if (onEvent) onEvent(event);
 
-        // Capture final result
+        // Capture final result and tear down the socket immediately on a
+        // terminal event. Trailing events (e.g. `test_fixed`, `persisted`)
+        // that may arrive after `complete` are intentionally dropped per the
+        // plan — the backend keeps the SSE stream open, so waiting for it to
+        // close on its own is what causes the ~80s hang we're fixing.
         if (event.event === 'complete' || event.event === 'error') {
           result = event.data;
+          reasonRef.current = 'complete';
+          controller.abort();
+          break;
         }
       }
 
       if (!result) {
+        // No terminal event arrived AND the stream closed (or was aborted).
+        // If we got here via idle timeout, surface that explicitly.
+        if (reasonRef.current === 'idle-timeout') {
+          throw new Error(`Test run timed out: no SSE events for ${idleTimeoutSec}s`);
+        }
         throw new Error('No result received from test execution');
       }
 
       return result;
     } catch (error) {
+      // If we triggered the abort ourselves on a terminal event, the for-await
+      // loop may surface the abort as an AbortError after we've already
+      // captured `result`. Swallow it and return the captured result.
+      if (
+        reasonRef.current === 'complete' &&
+        error instanceof Error &&
+        error.name === 'AbortError' &&
+        result
+      ) {
+        return result;
+      }
+      // Idle-timeout: the abort came from our watchdog, not from a real
+      // network failure. Surface a typed message that tools (and humans)
+      // can grep for.
+      if (
+        reasonRef.current === 'idle-timeout' &&
+        error instanceof Error &&
+        error.name === 'AbortError'
+      ) {
+        throw new Error(`Test run timed out: no SSE events for ${idleTimeoutSec}s`);
+      }
       if (error instanceof Error) {
         throw error;
       }
       throw new Error('Unknown error running test');
+    } finally {
+      // Defensive teardown: abort is idempotent. Guarantees the socket is
+      // released even if the consumer above threw mid-iteration.
+      controller.abort();
+      clearIdleTimer();
+      if (callerSignal && callerAbortListener) {
+        callerSignal.removeEventListener('abort', callerAbortListener);
+      }
     }
   }
 
