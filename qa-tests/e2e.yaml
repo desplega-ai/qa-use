@@ -1,7 +1,7 @@
 name: E2E Smoke Test
 description: >
-  Navigates to the Table Demo page on evals.desplega.ai and verifies
-  that the table data is visible.
+  Navigates to the Table Demo page on evals.desplega.ai and verifies that the
+  table data is visible.
 variables:
   base_url: https://evals.desplega.ai
 steps:
@@ -9,3 +9,4 @@ steps:
     target: Table Demo
   - action: to_be_visible
     target: John Doe
+version_hash: 5455e478ff1b8c96fd840915cb9f5118b4b4509fcff8ccd3265010ffb7e4dd1d
