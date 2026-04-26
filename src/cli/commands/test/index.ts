@@ -3,6 +3,7 @@
  */
 
 import { Command } from 'commander';
+import { createCommand } from './create.js';
 import { diffCommand } from './diff.js';
 import { exportCommand } from './export.js';
 import { infoCommand } from './info.js';
@@ -23,6 +24,7 @@ testCommand.addCommand(infoCommand);
 testCommand.addCommand(runsCommand);
 testCommand.addCommand(validateCommand);
 testCommand.addCommand(initCommand);
+testCommand.addCommand(createCommand);
 testCommand.addCommand(exportCommand);
 testCommand.addCommand(syncCommand);
 testCommand.addCommand(diffCommand);

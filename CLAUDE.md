@@ -152,7 +152,7 @@ bun run scripts/e2e.ts --cmd qa-use     # use installed qa-use binary
 
 Requires `.qa-use.json` in the repo root (valid `api_key` + `api_url`) and the backend at `api_url` running. Test site: https://evals.desplega.ai/.
 
-**7 sections** — Browser Commands · Table Filtering · Test Runner (`qa-tests/e2e.yaml`) · API Subcommands · Suite CRUD · Test Runs · Resource Smoke Tests (issues, app-config, app-context, persona, data-asset, usage).
+**Sections** cover, broadly: browser CLI commands, table interaction patterns, the test runner against `qa-tests/e2e.yaml`, API subcommands, suite/test-run CRUD, resource smoke tests (issues, app-config, app-context, persona, data-asset, usage), tunnel/detach regression, the doctor reaper, and SSE-exit timing. Read the section banners at the top of each block in `scripts/e2e.ts` for the live list — the count and ordering shift over time.
 
 **Extending.** When adding a new browser command, add a step in Section 1. New interaction patterns (drag, select, check, etc.) — add a dedicated section or extend Section 2. Keep `qa-tests/e2e.yaml` simple — it tests the runner path, not complex scenarios. Assertions should check output content, not just exit codes.
 

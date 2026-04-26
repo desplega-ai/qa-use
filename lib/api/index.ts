@@ -338,10 +338,7 @@ export interface ImportedTest {
 export interface ImportResult {
   success: boolean;
   imported: ImportedTest[];
-  errors: Array<{
-    name: string;
-    error: string;
-  }>;
+  errors: ValidationError[];
 }
 
 // Re-export TestDefinition for convenience

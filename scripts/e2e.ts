@@ -784,6 +784,94 @@ await section('Section 14: SSE-exit-time', async () => {
 });
 
 // ---------------------------------------------------------------------------
+// Section 15: Test Sync / Validate / Schema / Create
+// ---------------------------------------------------------------------------
+//
+// Covers the agentic-use feedback bundle:
+//   - schema --summary emits a flat field list (no $defs/$ref, much smaller)
+//   - test create exists and accepts a single file
+//   - sync push --dry-run actually hits the API (not local-only enumeration)
+//   - validation errors render as "path: message" (never "undefined: undefined")
+
+await section('Section 15: Test Sync / Validate / Schema / Create', async () => {
+	// 1. schema --summary: flat list, no $defs/$ref, smaller than full
+	const summary = stripAnsi(runOrThrow(['test', 'schema', '--summary']));
+	const fullSchema = stripAnsi(runOrThrow(['test', 'schema']));
+	assert(/^name:\s/m.test(summary), 'schema --summary lists "name" field');
+	assert(/^steps:\s/m.test(summary), 'schema --summary lists "steps" field');
+	assert(!summary.includes('$defs'), 'schema --summary has no $defs');
+	assert(!summary.includes('$ref'), 'schema --summary has no $ref');
+	assert(!summary.includes('{'), 'schema --summary contains no JSON braces');
+	assert(
+		summary.length < fullSchema.length / 5,
+		`schema --summary is ≥5× smaller than full (summary=${summary.length}B, full=${fullSchema.length}B)`,
+	);
+
+	// 2. test create is registered with expected shape
+	const testHelp = stripAnsi(runOrThrow(['test', '--help']));
+	assert(/\bcreate\b/.test(testHelp), 'test --help lists `create` subcommand');
+
+	const createHelp = stripAnsi(runOrThrow(['test', 'create', '--help']));
+	assert(createHelp.includes('<file>'), 'test create --help shows <file> argument');
+	assert(createHelp.includes('--dry-run'), 'test create --help has --dry-run');
+	assert(createHelp.includes('--force'), 'test create --help has --force');
+
+	// 3. sync push --dry-run goes through the API (no longer local-only enumeration).
+	//    Either succeeds with "Would <action>:" lines, or fails with formatted errors.
+	//    Critical assertion: never "undefined: undefined".
+	const dryPushRes = run(['test', 'sync', 'push', '--all', '--dry-run']);
+	const dryPushOut = stripAnsi(`${dryPushRes.stdout}\n${dryPushRes.stderr}`);
+	assert(
+		!dryPushOut.includes('undefined: undefined'),
+		'sync push --dry-run output never contains "undefined: undefined"',
+	);
+	if (dryPushRes.exitCode === 0) {
+		assert(
+			/Would (create|update|leave unchanged|conflict on|skip):/.test(dryPushOut),
+			'sync push --dry-run rendered "Would <verb>: ..." (API path was used)',
+		);
+	} else {
+		// API rejected the local fixture — fine; just verify we surfaced a real error
+		assert(
+			/failed/i.test(dryPushOut),
+			'sync push --dry-run failure surfaces "failed" with formatted errors',
+		);
+	}
+
+	// 4. test create on a definitively-broken YAML: API rejects, error is formatted (not undefined)
+	const brokenPath = '/tmp/qa-use-e2e-broken.yaml';
+	// Missing required `name` and `steps` → /cli/import will reject with ValidationError objects
+	writeFileSync(brokenPath, 'description: e2e broken fixture\n');
+	try {
+		const createRes = run(['test', 'create', brokenPath, '--dry-run']);
+		const createOut = stripAnsi(`${createRes.stdout}\n${createRes.stderr}`);
+		assert(createRes.exitCode !== 0, 'test create on broken YAML exits non-zero');
+		assert(
+			!createOut.includes('undefined: undefined'),
+			'broken YAML error never shows "undefined: undefined" (Item 1 fix)',
+		);
+		assert(/failed/i.test(createOut), 'broken YAML output contains "failed"');
+	} finally {
+		if (existsSync(brokenPath)) unlinkSync(brokenPath);
+	}
+
+	// 5. test validate on the same broken YAML: same formatted-error guarantee
+	const brokenValidatePath = '/tmp/qa-use-e2e-broken-validate.yaml';
+	writeFileSync(brokenValidatePath, 'description: e2e broken validate fixture\n');
+	try {
+		const validateRes = run(['test', 'validate', brokenValidatePath]);
+		const validateOut = stripAnsi(`${validateRes.stdout}\n${validateRes.stderr}`);
+		assert(validateRes.exitCode !== 0, 'test validate on broken YAML exits non-zero');
+		assert(
+			!validateOut.includes('undefined: undefined'),
+			'validate output never shows "undefined: undefined"',
+		);
+	} finally {
+		if (existsSync(brokenValidatePath)) unlinkSync(brokenValidatePath);
+	}
+});
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 

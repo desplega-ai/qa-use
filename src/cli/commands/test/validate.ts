@@ -35,6 +35,20 @@ export const validateCommand = new Command('validate')
       const validation = await client.validateTestDefinition(definitions);
 
       if (validation.valid) {
+        // Belt-and-suspenders: catch errors only the import path enforces today
+        // (e.g. missing app_config binding). Server-side `/cli/validate` is more
+        // permissive than `/cli/import`; remove this once the backend closes the gap.
+        const dryImport = await client.importTestDefinition(definitions, {
+          upsert: true,
+          dry_run: true,
+        });
+        if (!dryImport.success) {
+          console.log(error('Validation failed (import dry-run)\n'));
+          console.log(`Errors (${dryImport.errors.length}):`);
+          printValidationErrors(dryImport.errors);
+          process.exit(1);
+        }
+
         console.log(success('Validation passed\n'));
 
         if (validation.resolved) {

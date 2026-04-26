@@ -6,6 +6,49 @@ import { Command } from 'commander';
 import { createApiClient, loadConfig } from '../../lib/config.js';
 import { error, formatError, info } from '../../lib/output.js';
 
+type SchemaNode = Record<string, unknown>;
+
+function formatType(prop: SchemaNode): string {
+  if (prop.type === 'array') {
+    const items = (prop.items ?? {}) as SchemaNode;
+    const inner = formatType(items);
+    return inner.includes(' | ') ? `(${inner})[]` : `${inner}[]`;
+  }
+  if (typeof prop.$ref === 'string') {
+    return prop.$ref.split('/').pop() ?? 'object';
+  }
+  const union = (prop.oneOf ?? prop.anyOf) as SchemaNode[] | undefined;
+  if (Array.isArray(union)) {
+    return union.map((u) => formatType(u)).join(' | ');
+  }
+  if (typeof prop.type === 'string') return prop.type;
+  return 'unknown';
+}
+
+function firstSentence(desc: unknown): string {
+  if (typeof desc !== 'string') return '';
+  const trimmed = desc.trim();
+  const dot = trimmed.indexOf('. ');
+  const newline = trimmed.indexOf('\n');
+  const cuts = [dot >= 0 ? dot + 1 : -1, newline].filter((n) => n >= 0);
+  if (cuts.length === 0) return trimmed;
+  return trimmed.slice(0, Math.min(...cuts)).trim();
+}
+
+function printSummary(node: SchemaNode): boolean {
+  const properties = node.properties as Record<string, SchemaNode> | undefined;
+  if (!properties || typeof properties !== 'object') return false;
+  const required = new Set((node.required as string[] | undefined) ?? []);
+  for (const [name, prop] of Object.entries(properties)) {
+    const type = formatType(prop);
+    const req = required.has(name) ? ' (required)' : '';
+    const desc = firstSentence(prop.description);
+    const descPart = desc ? ` — ${desc}` : '';
+    console.log(`${name}: ${type}${req}${descPart}`);
+  }
+  return true;
+}
+
 export const schemaCommand = new Command('schema')
   .description('View test definition schema')
   .argument(
@@ -17,12 +60,14 @@ export const schemaCommand = new Command('schema')
     `
 Examples:
   qa-use test schema                     # Full schema
+  qa-use test schema --summary           # Flat field list (LLM-friendly, no $defs)
   qa-use test schema SimpleStep          # SimpleStep definition
   qa-use test schema SimpleStep.action   # Valid simple actions
   qa-use test schema --raw | jq '.properties.steps'  # Use jq for advanced queries
 `
   )
   .option('--raw', 'Output raw JSON without formatting')
+  .option('--summary', 'Print a flat field list (no JSON Schema, no $defs/$ref)')
   .action(async (schemaPath, options) => {
     try {
       const config = await loadConfig();
@@ -66,6 +111,16 @@ Examples:
       }
 
       // Output
+      if (options.summary) {
+        if (output && typeof output === 'object' && printSummary(output as SchemaNode)) {
+          return;
+        }
+        console.log(
+          error('--summary requires an object with `properties` (root schema, or a $defs entry)')
+        );
+        process.exit(1);
+      }
+
       if (options.raw) {
         console.log(JSON.stringify(output));
       } else {

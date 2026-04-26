@@ -11,7 +11,14 @@ import type { TestDefinition } from '../../../types/test-definition.js';
 import { toSafeFilename } from '../../../utils/strings.js';
 import { createApiClient, loadConfig } from '../../lib/config.js';
 import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
-import { error, formatError, info, success, warning } from '../../lib/output.js';
+import {
+  error,
+  formatError,
+  info,
+  printValidationErrors,
+  success,
+  warning,
+} from '../../lib/output.js';
 
 // Parent command
 export const syncCommand = new Command('sync').description('Sync local tests with cloud');
@@ -292,6 +299,30 @@ interface PushOptions {
 }
 
 /**
+ * Present-tense verb for dry-run "Would <verb>: <name>" lines.
+ *
+ * `ImportedTest.action` values are past tense (created, updated…) because
+ * they describe what the API would do; for the planning sentence we want the
+ * imperative form so it reads grammatically.
+ */
+export function planVerb(action: string): string {
+  switch (action) {
+    case 'created':
+      return 'create';
+    case 'updated':
+      return 'update';
+    case 'unchanged':
+      return 'leave unchanged';
+    case 'conflict':
+      return 'conflict on';
+    case 'skipped':
+      return 'skip';
+    default:
+      return action;
+  }
+}
+
+/**
  * Push local tests to cloud
  */
 async function pushToCloud(
@@ -342,12 +373,22 @@ async function pushToCloud(
   }
 
   if (dryRun) {
-    console.log(info('Dry run - would push:'));
-    for (const { file, def } of toImport) {
-      console.log(`  ${def.name || path.basename(file)}`);
+    console.log(info('Dry run - validating with cloud (no changes will be persisted)...\n'));
+    const dryResult = await client.importTestDefinition(
+      toImport.map((d) => d.def),
+      { upsert: true, force, dry_run: true }
+    );
+    if (dryResult.success) {
+      for (const imported of dryResult.imported) {
+        console.log(info(`  Would ${planVerb(imported.action)}: ${imported.name}`));
+      }
+      console.log('');
+      console.log(info(`Would import ${dryResult.imported.length} test(s)`));
+    } else {
+      console.log(error('Dry run failed'));
+      printValidationErrors(dryResult.errors);
+      process.exit(1);
     }
-    console.log('');
-    console.log(info(`Would import ${toImport.length} test(s)`));
     return;
   }
 
@@ -359,77 +400,85 @@ async function pushToCloud(
     { upsert: true, force }
   );
 
-  if (result.success) {
-    const conflictFiles: string[] = [];
+  await renderImportResult(result, toImport, testDir);
+}
 
-    for (const imported of result.imported) {
-      switch (imported.action) {
-        case 'created':
-          console.log(success(`  Created: ${imported.name} (${imported.id})`));
-          break;
-        case 'updated':
-          console.log(success(`  Updated: ${imported.name} (${imported.id})`));
-          break;
-        case 'unchanged':
-          console.log(info(`  Unchanged: ${imported.name}`));
-          break;
-        case 'conflict': {
-          console.log(warning(`  CONFLICT: ${imported.name} - ${imported.message}`));
-          // Find the local file for this conflict
-          const localDef = toImport.find(
-            (d) => d.def.id === imported.id || d.def.name === imported.name
-          );
-          if (localDef) {
-            // Strip extension for cleaner command suggestion
-            const relPath = path.relative(testDir, localDef.file);
-            const nameWithoutExt = relPath.replace(/\.(yaml|yml|json)$/, '');
-            conflictFiles.push(nameWithoutExt);
-          }
-          break;
-        }
-        case 'skipped':
-          console.log(info(`  Skipped: ${imported.name}`));
-          break;
-      }
-    }
+/**
+ * Render the result of an importTestDefinition call: print per-test action
+ * summary, refresh local version_hash, and surface conflicts/errors.
+ *
+ * Shared between `qa-use test sync push` and `qa-use test create`.
+ */
+export async function renderImportResult(
+  result: import('../../../../lib/api/index.js').ImportResult,
+  toImport: Array<{ file: string; def: TestDefinition }>,
+  testDir: string
+): Promise<void> {
+  if (!result.success) {
+    console.log(error('Import failed'));
+    printValidationErrors(result.errors);
+    return;
+  }
 
-    // Update local files with new version_hash after successful push
-    for (const imported of result.imported) {
-      if (
-        imported.version_hash &&
-        (imported.action === 'created' || imported.action === 'updated')
-      ) {
+  const conflictFiles: string[] = [];
+
+  for (const imported of result.imported) {
+    switch (imported.action) {
+      case 'created':
+        console.log(success(`  Created: ${imported.name} (${imported.id})`));
+        break;
+      case 'updated':
+        console.log(success(`  Updated: ${imported.name} (${imported.id})`));
+        break;
+      case 'unchanged':
+        console.log(info(`  Unchanged: ${imported.name}`));
+        break;
+      case 'conflict': {
+        console.log(warning(`  CONFLICT: ${imported.name} - ${imported.message}`));
         const localDef = toImport.find(
           (d) => d.def.id === imported.id || d.def.name === imported.name
         );
         if (localDef) {
-          try {
-            await updateLocalVersionHash(localDef.file, imported.version_hash);
-          } catch (err) {
-            console.log(
-              warning(`  Failed to update version_hash in ${localDef.file}: ${formatError(err)}`)
-            );
-          }
+          const relPath = path.relative(testDir, localDef.file);
+          const nameWithoutExt = relPath.replace(/\.(yaml|yml|json)$/, '');
+          conflictFiles.push(nameWithoutExt);
+        }
+        break;
+      }
+      case 'skipped':
+        console.log(info(`  Skipped: ${imported.name}`));
+        break;
+    }
+  }
+
+  // Update local files with new version_hash after successful push
+  for (const imported of result.imported) {
+    if (imported.version_hash && (imported.action === 'created' || imported.action === 'updated')) {
+      const localDef = toImport.find(
+        (d) => d.def.id === imported.id || d.def.name === imported.name
+      );
+      if (localDef) {
+        try {
+          await updateLocalVersionHash(localDef.file, imported.version_hash);
+        } catch (err) {
+          console.log(
+            warning(`  Failed to update version_hash in ${localDef.file}: ${formatError(err)}`)
+          );
         }
       }
     }
-
-    console.log('');
-
-    if (conflictFiles.length > 0) {
-      console.log(warning('Conflicts detected. To see differences, run:'));
-      for (const file of conflictFiles) {
-        console.log(`  qa-use test diff ${file}`);
-      }
-      console.log('');
-      console.log(info('Then use --force to overwrite, or pull to get latest versions.'));
-    }
-
-    console.log(success(`Pushed ${result.imported.length} test(s)`));
-  } else {
-    console.log(error('Import failed'));
-    for (const err of result.errors) {
-      console.log(error(`  ${err.name}: ${err.error}`));
-    }
   }
+
+  console.log('');
+
+  if (conflictFiles.length > 0) {
+    console.log(warning('Conflicts detected. To see differences, run:'));
+    for (const file of conflictFiles) {
+      console.log(`  qa-use test diff ${file}`);
+    }
+    console.log('');
+    console.log(info('Then use --force to overwrite, or pull to get latest versions.'));
+  }
+
+  console.log(success(`Pushed ${result.imported.length} test(s)`));
 }
