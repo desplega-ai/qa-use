@@ -11,6 +11,7 @@ import { createApiClient, loadConfig } from '../../lib/config.js';
 import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
 import { error, formatError, info } from '../../lib/output.js';
 import { formatStatus, formatTimestamp } from '../../lib/table.js';
+import { maskValue } from '../../lib/test-vars.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -69,7 +70,10 @@ function displayMatrixSummary(matrix: MatrixDefinition | null | undefined): void
     const idLabel = renderId(opt).padEnd(labelWidth);
     const pairs = (opt.var_options ?? []).map((vo) => {
       const k = vo.key ?? '?';
-      const v = vo.is_sensitive ? '****' : String(vo.value ?? '');
+      const v = maskValue({
+        value: vo.value,
+        is_sensitive: vo.is_sensitive,
+      });
       return `${k}=${v}`;
     });
     const pairsStr =
@@ -118,13 +122,7 @@ function displayTestInfo(test: TestDefinition, source: string): void {
   if (test.variables && Object.keys(test.variables).length > 0) {
     console.log('  Variables:');
     for (const [key, value] of Object.entries(test.variables)) {
-      let raw: string;
-      if (value && typeof value === 'object') {
-        const v = value as { value?: string | number; is_sensitive?: boolean };
-        raw = v.is_sensitive ? '****' : String(v.value ?? '');
-      } else {
-        raw = String(value ?? '');
-      }
+      const raw = maskValue(value);
       const displayValue = raw.length > 50 ? `${raw.substring(0, 47)}...` : raw;
       console.log(`    ${key}: ${colors.gray}${displayValue}${colors.reset}`);
     }
@@ -203,13 +201,7 @@ function displayCloudTestInfo(data: Record<string, unknown>): void {
     if (keys.length > 0) {
       console.log('  Variables:');
       for (const [key, value] of Object.entries(vars)) {
-        let raw: string;
-        if (value && typeof value === 'object') {
-          const v = value as { value?: string | number; is_sensitive?: boolean };
-          raw = v.is_sensitive ? '****' : String(v.value ?? '');
-        } else {
-          raw = String(value ?? '');
-        }
+        const raw = maskValue(value as Parameters<typeof maskValue>[0]);
         const displayValue = raw.length > 50 ? `${raw.substring(0, 47)}...` : raw;
         console.log(`    ${key}: ${colors.gray}${displayValue}${colors.reset}`);
       }
