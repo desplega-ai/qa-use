@@ -13,7 +13,12 @@ import * as yaml from 'yaml';
 import type { TestDefinition } from '../../../../types/test-definition.js';
 import { createApiClient, loadConfig } from '../../../lib/config.js';
 import { error, formatError, info, success } from '../../../lib/output.js';
-import { readVarsFromYamlFile, resolveVarsTarget, writeYamlFile } from '../../../lib/test-vars.js';
+import {
+  readVarsFromYamlFile,
+  resolveVarsTarget,
+  verifyUnsetMutation,
+  writeYamlFile,
+} from '../../../lib/test-vars.js';
 
 interface UnsetOptions {
   key?: string;
@@ -77,6 +82,29 @@ export const unsetCommand = new Command('unset')
       const result = await client.importTestDefinition([def]);
       if (result?.success === false) {
         fail(`import failed: ${JSON.stringify(result)}`);
+      }
+      const action = result?.imported?.[0]?.action;
+      if (action === 'conflict') {
+        const message = result?.imported?.[0]?.message;
+        fail(
+          `import returned conflict for test ${target.uuid}${
+            message ? `: ${message}` : ''
+          } — variable '${key}' was not removed`
+        );
+      }
+
+      // Re-export and verify the deletion took effect — see set.ts for why
+      // `ImportResult.success === true` is not a strong enough signal.
+      const reExportText = await client.exportTest(target.uuid, 'yaml', false);
+      const reExportDef =
+        (yaml.parse(reExportText) as TestDefinition | null) ?? ({} as TestDefinition);
+      const verifyError = verifyUnsetMutation(reExportDef.variables ?? {}, key);
+      if (verifyError !== null) {
+        fail(
+          `post-import verification failed: ${verifyError}${
+            action ? ` (import action: ${action})` : ''
+          }`
+        );
       }
       console.log(success(`Unset variable '${key}' on test ${target.uuid}`));
     } catch (err) {

@@ -110,6 +110,58 @@ export function maskValue(value: string | number | VariableEntry): string {
 }
 
 // ---------------------------------------------------------------------------
+// Post-import sanity checks (remote --id path)
+// ---------------------------------------------------------------------------
+
+/**
+ * Verify a `set` mutation actually stuck after `importTestDefinition`.
+ * `ImportResult.success` can be `true` while the per-test `action` is
+ * `conflict`/`unchanged`, so the only reliable signal is to re-export and
+ * compare against the entry we sent in the import payload.
+ *
+ * Returns `null` on match; otherwise a short reason describing the divergence.
+ * Only fields that were explicitly set on `expected` are compared — so a
+ * simple-form mutation tolerates the server normalizing to full form with
+ * extra defaults.
+ */
+export function verifySetMutation(
+  vars: Variables,
+  key: string,
+  expected: string | number | VariableEntry
+): string | null {
+  const actual = vars[key];
+  if (actual === undefined) {
+    return `variable '${key}' missing from post-import re-export`;
+  }
+  const expectedNorm = getNormalizedEntry(expected);
+  const actualNorm = getNormalizedEntry(actual);
+
+  const fields: (keyof VariableEntry)[] = ['value', 'type', 'lifetime', 'context', 'is_sensitive'];
+  for (const field of fields) {
+    const expVal = expectedNorm[field];
+    if (expVal === undefined) continue;
+    const actVal = actualNorm[field];
+    if (actVal !== expVal) {
+      return `field '${field}' on '${key}' diverged after import: expected ${JSON.stringify(
+        expVal
+      )}, got ${JSON.stringify(actVal)}`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Verify an `unset` mutation actually stuck — the key must be absent from the
+ * post-import re-export.
+ */
+export function verifyUnsetMutation(vars: Variables, key: string): string | null {
+  if (key in vars) {
+    return `variable '${key}' still present after unset`;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // YAML file IO
 // ---------------------------------------------------------------------------
 

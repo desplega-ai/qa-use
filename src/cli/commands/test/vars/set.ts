@@ -42,6 +42,7 @@ import {
   TEST_VARIABLE_CONTEXTS,
   TEST_VARIABLE_LIFETIMES,
   TEST_VARIABLE_TYPES,
+  verifySetMutation,
   writeYamlFile,
 } from '../../../lib/test-vars.js';
 
@@ -270,9 +271,38 @@ export const setCommand = new Command('set')
       const yamlText = await client.exportTest(target.uuid, 'yaml', false);
       const def = (yaml.parse(yamlText) as TestDefinition | null) ?? ({} as TestDefinition);
       def.variables = applyMutationToObject(def.variables ?? {}, options);
+      const expectedEntry = def.variables[options.key as string];
       const result = await client.importTestDefinition([def]);
       if (result?.success === false) {
         fail(`import failed: ${JSON.stringify(result)}`);
+      }
+      const action = result?.imported?.[0]?.action;
+      if (action === 'conflict') {
+        const message = result?.imported?.[0]?.message;
+        fail(
+          `import returned conflict for test ${target.uuid}${
+            message ? `: ${message}` : ''
+          } — variable '${options.key}' was not updated`
+        );
+      }
+
+      // Re-export and verify the mutation took effect. `ImportResult.success`
+      // can be `true` while `action` is `unchanged`/`conflict`, so a green
+      // import response is not enough — we must observe the change server-side.
+      const reExportText = await client.exportTest(target.uuid, 'yaml', false);
+      const reExportDef =
+        (yaml.parse(reExportText) as TestDefinition | null) ?? ({} as TestDefinition);
+      const verifyError = verifySetMutation(
+        reExportDef.variables ?? {},
+        options.key as string,
+        expectedEntry
+      );
+      if (verifyError !== null) {
+        fail(
+          `post-import verification failed: ${verifyError}${
+            action ? ` (import action: ${action})` : ''
+          }`
+        );
       }
       console.log(success(`Set variable '${options.key}' on test ${target.uuid}`));
     } catch (err) {

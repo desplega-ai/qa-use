@@ -9,6 +9,8 @@ import {
   TEST_VARIABLE_CONTEXTS,
   TEST_VARIABLE_LIFETIMES,
   TEST_VARIABLE_TYPES,
+  verifySetMutation,
+  verifyUnsetMutation,
 } from './test-vars.js';
 
 describe('getNormalizedEntry', () => {
@@ -67,6 +69,67 @@ describe('readVarsFromYamlFile', () => {
     expect(vars.foo).toBe('bar');
     expect(typeof vars.url).toBe('object');
     expect((vars.url as { value: string }).value).toBe('https://x');
+  });
+});
+
+describe('verifySetMutation', () => {
+  it('returns null when simple-form value matches', () => {
+    expect(verifySetMutation({ foo: 'bar' }, 'foo', 'bar')).toBeNull();
+  });
+
+  it('flags missing key', () => {
+    const err = verifySetMutation({}, 'foo', 'bar');
+    expect(err).toMatch(/missing/i);
+    expect(err).toContain("'foo'");
+  });
+
+  it('flags value mismatch', () => {
+    const err = verifySetMutation({ foo: 'wrong' }, 'foo', 'bar');
+    expect(err).toMatch(/diverged/i);
+    expect(err).toContain("'value'");
+  });
+
+  it('tolerates server normalizing simple form to full form (extra fields ok)', () => {
+    const actual = {
+      foo: { value: 'bar', type: 'custom' as const, is_sensitive: false },
+    };
+    expect(verifySetMutation(actual, 'foo', 'bar')).toBeNull();
+  });
+
+  it('asserts requested type/lifetime/context/is_sensitive on full form', () => {
+    const expected = {
+      value: 'https://x',
+      type: 'url' as const,
+      lifetime: 'test' as const,
+      context: 'test' as const,
+      is_sensitive: false,
+    };
+    const matching = { site: { ...expected } };
+    expect(verifySetMutation(matching, 'site', expected)).toBeNull();
+
+    const wrongType = { site: { ...expected, type: 'custom' as const } };
+    const err = verifySetMutation(wrongType, 'site', expected);
+    expect(err).toContain("'type'");
+  });
+
+  it('flags is_sensitive divergence (false-positive guard)', () => {
+    const expected = { value: 'hunter2', is_sensitive: true };
+    const actual = { password: { value: 'hunter2', is_sensitive: false } };
+    const err = verifySetMutation(actual, 'password', expected);
+    expect(err).toContain("'is_sensitive'");
+  });
+});
+
+describe('verifyUnsetMutation', () => {
+  it('returns null when key is absent', () => {
+    expect(verifyUnsetMutation({}, 'gone')).toBeNull();
+    expect(verifyUnsetMutation({ other: 'x' }, 'gone')).toBeNull();
+  });
+
+  it('flags key still present (catches conflict/unchanged false-positive)', () => {
+    const err = verifyUnsetMutation({ stuck: 'value' }, 'stuck');
+    expect(err).toMatch(/still present/i);
+    expect(err).toContain("'stuck'");
   });
 });
 
