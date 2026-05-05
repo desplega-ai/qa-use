@@ -203,7 +203,46 @@ qa-use test runs --status failed
 \`\`\`
 (Convenience shortcut for common test execution)
 
-### 4. Test Sync Lifecycle
+### 4. Test Variables (Imperative Edit)
+
+Quick \`set\`/\`unset\` for the typed \`variables:\` block on a single test —
+useful when you don't want to round-trip the full YAML.
+
+**CLI Workflow:**
+\`\`\`bash
+# Local YAML file — Document API preserves comments + key order
+qa-use test vars list  qa-tests/login.yaml
+qa-use test vars list  qa-tests/login.yaml --json
+qa-use test vars set   qa-tests/login.yaml --key user --value alice
+qa-use test vars set   qa-tests/login.yaml --key url --value https://x \\
+                                          --type url --lifetime all
+qa-use test vars set   qa-tests/login.yaml --key password --value hunter2 --sensitive
+qa-use test vars set   qa-tests/login.yaml --key password --sensitive  # preserves stored value
+qa-use test vars unset qa-tests/login.yaml --key user
+
+# Remote --id fallback — exports YAML, mutates, re-imports (best-effort RMW)
+qa-use test vars list  --id <uuid>
+qa-use test vars set   --id <uuid> --key user --value alice
+qa-use test vars unset --id <uuid> --key user
+\`\`\`
+
+**Rules:**
+
+- **Mutual exclusion**: pass either \`<file>\` *or* \`--id\`, not both. Neither → exit 1.
+- **\`--id\` requires a full UUID** (use \`qa-use test list --query <name>\` to find one).
+- **Form upgrade**: passing only \`--key\`/\`--value\` writes simple form (\`key: value\`).
+  Any of \`--type\`/\`--lifetime\`/\`--context\`/\`--sensitive\` upgrades to full form
+  (\`{ value, type, lifetime, context, is_sensitive }\`).
+- **Sensitive-preserve**: on an existing sensitive var, \`--sensitive\` *without*
+  \`--value\` keeps the stored value. On a new key, that combination errors out.
+- **\`--json\` redaction**: sensitive entries omit the \`value\` key entirely; the
+  \`is_sensitive: true\` flag is the redaction signal.
+- **Remote round-trip caveat**: comment/key-order preservation only applies to
+  the local-file path. The server normalizes formatting on import.
+
+**No Plugin Shortcut** - Use CLI commands directly.
+
+### 5. Test Sync Lifecycle
 
 **CLI Workflow:**
 \`\`\`bash
@@ -2118,6 +2157,41 @@ Variables can be overridden at runtime:
 \`\`\`bash
 qa-use test run my-test --var email=other@example.com
 \`\`\`
+
+### Typed variables (full form)
+
+When a variable needs a non-default \`type\`, \`lifetime\`, \`context\`, or the
+sensitive flag, write the full-form entry:
+
+\`\`\`yaml
+variables:
+  url:
+    value: https://example.com
+    type: url
+    lifetime: all
+    context: test
+  password:
+    value: hunter2
+    type: password
+    is_sensitive: true
+\`\`\`
+
+### Imperative edits via the CLI
+
+For one-key changes, prefer \`qa-use test vars\` over hand-editing the YAML:
+
+\`\`\`bash
+qa-use test vars list  qa-tests/foo.yaml                     # tabular, sensitive masked
+qa-use test vars set   qa-tests/foo.yaml --key key --value v
+qa-use test vars set   qa-tests/foo.yaml --key url --value https://x --type url
+qa-use test vars unset qa-tests/foo.yaml --key key
+
+qa-use test vars list  --id <uuid>                           # remote: export → list
+qa-use test vars set   --id <uuid> --key key --value v       # remote: RMW via export+import
+\`\`\`
+
+The local path uses yaml's Document API, so comments and key ordering survive
+the rewrite. Pass \`<file>\` *or* \`--id\`, never both. \`--id\` requires a full UUID.
 
 ## Dependencies
 

@@ -10,7 +10,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
@@ -868,6 +868,169 @@ await section('Section 15: Test Sync / Validate / Schema / Create', async () => 
 		);
 	} finally {
 		if (existsSync(brokenValidatePath)) unlinkSync(brokenValidatePath);
+	}
+});
+
+// ---------------------------------------------------------------------------
+// Section 16: Test Vars (imperative CLI)
+// ---------------------------------------------------------------------------
+//
+// Covers the DES-163 `qa-use test vars list | set | unset` surface:
+//   - local-file CRUD (simple → full form upgrade, sensitive-preserve, unset
+//     of last key removes the variables: block, comment preservation)
+//   - --json shape: sensitive entries omit the value key entirely
+//   - mutual-exclusion between <file> and --id
+//   - validation: bogus --type, --sensitive without --value on a new key,
+//     partial UUID via --id
+
+await section('Section 16: Test Vars (imperative CLI)', () => {
+	const fixture = '/tmp/qa-use-e2e-vars.yaml';
+	writeFileSync(
+		fixture,
+		[
+			'name: e2e-vars',
+			'steps: []',
+			'variables:',
+			'  # comment that must survive',
+			'  foo: bar',
+			'  pwd:',
+			'    value: hunter2',
+			'    type: password',
+			'    is_sensitive: true',
+			'',
+		].join('\n'),
+	);
+	try {
+		// 1. list — table contains expected keys, sensitive masked
+		const listOut = stripAnsi(runOrThrow(['test', 'vars', 'list', fixture]));
+		assert(/\bfoo\b/.test(listOut), 'list shows the foo key');
+		assert(/\bpwd\b/.test(listOut), 'list shows the pwd key');
+		assert(listOut.includes('****'), 'list masks the sensitive pwd value');
+		assert(!listOut.includes('hunter2'), 'list never leaks the sensitive value');
+
+		// 2. list --json — sensitive entries omit `value`
+		const jsonOut = runOrThrow(['test', 'vars', 'list', fixture, '--json']);
+		const parsed = JSON.parse(jsonOut) as Array<Record<string, unknown>>;
+		const pwd = parsed.find((r) => r.key === 'pwd');
+		const foo = parsed.find((r) => r.key === 'foo');
+		assert(pwd !== undefined && pwd.is_sensitive === true, 'json: pwd is_sensitive=true');
+		assert(pwd !== undefined && !('value' in pwd), 'json: sensitive entry omits value');
+		assert(foo !== undefined && foo.value === 'bar', 'json: non-sensitive entry carries value');
+
+		// 3. set simple form
+		runOrThrow(['test', 'vars', 'set', fixture, '--key', 'simple', '--value', 'ok']);
+		assert(
+			readFileSync(fixture, 'utf-8').match(/^\s+simple: ok$/m) !== null,
+			'set simple form writes `simple: ok`',
+		);
+
+		// 4. set full form via --type, comments survive
+		runOrThrow([
+			'test',
+			'vars',
+			'set',
+			fixture,
+			'--key',
+			'site',
+			'--value',
+			'https://x',
+			'--type',
+			'url',
+		]);
+		const afterFull = readFileSync(fixture, 'utf-8');
+		assert(/site:\s*\n\s+value: https:\/\/x/.test(afterFull), 'set full form writes site.value');
+		assert(/type: url/.test(afterFull), 'set full form writes site.type');
+		assert(afterFull.includes('# comment that must survive'), 'comments survive set');
+
+		// 5. sensitive-preserve: re-bumping pwd with --sensitive (no --value) keeps the stored value
+		runOrThrow(['test', 'vars', 'set', fixture, '--key', 'pwd', '--sensitive']);
+		assert(
+			readFileSync(fixture, 'utf-8').includes('value: hunter2'),
+			'sensitive-preserve keeps stored value',
+		);
+
+		// 6. validation: bogus --type
+		const badType = run([
+			'test',
+			'vars',
+			'set',
+			fixture,
+			'--key',
+			'x',
+			'--type',
+			'bogus',
+			'--value',
+			'y',
+		]);
+		assert(badType.exitCode !== 0, 'set --type bogus exits non-zero');
+		assert(
+			stripAnsi(`${badType.stdout}${badType.stderr}`).includes('--type'),
+			'bogus --type names the offending flag',
+		);
+
+		// 7. mutual exclusion: file + --id
+		const both = run([
+			'test',
+			'vars',
+			'set',
+			fixture,
+			'--id',
+			'12345678-1234-1234-1234-123456789abc',
+			'--key',
+			'x',
+			'--value',
+			'y',
+		]);
+		assert(both.exitCode !== 0, 'file + --id exits non-zero');
+		assert(
+			/both/i.test(stripAnsi(`${both.stdout}${both.stderr}`)),
+			'mutual-exclusion error mentions "both"',
+		);
+
+		// 8. neither file nor --id
+		const neither = run(['test', 'vars', 'set', '--key', 'x', '--value', 'y']);
+		assert(neither.exitCode !== 0, 'neither file nor --id exits non-zero');
+
+		// 9. partial UUID rejected
+		const partial = run([
+			'test',
+			'vars',
+			'set',
+			'--id',
+			'deadbeef',
+			'--key',
+			'x',
+			'--value',
+			'y',
+		]);
+		assert(partial.exitCode !== 0, 'partial UUID exits non-zero');
+		assert(
+			/UUID/i.test(stripAnsi(`${partial.stdout}${partial.stderr}`)),
+			'partial UUID error mentions UUID',
+		);
+
+		// 10. --sensitive without --value on a NEW key fails
+		const sensNew = run([
+			'test',
+			'vars',
+			'set',
+			fixture,
+			'--key',
+			'brand-new',
+			'--sensitive',
+		]);
+		assert(sensNew.exitCode !== 0, 'sensitive-without-value on new key exits non-zero');
+
+		// 11. unset removes the key; absent key is a no-op
+		runOrThrow(['test', 'vars', 'unset', fixture, '--key', 'simple']);
+		assert(
+			!/^\s+simple:/m.test(readFileSync(fixture, 'utf-8')),
+			'unset removes the key',
+		);
+		const absent = run(['test', 'vars', 'unset', fixture, '--key', 'gone']);
+		assert(absent.exitCode === 0, 'unset on absent key exits 0');
+	} finally {
+		if (existsSync(fixture)) unlinkSync(fixture);
 	}
 });
 
