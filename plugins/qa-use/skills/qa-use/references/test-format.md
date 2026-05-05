@@ -64,6 +64,41 @@ Variables can be overridden at runtime:
 qa-use test run my-test --var email=other@example.com
 ```
 
+### Typed variables (full form)
+
+When a variable needs a non-default `type`, `lifetime`, `context`, or the
+sensitive flag, write the full-form entry:
+
+```yaml
+variables:
+  url:
+    value: https://example.com
+    type: url
+    lifetime: all
+    context: test
+  password:
+    value: hunter2
+    type: password
+    is_sensitive: true
+```
+
+### Imperative edits via the CLI
+
+For one-key changes, prefer `qa-use test vars` over hand-editing the YAML:
+
+```bash
+qa-use test vars list  qa-tests/foo.yaml                     # tabular, sensitive masked
+qa-use test vars set   qa-tests/foo.yaml --key key --value v
+qa-use test vars set   qa-tests/foo.yaml --key url --value https://x --type url
+qa-use test vars unset qa-tests/foo.yaml --key key
+
+qa-use test vars list  --id <uuid>                           # remote: export → list
+qa-use test vars set   --id <uuid> --key key --value v       # remote: RMW via export+import
+```
+
+The local path uses yaml's Document API, so comments and key ordering survive
+the rewrite. Pass `<file>` *or* `--id`, never both. `--id` requires a full UUID.
+
 ## Dependencies
 
 Run prerequisite tests first:

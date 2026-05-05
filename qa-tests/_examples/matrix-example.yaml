@@ -1,0 +1,33 @@
+# Example fixture for the `qa-use test vars` subgroup walkthroughs.
+# Demonstrates simple-form, full-form, and sensitive variables, plus a
+# minimal matrix block with `var_options`.
+name: vars-fixture
+description: >
+  Minimal fixture used by `qa-use test vars` QA walkthroughs.
+  Not a real test — never executed against a backend.
+variables:
+  # Simple form: string value
+  foo: bar
+  # Full form: typed URL variable
+  url:
+    value: https://example.com
+    type: url
+    lifetime: all
+    context: test
+  # Sensitive: value should never leak through `vars list`/`list --json`
+  password:
+    value: hunter2
+    type: password
+    is_sensitive: true
+matrix:
+  options:
+    - is_default: true
+    - var_options:
+        - key: foo
+          value: variant
+        - key: password
+          value: rotated
+          is_sensitive: true
+steps:
+  - action: goto
+    url: '{{url}}'

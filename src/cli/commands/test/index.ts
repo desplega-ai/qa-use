@@ -14,6 +14,7 @@ import { runsCommand } from './runs/index.js';
 import { schemaCommand } from './schema.js';
 import { syncCommand } from './sync.js';
 import { validateCommand } from './validate.js';
+import { varsCommand } from './vars/index.js';
 
 export const testCommand = new Command('test').description('Manage and run test definitions');
 
@@ -29,3 +30,4 @@ testCommand.addCommand(exportCommand);
 testCommand.addCommand(syncCommand);
 testCommand.addCommand(diffCommand);
 testCommand.addCommand(schemaCommand);
+testCommand.addCommand(varsCommand);

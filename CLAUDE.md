@@ -79,6 +79,24 @@ For local backend work, the repo's `.qa-use.json` is pre-configured with `localh
 
 </important>
 
+<important if="you are mutating typed `variables:` on a test (CLI work, not test-author work)">
+
+`qa-use test vars list | set | unset` is the imperative twin of the declarative
+YAML editing path. It accepts either a positional `<file>` *or* `--id <uuid>`
+(mutually exclusive). The local-file path mutates via yaml's Document API so
+comments + key order survive; the `--id` path read-modify-writes via
+`exportTest` + `importTestDefinition`. Sensitive-preserve: passing `--sensitive`
+without `--value` keeps the stored value on an existing sensitive key — see
+`plugins/qa-use/skills/qa-use/SKILL.md` (§ Test Variables).
+
+The `TEST_VARIABLE_TYPES` / `TEST_VARIABLE_LIFETIMES` / `TEST_VARIABLE_CONTEXTS`
+runtime arrays in `src/cli/lib/test-vars.ts` mirror the auto-generated unions
+in `src/types/test-definition.ts`. A compile-time mutual-extends guard fails
+`bun run typecheck` if you regenerate types via `bun run generate:types` and
+the unions drift — update the arrays in lockstep.
+
+</important>
+
 <important if="you are adding or modifying TypeScript imports in this project">
 
 Use `.js` extensions on relative imports (this is an ESM project) — e.g. `import { foo } from './bar.js'`, even when `bar.ts` is the source file.
