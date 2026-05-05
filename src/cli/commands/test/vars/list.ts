@@ -1,14 +1,27 @@
 /**
  * qa-use test vars list - List typed variables on a test.
  *
- * Phase 1: local-file path only. `--id <uuid>` is wired up in Phase 3.
+ * Local-file path (`<file>` positional) is the primary surface; `--id <uuid>`
+ * exports the YAML from the backend in-memory and runs the same rendering
+ * path. Mutual exclusion is enforced via `resolveVarsTarget`.
  */
 
 import { Command } from 'commander';
-import type { VariableEntry, Variables } from '../../../../types/test-definition.js';
+import * as yaml from 'yaml';
+import type {
+  TestDefinition,
+  VariableEntry,
+  Variables,
+} from '../../../../types/test-definition.js';
+import { createApiClient, loadConfig } from '../../../lib/config.js';
 import { error, formatError } from '../../../lib/output.js';
 import { type Column, printTable } from '../../../lib/table.js';
-import { getNormalizedEntry, maskValue, readVarsFromYamlFile } from '../../../lib/test-vars.js';
+import {
+  getNormalizedEntry,
+  maskValue,
+  readVarsFromYamlFile,
+  resolveVarsTarget,
+} from '../../../lib/test-vars.js';
 
 interface VarRow {
   key: string;
@@ -60,18 +73,24 @@ function rowsForJson(rows: VarRow[]): Array<Record<string, unknown>> {
 }
 
 export const listCommand = new Command('list')
-  .description('List typed variables on a test (local YAML file)')
+  .description('List typed variables on a test (local YAML file or remote --id)')
   .argument('[file]', 'Path to a local test YAML file')
+  .option('--id <uuid>', 'Remote test UUID — exports YAML and lists from there')
   .option('--json', 'Output as JSON (sensitive values redacted)')
-  .action(async (file: string | undefined, options: { json?: boolean }) => {
+  .action(async (file: string | undefined, options: { id?: string; json?: boolean }) => {
     try {
-      if (!file) {
-        console.log(error('Missing target. Provide a YAML file path.'));
-        console.log('  Usage: qa-use test vars list <file>');
-        process.exit(1);
-      }
+      const target = resolveVarsTarget({ file, id: options.id });
 
-      const { vars } = await readVarsFromYamlFile(file);
+      let vars: Variables;
+      if (target.kind === 'file') {
+        ({ vars } = await readVarsFromYamlFile(target.path));
+      } else {
+        const config = await loadConfig();
+        const client = createApiClient(config);
+        const yamlText = await client.exportTest(target.uuid, 'yaml', false);
+        const def = yaml.parse(yamlText) as TestDefinition | null;
+        vars = def?.variables ?? {};
+      }
       const rows = rowsFromVariables(vars);
 
       if (options.json) {
@@ -93,7 +112,10 @@ export const listCommand = new Command('list')
       ];
 
       printTable(columns as unknown as Column[], rows as unknown as Record<string, unknown>[], {
-        emptyMessage: `No variables defined in ${file}`,
+        emptyMessage:
+          target.kind === 'file'
+            ? `No variables defined in ${target.path}`
+            : `No variables on test ${target.uuid}`,
       });
     } catch (err) {
       console.log(error(`Failed to list variables: ${formatError(err)}`));

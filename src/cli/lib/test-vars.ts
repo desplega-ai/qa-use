@@ -16,6 +16,7 @@ import type {
   Variables,
   Type as VariableType,
 } from '../../types/test-definition.js';
+import { isFullUuid } from './uuid.js';
 
 // ---------------------------------------------------------------------------
 // Runtime enum mirrors (kept in sync with src/types/test-definition.ts)
@@ -137,4 +138,37 @@ export async function readVarsFromYamlFile(filePath: string): Promise<YamlVarsFi
  */
 export async function writeYamlFile(filePath: string, doc: yaml.Document): Promise<void> {
   await fs.writeFile(filePath, doc.toString(), 'utf-8');
+}
+
+// ---------------------------------------------------------------------------
+// Target resolution: <file> XOR --id
+// ---------------------------------------------------------------------------
+
+export type VarsTarget = { kind: 'file'; path: string } | { kind: 'id'; uuid: string };
+
+/**
+ * Resolve the file/id target for a `vars` command. Throws when both or
+ * neither are provided, or when `--id` is not a full UUID. Callers exit 1
+ * with the thrown message — they are the entry points and own process.exit.
+ */
+export function resolveVarsTarget(args: { file?: string; id?: string }): VarsTarget {
+  const hasFile = typeof args.file === 'string' && args.file.length > 0;
+  const hasId = typeof args.id === 'string' && args.id.length > 0;
+
+  if (hasFile && hasId) {
+    throw new Error('use file OR --id, not both');
+  }
+  if (!hasFile && !hasId) {
+    throw new Error('missing target: provide a YAML file path or --id <uuid>');
+  }
+  if (hasId) {
+    const id = args.id as string;
+    if (!isFullUuid(id)) {
+      throw new Error(
+        `--id requires a full UUID (use 'qa-use test list --query <name>' to find one)`
+      );
+    }
+    return { kind: 'id', uuid: id };
+  }
+  return { kind: 'file', path: args.file as string };
 }

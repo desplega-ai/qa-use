@@ -12,8 +12,7 @@ import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
 import { error, formatError, info } from '../../lib/output.js';
 import { formatStatus, formatTimestamp } from '../../lib/table.js';
 import { maskValue } from '../../lib/test-vars.js';
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { UUID_RE } from '../../lib/uuid.js';
 
 // ANSI color codes
 const colors = {
