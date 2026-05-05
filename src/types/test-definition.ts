@@ -4,8 +4,8 @@
  * DO NOT EDIT MANUALLY - Generated from API schema
  * Run 'pnpm generate:types' to regenerate
  *
- * Source: https://api.desplega.ai/vibe-qa/cli/schema
- * Generated: 2026-04-04T20:44:09.809Z
+ * Source: http://localhost:5005/vibe-qa/cli/schema
+ * Generated: 2026-05-05T13:12:45.740Z
  */
 
 export type Name = string;
@@ -13,12 +13,39 @@ export type Id = string | null;
 export type AppConfig = string | null;
 export type Tags = string[];
 export type Description = string | null;
+export type Key = string | null;
+export type Value = string | number | null;
+export type Type =
+  | 'custom'
+  | 'company_name'
+  | 'random_string'
+  | 'random_number'
+  | 'first_name'
+  | 'last_name'
+  | 'full_name'
+  | 'username'
+  | 'address'
+  | 'phone_number'
+  | 'city'
+  | 'country'
+  | 'url'
+  | 'email'
+  | 'password'
+  | 'email_message'
+  | 'sensitive'
+  | 'text'
+  | 'uuid'
+  | 'slug';
+export type Lifetime = 'all' | 'test' | 'suite';
+export type LifetimeIndex = number | null;
+export type Context = 'test' | 'suite' | 'persona' | 'app_config' | 'global';
+export type IsSensitive = boolean;
 export type DependsOn = string | null;
 export type Contexts = {
   [k: string]: ContextDefinition;
 } | null;
 export type AppConfigId = string;
-export type Type = 'simple';
+export type Type1 = 'simple';
 export type Action =
   | 'goto'
   | 'fill'
@@ -34,15 +61,15 @@ export type Action =
   | 'to_be_visible'
   | 'to_have_url';
 export type Target = string | null;
-export type Value = string | null;
+export type Value1 = string | null;
 export type To = string | null;
 export type Url = string | null;
 export type Timeout = number | null;
 export type AaaPhase = ('arrange' | 'act' | 'assert') | null;
 export type StepId = string | null;
-export type Context = string | null;
+export type Context1 = string | null;
 export type DependsOn1 = string | null;
-export type Type1 = 'extended';
+export type Type2 = 'extended';
 /**
  * Action to perform
  */
@@ -79,6 +106,7 @@ export type Action1 =
       | 'handle_file_chooser'
       | 'ai_action'
       | 'ai_assertion'
+      | 'ai_auto_close_popup'
       | 'extract_from_file'
       | 'get_last_email'
       | 'reply_to_email'
@@ -128,7 +156,7 @@ export type Action1 =
 /**
  * Optional value for the action, can be a string, int, or a free-form dictionary
  */
-export type Value1 = number | string | AnyDict | null;
+export type Value2 = number | string | AnyDict | null;
 export type Text = string;
 export type HasText = string;
 export type Regex = string;
@@ -143,9 +171,9 @@ export type DeltaX = number;
 export type DeltaY = number;
 export type Force = boolean;
 export type WaitNewPage = boolean;
-export type Key = string;
+export type Key1 = string;
 export type Delay = number;
-export type Value2 = string;
+export type Value3 = string;
 export type Index = number;
 export type Label = string;
 export type Url1 = string;
@@ -312,14 +340,56 @@ export type Description1 = string | null;
 export type AaaPhase1 = ('arrange' | 'act' | 'assert') | null;
 export type ShouldSkip = boolean;
 export type StepId1 = string | null;
-export type Context1 = string | null;
+export type Context2 = string | null;
 export type DependsOn2 = string | null;
+export type EndGoal = string | null;
+export type StartUrl = string | null;
+export type EndUrl = string | null;
+export type SetVariableName = string | null;
+export type UseVariableName = string | null;
+export type Group = string | null;
+export type IsGroupCheck = boolean;
+export type OriginalTask = string | null;
+export type ComputeSemanticDiff = boolean | null;
 export type Steps = (SimpleStep | ExtendedStep)[];
 export type Severity = ('low' | 'medium' | 'high' | 'critical') | null;
 export type Priority = ('low' | 'medium' | 'high' | 'urgent') | null;
 export type SuccessCriteria = string | null;
 export type IsPositive = boolean | null;
 export type VersionHash = string | null;
+export type MaxParallel = number | null;
+export type Id1 = string | null;
+export type IsDefault = boolean;
+export type Key2 = string;
+export type Value4 = string | number | null;
+export type Type3 =
+  | 'custom'
+  | 'company_name'
+  | 'random_string'
+  | 'random_number'
+  | 'first_name'
+  | 'last_name'
+  | 'full_name'
+  | 'username'
+  | 'address'
+  | 'phone_number'
+  | 'city'
+  | 'country'
+  | 'url'
+  | 'email'
+  | 'password'
+  | 'email_message'
+  | 'sensitive'
+  | 'text'
+  | 'uuid'
+  | 'slug';
+export type Lifetime1 = 'all' | 'test' | 'suite';
+export type LifetimeIndex1 = number | null;
+export type Context3 = 'test' | 'suite' | 'persona' | 'app_config' | 'global';
+export type IsSensitive1 = boolean;
+export type VarOptions = MatrixVariableEntry[];
+export type TimeoutOverride = number | null;
+export type Options = TestMatrixOptionDefinition[];
 
 /**
  * Schema for qa-use test definition files
@@ -339,10 +409,33 @@ export interface TestDefinition {
   success_criteria?: SuccessCriteria;
   is_positive?: IsPositive;
   version_hash?: VersionHash;
+  matrix?: TestMatrixDefinition | null;
   [k: string]: unknown;
 }
 export interface Variables {
-  [k: string]: string;
+  [k: string]: string | number | VariableEntry;
+}
+/**
+ * Full-form variable entry.
+ *
+ * Used inside top-level ``variables:`` (when a value is wrapped in a dict
+ * with ``value`` + extra fields) and inside matrix ``var_options:`` lists.
+ *
+ * Top-level dict form (``variables: {key: VariableEntry}``) leaves ``key``
+ * optional — the dict key carries the identity. The matrix list form uses
+ * :class:`MatrixVariableEntry` which makes ``key`` required.
+ *
+ * This interface was referenced by `TestDefinition`'s JSON-Schema
+ * via the `definition` "VariableEntry".
+ */
+export interface VariableEntry {
+  key?: Key;
+  value?: Value;
+  type?: Type;
+  lifetime?: Lifetime;
+  lifetime_index?: LifetimeIndex;
+  context?: Context;
+  is_sensitive?: IsSensitive;
 }
 /**
  * Definition for a named browser context in multi-context tests.
@@ -375,16 +468,16 @@ export interface ContextDefinition {
  * via the `definition` "SimpleStep".
  */
 export interface SimpleStep {
-  type?: Type;
+  type?: Type1;
   action: Action;
   target?: Target;
-  value?: Value;
+  value?: Value1;
   to?: To;
   url?: Url;
   timeout?: Timeout;
   aaa_phase?: AaaPhase;
   step_id?: StepId;
-  context?: Context;
+  context?: Context1;
   depends_on?: DependsOn1;
   [k: string]: unknown;
 }
@@ -397,7 +490,7 @@ export interface SimpleStep {
  * via the `definition` "ExtendedStep".
  */
 export interface ExtendedStep {
-  type: Type1;
+  type: Type2;
   action: ActionInstruction;
   locator?: LocatorInstruction | null;
   name?: Name2;
@@ -405,8 +498,17 @@ export interface ExtendedStep {
   aaa_phase?: AaaPhase1;
   should_skip?: ShouldSkip;
   step_id?: StepId1;
-  context?: Context1;
+  context?: Context2;
   depends_on?: DependsOn2;
+  end_goal?: EndGoal;
+  start_url?: StartUrl;
+  end_url?: EndUrl;
+  set_variable_name?: SetVariableName;
+  use_variable_name?: UseVariableName;
+  group?: Group;
+  is_group_check?: IsGroupCheck;
+  original_task?: OriginalTask;
+  compute_semantic_diff?: ComputeSemanticDiff;
   [k: string]: unknown;
 }
 /**
@@ -415,7 +517,7 @@ export interface ExtendedStep {
  */
 export interface ActionInstruction {
   action: Action1;
-  value?: Value1;
+  value?: Value2;
   value_can_be_variable?: ValueCanBeVariable;
   timeout?: Timeout2;
   allowed_ai_actions?: AllowedAiActions;
@@ -446,9 +548,9 @@ export interface AnyDict {
   delta_y?: DeltaY;
   force?: Force;
   wait_new_page?: WaitNewPage;
-  key?: Key;
+  key?: Key1;
   delay?: Delay;
-  value?: Value2;
+  value?: Value3;
   index?: Index;
   label?: Label;
   url?: Url1;
@@ -513,4 +615,46 @@ export interface LocatorStep {
   attribute?: Attribute;
   human_name?: HumanName;
   [k: string]: unknown;
+}
+/**
+ * Matrix block declaring N variants for a test definition.
+ *
+ * This interface was referenced by `TestDefinition`'s JSON-Schema
+ * via the `definition` "TestMatrixDefinition".
+ */
+export interface TestMatrixDefinition {
+  max_parallel?: MaxParallel;
+  options?: Options;
+}
+/**
+ * A single matrix option (variant) in a TestDefinition.
+ *
+ * This interface was referenced by `TestDefinition`'s JSON-Schema
+ * via the `definition` "TestMatrixOptionDefinition".
+ */
+export interface TestMatrixOptionDefinition {
+  id?: Id1;
+  is_default?: IsDefault;
+  var_options?: VarOptions;
+  timeout_override?: TimeoutOverride;
+}
+/**
+ * Variable entry inside a matrix ``var_options:`` list. ``key`` is REQUIRED.
+ *
+ * A bare ``MatrixVariableEntry = VariableEntry`` alias was insufficient —
+ * Pydantic inherits the parent's ``key: str | None = None``, silently
+ * allowing keyless var_options that compile to ``TestVariable(key=None,
+ * ...)`` and break at runtime.
+ *
+ * This interface was referenced by `TestDefinition`'s JSON-Schema
+ * via the `definition` "MatrixVariableEntry".
+ */
+export interface MatrixVariableEntry {
+  key: Key2;
+  value?: Value4;
+  type?: Type3;
+  lifetime?: Lifetime1;
+  lifetime_index?: LifetimeIndex1;
+  context?: Context3;
+  is_sensitive?: IsSensitive1;
 }

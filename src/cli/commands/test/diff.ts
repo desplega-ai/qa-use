@@ -59,6 +59,54 @@ function showDiff(localYaml: string, cloudYaml: string): { hasChanges: boolean }
 }
 
 /**
+ * UUID-v4 shape regex for matrix-id stripping during canonicalization.
+ * Auto-generated option ids regenerate on each round-trip; treating them as
+ * equivalent prevents spurious diffs when only the auto id changed.
+ */
+const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * Canonicalize a matrix block for stable structured-diff hashing:
+ *   - strip auto-generated UUID-v4 ids (they regenerate on round-trip);
+ *     user-supplied non-UUID-shape ids are preserved
+ *   - sort var_options within each option by `key`
+ *   - sort options by their canonicalized JSON content
+ */
+function canonicalizeMatrix(matrix: unknown): unknown {
+  if (!matrix || typeof matrix !== 'object') return matrix;
+  const m = matrix as { max_parallel?: unknown; options?: unknown };
+  const optionsIn = Array.isArray(m.options) ? m.options : [];
+
+  const canonOptions = optionsIn.map((rawOpt) => {
+    if (!rawOpt || typeof rawOpt !== 'object') return rawOpt;
+    const opt = { ...(rawOpt as Record<string, unknown>) };
+
+    // Strip UUID-v4 ids (auto-generated)
+    if (typeof opt.id === 'string' && UUID_V4_RE.test(opt.id)) {
+      delete opt.id;
+    }
+
+    // Sort var_options by key
+    if (Array.isArray(opt.var_options)) {
+      const sorted = [...opt.var_options].sort((a, b) => {
+        const ak =
+          a && typeof a === 'object' ? String((a as Record<string, unknown>).key ?? '') : '';
+        const bk =
+          b && typeof b === 'object' ? String((b as Record<string, unknown>).key ?? '') : '';
+        return ak.localeCompare(bk);
+      });
+      opt.var_options = sorted;
+    }
+    return opt;
+  });
+
+  // Sort options by canonicalized JSON content
+  canonOptions.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+
+  return { max_parallel: m.max_parallel ?? null, options: canonOptions };
+}
+
+/**
  * Show key field differences in a structured way
  */
 function showFieldDiff(local: TestDefinition, cloud: TestDefinition): void {
@@ -70,6 +118,7 @@ function showFieldDiff(local: TestDefinition, cloud: TestDefinition): void {
     'tags',
     'depends_on',
     'variables',
+    'matrix',
   ] as const;
 
   console.log(`${colors.cyan}Field Comparison:${colors.reset}`);
@@ -78,8 +127,14 @@ function showFieldDiff(local: TestDefinition, cloud: TestDefinition): void {
   let hasDiff = false;
 
   for (const field of fieldsToCompare) {
-    const localVal = JSON.stringify((local as Record<string, unknown>)[field] ?? null);
-    const cloudVal = JSON.stringify((cloud as Record<string, unknown>)[field] ?? null);
+    const rawLocal = (local as Record<string, unknown>)[field] ?? null;
+    const rawCloud = (cloud as Record<string, unknown>)[field] ?? null;
+    // Matrix: hash via canonical form so auto-UUID-id churn + var_options
+    // ordering don't trip the diff.
+    const normLocal = field === 'matrix' ? canonicalizeMatrix(rawLocal) : rawLocal;
+    const normCloud = field === 'matrix' ? canonicalizeMatrix(rawCloud) : rawCloud;
+    const localVal = JSON.stringify(normLocal);
+    const cloudVal = JSON.stringify(normCloud);
 
     if (localVal !== cloudVal) {
       hasDiff = true;

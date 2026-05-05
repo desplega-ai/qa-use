@@ -860,7 +860,7 @@ ${status === 'idle' ? '⏸️ **Paused**: Session is idle, may need intervention
           {
             name: 'run_automated_tests',
             description:
-              'Execute multiple automated tests simultaneously. Uses the global browser WebSocket URL from init_qa_server.',
+              "Execute multiple automated tests simultaneously. If a test has a matrix configured, all variants are run in parallel automatically (bounded by Hatchet's per-task concurrency cap; matrix.max_parallel is currently not honored at runtime). Uses the global browser WebSocket URL from init_qa_server.",
             inputSchema: {
               type: 'object',
               properties: {

@@ -22,6 +22,62 @@ const colors = {
   yellow: '\x1b[33m',
 };
 
+interface MatrixVarOption {
+  key?: string;
+  value?: string | number;
+  is_sensitive?: boolean;
+}
+
+interface MatrixOption {
+  id?: string | null;
+  is_default?: boolean;
+  var_options?: MatrixVarOption[];
+  timeout_override?: number | null;
+}
+
+interface MatrixDefinition {
+  max_parallel?: number | null;
+  options?: MatrixOption[];
+}
+
+/**
+ * Render the Matrix summary block when a test has matrix options.
+ * Sensitive var_options are masked as ****; auto-UUID ids show as <auto-uuid>.
+ */
+function displayMatrixSummary(matrix: MatrixDefinition | null | undefined): void {
+  if (!matrix?.options || matrix.options.length === 0) return;
+
+  const opts = matrix.options;
+  const headerExtras: string[] = [];
+  if (typeof matrix.max_parallel === 'number') {
+    headerExtras.push(`max_parallel: ${matrix.max_parallel}`);
+  }
+  const headerSuffix = headerExtras.length > 0 ? ` (${headerExtras.join(', ')})` : '';
+  console.log(`  Matrix:      ${opts.length} options${headerSuffix}`);
+
+  // Determine label width — pick the longest of the rendered ids/labels so
+  // the var-options column lines up.
+  const renderId = (opt: MatrixOption): string => {
+    if (opt.is_default) return 'default';
+    const id = typeof opt.id === 'string' ? opt.id : '';
+    if (!id) return '<auto-uuid>';
+    return UUID_RE.test(id) ? '<auto-uuid>' : id;
+  };
+  const labelWidth = Math.max(...opts.map((o) => renderId(o).length));
+
+  for (const opt of opts) {
+    const idLabel = renderId(opt).padEnd(labelWidth);
+    const pairs = (opt.var_options ?? []).map((vo) => {
+      const k = vo.key ?? '?';
+      const v = vo.is_sensitive ? '****' : String(vo.value ?? '');
+      return `${k}=${v}`;
+    });
+    const pairsStr =
+      pairs.length > 0 ? pairs.join(', ') : `${colors.gray}(no overrides)${colors.reset}`;
+    console.log(`    ${colors.gray}↳${colors.reset} ${idLabel}  ${pairsStr}`);
+  }
+}
+
 /**
  * Format a test definition for display (local mode)
  */
@@ -57,14 +113,25 @@ function displayTestInfo(test: TestDefinition, source: string): void {
     console.log(`  Depends On:  ${test.depends_on}`);
   }
 
-  // Variables
+  // Variables — flexible shape: simple `string | number` or full `VariableEntry`.
+  // Sensitive entries (full form, is_sensitive=true) display masked.
   if (test.variables && Object.keys(test.variables).length > 0) {
     console.log('  Variables:');
     for (const [key, value] of Object.entries(test.variables)) {
-      const displayValue = value.length > 50 ? `${value.substring(0, 47)}...` : value;
+      let raw: string;
+      if (value && typeof value === 'object') {
+        const v = value as { value?: string | number; is_sensitive?: boolean };
+        raw = v.is_sensitive ? '****' : String(v.value ?? '');
+      } else {
+        raw = String(value ?? '');
+      }
+      const displayValue = raw.length > 50 ? `${raw.substring(0, 47)}...` : raw;
       console.log(`    ${key}: ${colors.gray}${displayValue}${colors.reset}`);
     }
   }
+
+  // Matrix summary
+  displayMatrixSummary((test as { matrix?: MatrixDefinition | null }).matrix);
 
   // Steps summary
   if (test.steps && test.steps.length > 0) {
@@ -129,21 +196,28 @@ function displayCloudTestInfo(data: Record<string, unknown>): void {
     if (run.finished_at) console.log(`    Finished:  ${formatTimestamp(String(run.finished_at))}`);
   }
 
-  // Variables
+  // Variables — accept simple value or full `{value, is_sensitive}` entry.
   if (data.variables && typeof data.variables === 'object') {
-    const vars = data.variables as Record<string, string>;
+    const vars = data.variables as Record<string, unknown>;
     const keys = Object.keys(vars);
     if (keys.length > 0) {
       console.log('  Variables:');
       for (const [key, value] of Object.entries(vars)) {
-        const displayValue =
-          typeof value === 'string' && value.length > 50
-            ? `${value.substring(0, 47)}...`
-            : String(value);
+        let raw: string;
+        if (value && typeof value === 'object') {
+          const v = value as { value?: string | number; is_sensitive?: boolean };
+          raw = v.is_sensitive ? '****' : String(v.value ?? '');
+        } else {
+          raw = String(value ?? '');
+        }
+        const displayValue = raw.length > 50 ? `${raw.substring(0, 47)}...` : raw;
         console.log(`    ${key}: ${colors.gray}${displayValue}${colors.reset}`);
       }
     }
   }
+
+  // Matrix summary (cloud data may shape it as `{options: [...]}`)
+  displayMatrixSummary(data.matrix as MatrixDefinition | null | undefined);
 
   // Steps summary
   if (Array.isArray(data.steps) && data.steps.length > 0) {

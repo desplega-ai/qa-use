@@ -277,6 +277,17 @@ export interface RunCliTestOptions {
   ws_url?: string;
   vars?: Record<string, string>; // Variable overrides for cloud test (test_id)
   agent_session_id?: string; // Link to agent session for UI grouping
+  /**
+   * When true and `test_id` refers to a test with a matrix, fan out across
+   * all matrix options. Mutually exclusive with `test_definitions` (inline
+   * tests have no persisted matrix).
+   */
+  run_matrix?: boolean;
+  /**
+   * Subset of matrix option ids to run. Implies `run_matrix=true` server-side.
+   * Requires `test_id`.
+   */
+  matrix_ids?: string[];
 }
 
 export type SSECallback = (event: SSEEvent) => void;

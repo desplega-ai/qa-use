@@ -55,6 +55,13 @@ export const runCommand = addTunnelOption(
     )
     .option('--var <key=value...>', 'Variable overrides', collectVars, {})
     .option('--app-config-id <uuid>', 'App config ID to use')
+    .option('--run-matrix', 'When using --id, run all matrix variants')
+    .option(
+      '--matrix-id <id...>',
+      'Run specific matrix option(s) by id (implies --run-matrix). Repeatable.',
+      (value: string, previous: string[]) => [...(previous ?? []), value],
+      [] as string[]
+    )
     .option(
       '--timeout <seconds>',
       'Idle timeout in seconds — abort if no SSE events for this long (0 disables)',
@@ -75,6 +82,20 @@ export const runCommand = addTunnelOption(
 
     // Initialize API client
     const client = createApiClient(config);
+
+    // Matrix flags require --id (cloud test). Inline test_definitions have no
+    // persisted Test.matrix on the server; allowing matrix flags here would
+    // silently no-op. --matrix-id implies --run-matrix.
+    const matrixIds: string[] = Array.isArray(options.matrixId) ? options.matrixId : [];
+    const runMatrix = Boolean(options.runMatrix) || matrixIds.length > 0;
+    if (runMatrix && !options.id) {
+      console.log(
+        error(
+          '--run-matrix and --matrix-id require --id <uuid> (cloud test). Inline tests have no persisted matrix.'
+        )
+      );
+      process.exit(1);
+    }
 
     let testDefinitions;
     let sourceFile: string | undefined;
@@ -118,9 +139,20 @@ export const runCommand = addTunnelOption(
       // Figure out the effective base URL for the Phase-2 auto decision:
       // explicit --var base_url wins; otherwise the first test definition's
       // `variables.base_url` (if any). Undefined disables auto.
-      const varBaseUrl =
+      // Variables now carry a flexible union (`string | number | VariableEntry`);
+      // unwrap to a plain string for the resolver / tunnel start.
+      const rawVarBaseUrl =
         (options.var as Record<string, string> | undefined)?.base_url ??
         testDefinitions?.[0]?.variables?.base_url;
+      let varBaseUrl: string | undefined;
+      if (typeof rawVarBaseUrl === 'string') {
+        varBaseUrl = rawVarBaseUrl;
+      } else if (typeof rawVarBaseUrl === 'number') {
+        varBaseUrl = String(rawVarBaseUrl);
+      } else if (rawVarBaseUrl && typeof rawVarBaseUrl === 'object') {
+        const entry = rawVarBaseUrl as { value?: string | number };
+        varBaseUrl = entry.value !== undefined ? String(entry.value) : undefined;
+      }
 
       const tunnelDecision = resolveTunnelMode(resolvedTunnelMode, varBaseUrl, config.api_url);
       const tunnelOn = tunnelDecision === 'on';
@@ -183,6 +215,8 @@ export const runCommand = addTunnelOption(
           ws_url: wsUrl,
           vars: varOverrides,
           agent_session_id: getAgentSessionId(),
+          run_matrix: runMatrix || undefined,
+          matrix_ids: matrixIds.length > 0 ? matrixIds : undefined,
         },
         {
           verbose: options.verbose || false,
