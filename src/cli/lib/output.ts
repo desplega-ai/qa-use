@@ -306,7 +306,11 @@ export function printSSEProgress(
         context.runId = event.data.run_id;
       }
       console.log(success(`Test started (run_id: ${event.data.run_id})`));
-      console.log(`Total steps: ${event.data.total_steps}\n`);
+      if (event.data.matrix === true) {
+        console.log(`Matrix run — children will be queued in parallel.\n`);
+      } else {
+        console.log(`Total steps: ${event.data.total_steps}\n`);
+      }
       break;
 
     case 'step_start':
@@ -437,6 +441,15 @@ export function printSSEProgress(
 
     case 'complete':
       console.log('');
+      if (event.data.matrix === true) {
+        // Matrix runs only emit start+complete (no per-step events) — the
+        // parent run is queued and children fan out in the background.
+        const msg =
+          event.data.message ??
+          `Matrix run queued. Inspect children with: qa-use test runs list --id <test-id>`;
+        console.log(success(msg));
+        break;
+      }
       if (event.data.status === 'passed') {
         console.log(success(`Test passed in ${duration(event.data.duration_seconds)}`));
       } else {
