@@ -8,16 +8,10 @@ import { apiCall, paginationQuery, requireApiKey } from '../../lib/api-helpers.j
 import { loadConfig } from '../../lib/config.js';
 import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
 import { error, formatError } from '../../lib/output.js';
-import {
-  type Column,
-  formatStatus,
-  formatTimestamp,
-  printTable,
-  truncate,
-} from '../../lib/table.js';
+import { type Column, formatStatus, formatTimestamp, printTable } from '../../lib/table.js';
 
 const cloudColumns: Column[] = [
-  { key: 'id', header: 'ID', width: 10, format: (v) => truncate(String(v ?? '-'), 10) },
+  { key: 'id', header: 'ID', width: 36 },
   { key: 'name', header: 'NAME' },
   { key: 'status', header: 'STATUS', format: (v) => formatStatus(String(v ?? '-')) },
   {
@@ -29,6 +23,7 @@ const cloudColumns: Column[] = [
 ];
 
 const localColumns: Column[] = [
+  { key: 'id', header: 'ID', width: 36, format: (v) => (v ? String(v) : '-') },
   { key: 'name', header: 'NAME' },
   { key: 'steps', header: 'STEPS', width: 5 },
   { key: 'deps', header: 'DEPS' },
@@ -114,6 +109,7 @@ export const listCommand = new Command('list')
               .relative(resolvedTestDir, file)
               .replace(/\.(yaml|yml|json)$/, '');
             rows.push({
+              id: def.id,
               name: relativePath,
               steps: def.steps?.length ?? '-',
               deps: def.depends_on || '-',

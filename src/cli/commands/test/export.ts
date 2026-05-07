@@ -7,7 +7,7 @@ import * as path from 'node:path';
 import { Command } from 'commander';
 import * as yaml from 'yaml';
 import type { TestDefinition } from '../../../types/test-definition.js';
-import { toSafeFilename } from '../../../utils/strings.js';
+import { toUniqueTestFilename } from '../../../utils/strings.js';
 import { createApiClient, loadConfig } from '../../lib/config.js';
 import { error, formatError, info, success, warning } from '../../lib/output.js';
 
@@ -93,8 +93,8 @@ export const exportCommand = new Command('export')
       const written: string[] = [];
 
       for (const test of tests) {
-        const safeName = toSafeFilename(test.name || test.id || '');
-        const outputPath = path.join(testDir, safeName + ext);
+        const slug = toUniqueTestFilename(test.name || test.id || '', test.id);
+        const outputPath = path.join(testDir, slug + ext);
 
         // Serialize individual test (depends_on stays as UUID)
         const testContent =

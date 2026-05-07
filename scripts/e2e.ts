@@ -10,8 +10,18 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { randomUUID } from 'node:crypto';
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	readdirSync,
+	rmSync,
+	unlinkSync,
+	writeFileSync,
+} from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 
 const EVALS_URL = 'https://evals.desplega.ai/';
@@ -184,28 +194,32 @@ await section('Section 1: Browser Commands', () => {
 await section('Section 2: Table Filtering', () => {
 	let sessionId = '';
 
+	// Loads /table directly. The home → click("Table Demo") path triggers a
+	// React reconciliation crash under a qa-use tunneled session — see
+	// DES-356. The page itself is healthy; only client-side <Link> navigation
+	// from home crashes. Direct loads work fine and exercise the same filter
+	// regression coverage Section 2 was originally written for.
+	const TABLE_URL = `${EVALS_URL.replace(/\/?$/, '')}/table`;
+
 	try {
-		// 1. Create session
-		const createOut = runOrThrow(['browser', 'create', EVALS_URL]);
+		// 1. Create session directly on /table
+		const createOut = runOrThrow(['browser', 'create', TABLE_URL]);
 		sessionId = parseSessionId(createOut);
 
-		// 2. Navigate to Table Demo
-		runOrThrow(['browser', 'click', '--text', 'Table Demo']);
-
-		// 3. Verify table page and find filter input ref
+		// 2. Verify table page and find filter input ref
 		const snap1 = runOrThrow(['browser', 'snapshot']);
 		assert(snap1.includes('Filter by name'), 'Table page has filter input');
 		const filterRef = extractRef(snap1, /textbox.*?ref=(\w+)/);
 
-		// 4. Fill filter with "John" using ref from snapshot
+		// 3. Fill filter with "John" using ref from snapshot
 		runOrThrow(['browser', 'fill', filterRef, 'John']);
 
-		// 5. Verify filtered results
+		// 4. Verify filtered results
 		const snap2 = runOrThrow(['browser', 'snapshot']);
 		assert(snap2.includes('John Doe'), 'Filtered snapshot contains "John Doe"');
 		assert(!snap2.includes('Alice Brown'), 'Filtered snapshot does NOT contain "Alice Brown"');
 
-		// 6. Close
+		// 5. Close
 		runOrThrow(['browser', 'close']);
 		assert(true, 'Session closed');
 	} finally {
@@ -1033,6 +1047,284 @@ await section('Section 16: Test Vars (imperative CLI)', () => {
 		if (existsSync(fixture)) unlinkSync(fixture);
 	}
 });
+
+// ---------------------------------------------------------------------------
+// Section 17: Test sync name-collision regression
+// ---------------------------------------------------------------------------
+//
+// Regression coverage for the duplicate-name pull/push fix:
+//   - `pull` writes one file per cloud row, suffixed with `-${shortId8}.yaml`,
+//     even when two cloud tests share the same `name`.
+//   - A legacy un-suffixed `${safeName}.yaml` left in place from older qa-use
+//     versions surfaces a one-line `Legacy file:` warning on next pull.
+//   - `push --id <colliding-name>` exits 1 with an `Ambiguous: ...` banner that
+//     names both local files and the `Use --id <uuid>` opt-out.
+//   - `push --id <uuid>` resolves to exactly one test (BC for unique-name --id).
+//
+// **Cleanup.** The public API does not expose `DELETE /api/v1/tests/{id}` — see
+// `qa-use api ls` (only POST/GET on /tests endpoints). Cleanup attempts the
+// DELETE for forward-compat and logs a warning on 405; the cloud rows are
+// named with a unique `e2e-dup-${nonce}` prefix so they're easy to reap
+// manually if they accumulate. The temp directory is always removed.
+
+await section('Section 17: Test sync name-collision regression', () => {
+	// Quick reachability probe — if we can't list tests, skip the whole section.
+	const probe = run(['api', '-X', 'GET', '/api/v1/tests', '-f', 'limit=1'], 15_000);
+	if (probe.exitCode !== 0) {
+		console.log(
+			`  SKIP: backend unreachable for /api/v1/tests probe (exit=${probe.exitCode}); cannot exercise pull/push round-trip`,
+		);
+		return;
+	}
+
+	// Section-local helper: spawn the CLI with a custom cwd so commands resolve
+	// `.qa-use.json` and `test_directory` against our temp scratch dir, not the
+	// repo root.
+	//
+	// `cmdPrefix` defaults to `bun run cli`, which resolves the `cli` script
+	// against package.json in the spawn cwd. Since the temp dir has no
+	// package.json, we translate `bun run cli` → `bun <repoRoot>/src/cli/index.ts`
+	// for this section so the CLI entry resolves regardless of cwd. For
+	// `--cmd qa-use` (or any arbitrary binary on PATH), we use cmdPrefix as-is.
+	const repoRoot = resolve(import.meta.dirname, '..');
+	function runIn(
+		cwd: string,
+		args: string[],
+		timeout = 60_000,
+	): { stdout: string; stderr: string; exitCode: number } {
+		let parts: string[];
+		if (cmdPrefix.trim() === 'bun run cli') {
+			parts = ['bun', resolve(repoRoot, 'src/cli/index.ts'), ...args];
+		} else {
+			parts = cmdPrefix.split(/\s+/).concat(args);
+		}
+		const cmd = parts[0];
+		const spawnArgs = parts.slice(1);
+		const r = spawnSync(cmd, spawnArgs, {
+			cwd,
+			encoding: 'utf-8',
+			timeout,
+			env: process.env,
+		});
+		return {
+			stdout: r.stdout ?? '',
+			stderr: r.stderr ?? '',
+			exitCode: r.status ?? 1,
+		};
+	}
+
+	// Resolve api_key + api_url from the repo's `.qa-use.json` so the temp dir
+	// inherits credentials without us re-implementing the lookup chain.
+	let repoApiKey: string | undefined;
+	let repoApiUrl: string | undefined;
+	try {
+		const repoCfg = JSON.parse(readFileSync(configPath, 'utf-8')) as {
+			api_key?: string;
+			api_url?: string;
+		};
+		repoApiKey = repoCfg.api_key;
+		repoApiUrl = repoCfg.api_url;
+	} catch (err) {
+		console.log(`  SKIP: could not parse repo .qa-use.json: ${err}`);
+		return;
+	}
+	if (!repoApiKey) {
+		console.log('  SKIP: repo .qa-use.json has no api_key');
+		return;
+	}
+
+	// Use a unique nonce so the cloud rows we create are recognizable if cleanup
+	// fails (no DELETE endpoint — best-effort only).
+	const nonce = `${Date.now().toString(36)}-${randomUUID().slice(0, 4)}`;
+	const collidingName = `e2e dup ${nonce}`;
+	const uuidA = randomUUID();
+	const uuidB = randomUUID();
+	const shortA = uuidA.replace(/-/g, '').slice(0, 8);
+	const shortB = uuidB.replace(/-/g, '').slice(0, 8);
+
+	const tmpRoot = mkdtempSync(resolve(tmpdir(), 'qa-use-e2e-collision-'));
+	const tmpQaTests = resolve(tmpRoot, 'qa-tests');
+	mkdirSync(tmpQaTests, { recursive: true });
+
+	// Plant a per-tmp `.qa-use.json` so the CLI uses our temp test_directory.
+	const tmpConfig = {
+		test_directory: './qa-tests',
+		api_key: repoApiKey,
+		api_url: repoApiUrl,
+		defaults: { headless: true, persist: false, timeout: 60 },
+	};
+	writeFileSync(
+		resolve(tmpRoot, '.qa-use.json'),
+		JSON.stringify(tmpConfig, null, 2),
+		'utf-8',
+	);
+
+	// Two YAML test files with the same `name` and pre-assigned, distinct UUIDs.
+	// Pre-assigning the UUIDs lets us deterministically assert the `-${shortId8}`
+	// filename suffix on pull without round-tripping through stdout.
+	const fileA = resolve(tmpQaTests, 'a.yaml');
+	const fileB = resolve(tmpQaTests, 'b.yaml');
+	writeFileSync(
+		fileA,
+		[
+			`id: ${uuidA}`,
+			`name: ${collidingName}`,
+			'steps:',
+			'  - action: goto',
+			'    url: https://example.com',
+			'',
+		].join('\n'),
+	);
+	writeFileSync(
+		fileB,
+		[
+			`id: ${uuidB}`,
+			`name: ${collidingName}`,
+			'steps:',
+			'  - action: goto',
+			'    url: https://example.com',
+			'',
+		].join('\n'),
+	);
+
+	let pushedA = false;
+	let pushedB = false;
+
+	try {
+		// 1. SETUP — push both YAMLs (real, not dry-run) to create two cloud rows
+		// with the same name and pre-assigned UUIDs.
+		const setupPush = runIn(tmpRoot, ['test', 'sync', 'push', '--all'], 60_000);
+		if (setupPush.exitCode !== 0) {
+			console.log(
+				`  SKIP: setup push failed (exit=${setupPush.exitCode}); cannot exercise round-trip`,
+			);
+			console.log(`    stdout: ${stripAnsi(setupPush.stdout).split('\n').slice(-5).join(' | ')}`);
+			console.log(`    stderr: ${stripAnsi(setupPush.stderr).split('\n').slice(-3).join(' | ')}`);
+			return;
+		}
+		const setupOut = stripAnsi(setupPush.stdout);
+		// Sanity: both UUIDs appear in push output (action lines reference them).
+		pushedA = setupOut.includes(uuidA);
+		pushedB = setupOut.includes(uuidB);
+		assert(pushedA && pushedB, 'Setup push created both rows with pre-assigned UUIDs');
+
+		// 2. PULL-COLLISION — clear local files, then pull. Expect two suffixed
+		// files containing the right ids.
+		unlinkSync(fileA);
+		unlinkSync(fileB);
+		const pullRes = runIn(tmpRoot, ['test', 'sync', 'pull'], 60_000);
+		assert(pullRes.exitCode === 0, 'pull (no --id) exits 0 against a populated cloud');
+
+		// Filter to only files matching our nonce-named tests so we don't
+		// trip on unrelated org tests pulled at the same time.
+		const yamlFiles = readdirSync(tmpQaTests).filter((f) => f.endsWith('.yaml'));
+		const expectedA = `${toSafeFilenameLocal(collidingName)}-${shortA}.yaml`;
+		const expectedB = `${toSafeFilenameLocal(collidingName)}-${shortB}.yaml`;
+		const hasA = yamlFiles.includes(expectedA);
+		const hasB = yamlFiles.includes(expectedB);
+		assert(hasA, `pull wrote suffixed file for uuid A: ${expectedA}`);
+		assert(hasB, `pull wrote suffixed file for uuid B: ${expectedB}`);
+
+		if (hasA) {
+			const aContent = readFileSync(resolve(tmpQaTests, expectedA), 'utf-8');
+			assert(aContent.includes(uuidA), `Pulled file A contains its UUID (${uuidA})`);
+		}
+		if (hasB) {
+			const bContent = readFileSync(resolve(tmpQaTests, expectedB), 'utf-8');
+			assert(bContent.includes(uuidB), `Pulled file B contains its UUID (${uuidB})`);
+		}
+
+		// 3. LEGACY-ORPHAN WARNING — plant the un-suffixed legacy file and pull
+		// again; expect the `Legacy file:` warning per `warnLegacyOrphan` in
+		// sync.ts.
+		const legacyName = `${toSafeFilenameLocal(collidingName)}.yaml`;
+		const legacyPath = resolve(tmpQaTests, legacyName);
+		// Plant a legacy file with one of the UUIDs so the warning's "ownership"
+		// branch ("same id — safe to remove") fires for one of the two pulled rows.
+		writeFileSync(
+			legacyPath,
+			[
+				`id: ${uuidA}`,
+				`name: ${collidingName}`,
+				'steps:',
+				"  - type: go_to",
+				'    url: https://example.com',
+				'',
+			].join('\n'),
+		);
+		const pullAgain = runIn(tmpRoot, ['test', 'sync', 'pull', '--force'], 60_000);
+		assert(pullAgain.exitCode === 0, 'pull --force re-run exits 0 with legacy file present');
+		const pullAgainOut = stripAnsi(`${pullAgain.stdout}\n${pullAgain.stderr}`);
+		assert(
+			pullAgainOut.includes(`Legacy file: ${legacyName}`),
+			`pull surfaces "Legacy file: ${legacyName}" warning`,
+		);
+		// And the file itself is preserved — qa-use never auto-deletes legacy files.
+		assert(existsSync(legacyPath), 'Legacy un-suffixed file is preserved (not auto-deleted)');
+
+		// 4. PUSH-AMBIGUITY — `push --id "<colliding-name>"` against a directory
+		// containing both YAMLs must exit 1 with the disambiguation banner.
+		// First, remove the legacy file so it doesn't trip the load (its id
+		// matches uuidA, which would still get filtered, but cleaner without it).
+		unlinkSync(legacyPath);
+		const ambig = runIn(
+			tmpRoot,
+			['test', 'sync', 'push', '--id', collidingName, '--dry-run'],
+			60_000,
+		);
+		assert(ambig.exitCode === 1, 'push --id <colliding-name> exits 1');
+		const ambigOut = stripAnsi(`${ambig.stdout}\n${ambig.stderr}`);
+		assert(/Ambiguous/.test(ambigOut), 'push --id <colliding-name> output contains "Ambiguous"');
+		assert(
+			ambigOut.includes(uuidA) && ambigOut.includes(uuidB),
+			'Ambiguous banner lists both colliding UUIDs',
+		);
+		assert(
+			/Use --id <uuid>/.test(ambigOut),
+			'Ambiguous banner mentions "Use --id <uuid>" opt-out',
+		);
+
+		// 5. PUSH-BY-UUID — disambiguates to exactly one test.
+		const single = runIn(
+			tmpRoot,
+			['test', 'sync', 'push', '--id', uuidA, '--dry-run'],
+			60_000,
+		);
+		assert(single.exitCode === 0, 'push --id <uuid> exits 0');
+		const singleOut = stripAnsi(`${single.stdout}\n${single.stderr}`);
+		assert(
+			/Found 1 matching/.test(singleOut),
+			'push --id <uuid> reports "Found 1 matching" test',
+		);
+	} finally {
+		// Best-effort cleanup. No public DELETE endpoint exists for tests today;
+		// this attempt is forward-compat — if it 405s, the cloud rows leak under
+		// recognizable names (`e2e dup <nonce>`) but the test passes.
+		for (const id of [uuidA, uuidB]) {
+			const del = run(['api', '-X', 'DELETE', `/api/v1/tests/${id}`], 15_000);
+			if (del.exitCode !== 0) {
+				const tail = stripAnsi(`${del.stdout}\n${del.stderr}`).split('\n').slice(-2).join(' | ');
+				console.log(
+					`  WARN: cleanup DELETE /api/v1/tests/${id} failed (exit=${del.exitCode}) — likely no DELETE endpoint; row leaks. ${tail}`,
+				);
+			}
+		}
+		try {
+			rmSync(tmpRoot, { recursive: true, force: true });
+		} catch {
+			// Ignore
+		}
+	}
+});
+
+// Local copy of `toSafeFilename` from src/utils/strings.ts. Inlined here to
+// avoid a TypeScript path import — scripts/e2e.ts is a top-level executable.
+function toSafeFilenameLocal(name: string, fallback = 'unnamed-test'): string {
+	return (name || fallback)
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-|-$/g, '');
+}
 
 // ---------------------------------------------------------------------------
 // Summary

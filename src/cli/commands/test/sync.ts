@@ -8,7 +8,7 @@ import { Command } from 'commander';
 import * as yaml from 'yaml';
 import type { ApiClient } from '../../../../lib/api/index.js';
 import type { TestDefinition } from '../../../types/test-definition.js';
-import { toSafeFilename } from '../../../utils/strings.js';
+import { isUuid, toSafeFilename, toUniqueTestFilename } from '../../../utils/strings.js';
 import { createApiClient, loadConfig } from '../../lib/config.js';
 import { discoverTests, loadTestDefinition } from '../../lib/loader.js';
 import {
@@ -175,8 +175,8 @@ async function pullFromCloud(
     }
 
     if (dryRun) {
-      const safeName = toSafeFilename(test.name);
-      console.log(`  Would pull: ${test.name} -> ${path.join(testDir, `${safeName}.yaml`)}`);
+      const slug = toUniqueTestFilename(test.name, test.id);
+      console.log(`  Would pull: ${test.name} -> ${path.join(testDir, `${slug}.yaml`)}`);
       continue;
     }
 
@@ -195,8 +195,8 @@ async function pullFromCloud(
           continue;
         }
 
-        const safeName = toSafeFilename(testDef.name || testDef.id || '');
-        const outputPath = path.join(testDir, `${safeName}.yaml`);
+        const slug = toUniqueTestFilename(testDef.name || testDef.id || '', testDef.id);
+        const outputPath = path.join(testDir, `${slug}.yaml`);
 
         // Check if file exists
         let exists = false;
@@ -208,14 +208,22 @@ async function pullFromCloud(
         }
 
         if (exists && !force) {
-          console.log(`  Skip: ${safeName}.yaml (exists, use --force to overwrite)`);
+          console.log(`  Skip: ${slug}.yaml (exists, use --force to overwrite)`);
           skipped++;
         } else {
           // Serialize individual test (depends_on stays as UUID)
           const testContent = yaml.stringify(testDef);
           await fs.writeFile(outputPath, testContent, 'utf-8');
-          console.log(success(`  ${safeName}.yaml`));
+          console.log(success(`  ${slug}.yaml`));
           pulled++;
+        }
+
+        // Warn about orphaned legacy files (un-suffixed slug from older qa-use
+        // versions). Names can collide across rows — the legacy file may
+        // represent a different test entirely. We never auto-delete; the user
+        // disambiguates by inspecting the `id` field.
+        if (testDef.id) {
+          await warnLegacyOrphan(testDir, testDef.name || testDef.id, testDef.id);
         }
 
         if (testDef.id) {
@@ -233,6 +241,43 @@ async function pullFromCloud(
   } else {
     console.log(success(`Pulled ${pulled} test(s), skipped ${skipped}`));
   }
+}
+
+/**
+ * Warn about a legacy un-suffixed file from older qa-use versions.
+ *
+ * Pre-name-collision-fix versions wrote `${safeName}.yaml`. Now we always
+ * write `${safeName}-${shortId}.yaml`. After a fresh pull, the legacy file
+ * is left in place — it may belong to this test, or to a different test
+ * with the same name. We never auto-delete; we just nudge the user to
+ * inspect and clean up. Read the local file's `id` to make the message
+ * actionable.
+ */
+async function warnLegacyOrphan(testDir: string, testName: string, testId: string): Promise<void> {
+  const legacySlug = toSafeFilename(testName);
+  const legacyPath = path.join(testDir, `${legacySlug}.yaml`);
+  const newPath = path.join(testDir, `${toUniqueTestFilename(testName, testId)}.yaml`);
+  if (legacyPath === newPath) return;
+  try {
+    await fs.access(legacyPath);
+  } catch {
+    return;
+  }
+  let legacyId: string | undefined;
+  try {
+    const raw = await fs.readFile(legacyPath, 'utf-8');
+    const parsed = yaml.parse(raw) as { id?: string } | null;
+    legacyId = parsed?.id;
+  } catch {
+    // Unreadable / not YAML — still surface the orphan; user decides.
+  }
+  const ownership =
+    legacyId === testId
+      ? 'same id — safe to remove'
+      : legacyId
+        ? `belongs to a different test (${legacyId}) — verify before removing`
+        : 'no `id` field — verify before removing';
+  console.log(warning(`  Legacy file: ${legacySlug}.yaml (${ownership})`));
 }
 
 /**
@@ -254,8 +299,8 @@ async function writeTestsFromContent(
   let skipped = 0;
 
   for (const testDef of tests) {
-    const safeName = toSafeFilename(testDef.name || testDef.id || '');
-    const outputPath = path.join(testDir, `${safeName}.yaml`);
+    const slug = toUniqueTestFilename(testDef.name || testDef.id || '', testDef.id);
+    const outputPath = path.join(testDir, `${slug}.yaml`);
 
     // Check if file exists
     let exists = false;
@@ -267,13 +312,17 @@ async function writeTestsFromContent(
     }
 
     if (exists && !force) {
-      console.log(`  Skip: ${safeName}.yaml (exists, use --force to overwrite)`);
+      console.log(`  Skip: ${slug}.yaml (exists, use --force to overwrite)`);
       skipped++;
     } else {
       const testContent = yaml.stringify(testDef);
       await fs.writeFile(outputPath, testContent, 'utf-8');
-      console.log(success(`  ${safeName}.yaml`));
+      console.log(success(`  ${slug}.yaml`));
       pulled++;
+    }
+
+    if (testDef.id) {
+      await warnLegacyOrphan(testDir, testDef.name || testDef.id, testDef.id);
     }
   }
 
@@ -296,6 +345,36 @@ interface PushOptions {
   dryRun?: boolean;
   force?: boolean;
   testId?: string;
+}
+
+/**
+ * Filter loaded definitions by a `--id` handle.
+ *
+ * The push CLI accepts either a UUID or a name as `--id`. UUIDs are
+ * unambiguous (test ids are unique by construction); names are NOT — multiple
+ * Test rows can legitimately share a `name`. This function returns:
+ *
+ *   - `matched`: the local defs that match the handle (0, 1, or N entries).
+ *   - `ambiguous`: true iff the handle was a *name* and matched ≥2 local defs.
+ *     Callers render the disambiguation banner and exit 1 in that case.
+ *
+ * `ambiguous` is **never** set on the UUID branch — even if some pathological
+ * test row had a duplicate UUID, that's a backend invariant violation, not a
+ * client-side handle-resolution problem. Likewise, an empty `matched` array
+ * is not "ambiguous"; callers print a "not found" error in that case.
+ *
+ * @internal Exported for testing; the action handler in `pushToCloud` is the
+ * only production caller.
+ */
+export function filterDefinitionsByHandle(
+  definitions: ReadonlyArray<{ def: TestDefinition; file: string }>,
+  testId: string
+): { matched: Array<{ def: TestDefinition; file: string }>; ambiguous: boolean } {
+  if (isUuid(testId)) {
+    return { matched: definitions.filter((d) => d.def.id === testId), ambiguous: false };
+  }
+  const matched = definitions.filter((d) => d.def.name === testId);
+  return { matched, ambiguous: matched.length > 1 };
 }
 
 /**
@@ -358,15 +437,32 @@ async function pushToCloud(
     return;
   }
 
-  // Filter to single test if --id provided
+  // Filter to single test if --id provided.
+  //
+  // A UUID-shaped --id is unambiguous (test ids are unique). A name-shaped
+  // --id is a convenience: it works only when exactly one local test
+  // matches that name. Names can collide by design — if the local test
+  // directory has multiple files with the same `name`, refuse the operation
+  // and ask the user to disambiguate by UUID.
   let toImport = definitions;
   if (testId) {
-    toImport = definitions.filter((d) => d.def.id === testId || d.def.name === testId);
-    if (toImport.length === 0) {
+    const { matched, ambiguous } = filterDefinitionsByHandle(definitions, testId);
+    if (ambiguous) {
+      console.log(error(`Ambiguous: '${testId}' matches ${matched.length} local tests by name`));
+      for (const d of matched) {
+        const rel = path.relative(testDir, d.file);
+        console.log(`  - ${d.def.id ?? '<no-id>'}  (${rel})`);
+      }
+      console.log('');
+      console.log('  Names can collide. Use --id <uuid> to disambiguate.');
+      process.exit(1);
+    }
+    if (matched.length === 0) {
       console.log(error(`Test not found: ${testId}`));
       console.log('  Searched by ID and name in local test files');
       process.exit(1);
     }
+    toImport = matched;
     console.log(`Found ${toImport.length} matching test(s)\n`);
   } else {
     console.log(`Found ${definitions.length} local test(s)\n`);
@@ -404,6 +500,38 @@ async function pushToCloud(
 }
 
 /**
+ * Map an imported result entry back to its local file safely.
+ *
+ * Names can collide within an org by design (Test.matrix is JSONB on a single
+ * row, so multiple rows legitimately share a `name`). The previous
+ * `id || name` fallback could silently target the wrong local file:
+ *
+ * 1. **Prefer id-match.** When the local def already has an id, that id is
+ *    unambiguous — match on it first.
+ * 2. **Fall back to name-match only for brand-new defs.** A first-push def
+ *    has no local id; the cloud has assigned one. We can still recover the
+ *    mapping via name, but only when exactly one local def with that name
+ *    has no id. If two un-id'd locals share a name, we refuse rather than
+ *    pick the wrong one.
+ *
+ * Callers handle the `null` case explicitly (skip conflict-path push, log a
+ * warning before version_hash writeback, etc.).
+ *
+ * @internal Exported for testing; callers in this module are the only
+ * production consumers.
+ */
+export function findLocalForImported(
+  imported: { id: string; name: string },
+  toImport: ReadonlyArray<{ def: TestDefinition; file: string }>
+): { def: TestDefinition; file: string } | null {
+  const byId = toImport.find((d) => d.def.id === imported.id);
+  if (byId) return byId;
+  const candidates = toImport.filter((d) => !d.def.id && d.def.name === imported.name);
+  if (candidates.length === 1) return candidates[0];
+  return null;
+}
+
+/**
  * Render the result of an importTestDefinition call: print per-test action
  * summary, refresh local version_hash, and surface conflicts/errors.
  *
@@ -435,9 +563,7 @@ export async function renderImportResult(
         break;
       case 'conflict': {
         console.log(warning(`  CONFLICT: ${imported.name} - ${imported.message}`));
-        const localDef = toImport.find(
-          (d) => d.def.id === imported.id || d.def.name === imported.name
-        );
+        const localDef = findLocalForImported(imported, toImport);
         if (localDef) {
           const relPath = path.relative(testDir, localDef.file);
           const nameWithoutExt = relPath.replace(/\.(yaml|yml|json)$/, '');
@@ -454,17 +580,21 @@ export async function renderImportResult(
   // Update local files with new version_hash after successful push
   for (const imported of result.imported) {
     if (imported.version_hash && (imported.action === 'created' || imported.action === 'updated')) {
-      const localDef = toImport.find(
-        (d) => d.def.id === imported.id || d.def.name === imported.name
-      );
-      if (localDef) {
-        try {
-          await updateLocalVersionHash(localDef.file, imported.version_hash);
-        } catch (err) {
-          console.log(
-            warning(`  Failed to update version_hash in ${localDef.file}: ${formatError(err)}`)
-          );
-        }
+      const localDef = findLocalForImported(imported, toImport);
+      if (!localDef) {
+        console.log(
+          warning(
+            `  Could not unambiguously map imported '${imported.name}' back to a local file — version_hash not updated. Pull or push by --id <uuid> to resolve.`
+          )
+        );
+        continue;
+      }
+      try {
+        await updateLocalVersionHash(localDef.file, imported.version_hash);
+      } catch (err) {
+        console.log(
+          warning(`  Failed to update version_hash in ${localDef.file}: ${formatError(err)}`)
+        );
       }
     }
   }

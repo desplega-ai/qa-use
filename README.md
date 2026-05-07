@@ -70,6 +70,8 @@ qa-use test run --all           # Run all tests
 
 Run `qa-use test --help` for all options.
 
+> **Filename suffix (≥ 2.17).** `pull` writes one file per cloud test as `${safe-name}-${short-id}.yaml`, where `${short-id}` is the first 8 hex chars of the test UUID. Test names can collide within an org by design, so the suffix guarantees one local file per cloud row. If you upgrade from an earlier version, the next `pull` will write new suffixed files alongside any legacy un-suffixed file you had — qa-use prints a one-line `Legacy file: …` notice per orphan and never auto-deletes. Inspect the legacy file's `id:` field; remove it manually once you've confirmed it's not load-bearing.
+
 ### Browser Commands
 
 Interactive browser control for test development and debugging:
