@@ -194,28 +194,32 @@ await section('Section 1: Browser Commands', () => {
 await section('Section 2: Table Filtering', () => {
 	let sessionId = '';
 
+	// Loads /table directly. The home → click("Table Demo") path triggers a
+	// React reconciliation crash under a qa-use tunneled session — see
+	// DES-356. The page itself is healthy; only client-side <Link> navigation
+	// from home crashes. Direct loads work fine and exercise the same filter
+	// regression coverage Section 2 was originally written for.
+	const TABLE_URL = `${EVALS_URL.replace(/\/?$/, '')}/table`;
+
 	try {
-		// 1. Create session
-		const createOut = runOrThrow(['browser', 'create', EVALS_URL]);
+		// 1. Create session directly on /table
+		const createOut = runOrThrow(['browser', 'create', TABLE_URL]);
 		sessionId = parseSessionId(createOut);
 
-		// 2. Navigate to Table Demo
-		runOrThrow(['browser', 'click', '--text', 'Table Demo']);
-
-		// 3. Verify table page and find filter input ref
+		// 2. Verify table page and find filter input ref
 		const snap1 = runOrThrow(['browser', 'snapshot']);
 		assert(snap1.includes('Filter by name'), 'Table page has filter input');
 		const filterRef = extractRef(snap1, /textbox.*?ref=(\w+)/);
 
-		// 4. Fill filter with "John" using ref from snapshot
+		// 3. Fill filter with "John" using ref from snapshot
 		runOrThrow(['browser', 'fill', filterRef, 'John']);
 
-		// 5. Verify filtered results
+		// 4. Verify filtered results
 		const snap2 = runOrThrow(['browser', 'snapshot']);
 		assert(snap2.includes('John Doe'), 'Filtered snapshot contains "John Doe"');
 		assert(!snap2.includes('Alice Brown'), 'Filtered snapshot does NOT contain "Alice Brown"');
 
-		// 6. Close
+		// 5. Close
 		runOrThrow(['browser', 'close']);
 		assert(true, 'Session closed');
 	} finally {
