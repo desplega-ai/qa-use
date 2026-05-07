@@ -94,7 +94,9 @@ describe('syncCommand', () => {
     it('should have --id option', () => {
       const idOption = pushCommand?.options.find((o) => o.long === '--id');
       expect(idOption).toBeDefined();
-      expect(idOption?.description).toBe('Push single test by ID');
+      expect(idOption?.description).toBe(
+        'Push single test by UUID, or by name when unique among local files'
+      );
     });
 
     it('should have --all option', () => {
@@ -150,7 +152,7 @@ describe('syncCommand', () => {
 
       it('should parse --id option with argument', () => {
         const idOption = pushCommand?.options.find((o) => o.long === '--id');
-        expect(idOption?.flags).toContain('<uuid>');
+        expect(idOption?.flags).toContain('<id-or-name>');
       });
 
       it('should have boolean --all option (no argument)', () => {

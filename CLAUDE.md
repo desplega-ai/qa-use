@@ -65,7 +65,7 @@ Required: `QA_USE_API_KEY=xxx`. Optional: `QA_USE_REGION=us|auto` (default `auto
 
 A `~/.qa-use.json` config file is also supported. **Env vars take precedence over the file.** The file may include a top-level `"tunnel": "auto" | "on" | "off"` (see tunnel block below).
 
-For local backend work, the repo's `.qa-use.json` is pre-configured with `localhost:5005` and a valid API key — no extra env setup needed.
+The repo's `.qa-use.json` is pre-configured against `https://api.desplega.ai` with a valid `api_key` — no extra env setup needed. It also carries an underscore-prefixed `_api_url` / `_api_key` pair pointing at `http://localhost:5005`; swap the underscores to flip between prod and local backend without touching env vars.
 
 </important>
 
@@ -178,7 +178,7 @@ Requires `.qa-use.json` in the repo root (valid `api_key` + `api_url`) and the b
 
 <important if="you need to manually exercise browser CLI flows against a local backend (snapshot/click/screenshot/logs)">
 
-Test site is https://evals.desplega.ai/ (buttons, checkboxes, forms, tables for component testing). Repo `.qa-use.json` is pre-configured for `localhost:5005`.
+Test site is https://evals.desplega.ai/ (buttons, checkboxes, forms, tables for component testing). Repo `.qa-use.json` defaults to `https://api.desplega.ai`; swap the underscore prefix on `api_url` / `api_key` to flip to `http://localhost:5005` for local backend work.
 
 Representative flow:
 

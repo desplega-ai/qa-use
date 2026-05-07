@@ -61,15 +61,15 @@ const pullCommand = new Command('pull')
 // Push subcommand
 const pushCommand = new Command('push')
   .description('Push local tests to cloud')
-  .option('--id <uuid>', 'Push single test by ID')
+  .option('--id <id-or-name>', 'Push single test by UUID, or by name when unique among local files')
   .option('--all', 'Push all local tests')
   .option('--dry-run', 'Show what would be synced without making changes')
   .option('--force', 'Overwrite cloud tests without version check')
   .action(async (options) => {
     // Require --id or --all
     if (!options.id && !options.all) {
-      console.log(error('Must specify --id <uuid> or --all'));
-      console.log('  Use --id to push a single test');
+      console.log(error('Must specify --id <id-or-name> or --all'));
+      console.log('  Use --id to push a single test (UUID, or name if unique locally)');
       console.log('  Use --all to push all local tests');
       process.exit(1);
     }
