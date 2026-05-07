@@ -348,6 +348,36 @@ interface PushOptions {
 }
 
 /**
+ * Filter loaded definitions by a `--id` handle.
+ *
+ * The push CLI accepts either a UUID or a name as `--id`. UUIDs are
+ * unambiguous (test ids are unique by construction); names are NOT — multiple
+ * Test rows can legitimately share a `name`. This function returns:
+ *
+ *   - `matched`: the local defs that match the handle (0, 1, or N entries).
+ *   - `ambiguous`: true iff the handle was a *name* and matched ≥2 local defs.
+ *     Callers render the disambiguation banner and exit 1 in that case.
+ *
+ * `ambiguous` is **never** set on the UUID branch — even if some pathological
+ * test row had a duplicate UUID, that's a backend invariant violation, not a
+ * client-side handle-resolution problem. Likewise, an empty `matched` array
+ * is not "ambiguous"; callers print a "not found" error in that case.
+ *
+ * @internal Exported for testing; the action handler in `pushToCloud` is the
+ * only production caller.
+ */
+export function filterDefinitionsByHandle(
+  definitions: ReadonlyArray<{ def: TestDefinition; file: string }>,
+  testId: string
+): { matched: Array<{ def: TestDefinition; file: string }>; ambiguous: boolean } {
+  if (isUuid(testId)) {
+    return { matched: definitions.filter((d) => d.def.id === testId), ambiguous: false };
+  }
+  const matched = definitions.filter((d) => d.def.name === testId);
+  return { matched, ambiguous: matched.length > 1 };
+}
+
+/**
  * Present-tense verb for dry-run "Would <verb>: <name>" lines.
  *
  * `ImportedTest.action` values are past tense (created, updated…) because
@@ -416,26 +446,23 @@ async function pushToCloud(
   // and ask the user to disambiguate by UUID.
   let toImport = definitions;
   if (testId) {
-    if (isUuid(testId)) {
-      toImport = definitions.filter((d) => d.def.id === testId);
-    } else {
-      toImport = definitions.filter((d) => d.def.name === testId);
-      if (toImport.length > 1) {
-        console.log(error(`Ambiguous: '${testId}' matches ${toImport.length} local tests by name`));
-        for (const d of toImport) {
-          const rel = path.relative(testDir, d.file);
-          console.log(`  - ${d.def.id ?? '<no-id>'}  (${rel})`);
-        }
-        console.log('');
-        console.log('  Names can collide. Use --id <uuid> to disambiguate.');
-        process.exit(1);
+    const { matched, ambiguous } = filterDefinitionsByHandle(definitions, testId);
+    if (ambiguous) {
+      console.log(error(`Ambiguous: '${testId}' matches ${matched.length} local tests by name`));
+      for (const d of matched) {
+        const rel = path.relative(testDir, d.file);
+        console.log(`  - ${d.def.id ?? '<no-id>'}  (${rel})`);
       }
+      console.log('');
+      console.log('  Names can collide. Use --id <uuid> to disambiguate.');
+      process.exit(1);
     }
-    if (toImport.length === 0) {
+    if (matched.length === 0) {
       console.log(error(`Test not found: ${testId}`));
       console.log('  Searched by ID and name in local test files');
       process.exit(1);
     }
+    toImport = matched;
     console.log(`Found ${toImport.length} matching test(s)\n`);
   } else {
     console.log(`Found ${definitions.length} local test(s)\n`);
@@ -489,8 +516,11 @@ async function pushToCloud(
  *
  * Callers handle the `null` case explicitly (skip conflict-path push, log a
  * warning before version_hash writeback, etc.).
+ *
+ * @internal Exported for testing; callers in this module are the only
+ * production consumers.
  */
-function findLocalForImported(
+export function findLocalForImported(
   imported: { id: string; name: string },
   toImport: ReadonlyArray<{ def: TestDefinition; file: string }>
 ): { def: TestDefinition; file: string } | null {

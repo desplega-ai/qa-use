@@ -6,7 +6,30 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { syncCommand, updateLocalVersionHash } from './sync.js';
+import type { TestDefinition } from '../../../types/test-definition.js';
+import {
+  filterDefinitionsByHandle,
+  findLocalForImported,
+  syncCommand,
+  updateLocalVersionHash,
+} from './sync.js';
+
+// ---------------------------------------------------------------------------
+// Test fixtures helpers
+// ---------------------------------------------------------------------------
+//
+// We only ever care about `id` + `name` for the resolution helpers under test
+// — the other TestDefinition fields are irrelevant to the disambiguation
+// logic. `mkDef` keeps each fixture line short and intent-revealing.
+function mkDef(name: string, id?: string): { def: TestDefinition; file: string } {
+  const def: TestDefinition = id
+    ? ({ name, id, steps: [] } as unknown as TestDefinition)
+    : ({ name, steps: [] } as unknown as TestDefinition);
+  // Synthesize a file path. Disambiguates entries with the same name when we
+  // assert which entry came back.
+  const file = `qa-tests/${name.toLowerCase().replace(/\s+/g, '-')}${id ? `-${id.slice(0, 4)}` : ''}.yaml`;
+  return { def, file };
+}
 
 describe('syncCommand', () => {
   describe('command structure', () => {
@@ -288,5 +311,137 @@ steps:
     const nonExistentFile = path.join(tempDir, 'does-not-exist.yaml');
 
     await expect(updateLocalVersionHash(nonExistentFile, 'hash')).rejects.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// filterDefinitionsByHandle
+// ---------------------------------------------------------------------------
+//
+// The `--id` handle on `qa-use test sync push` accepts either a UUID or a
+// name. UUIDs are unambiguous; names can collide. The function under test
+// returns a structured `{ matched, ambiguous }` shape — the CLI runtime
+// renders the disambiguation banner and exits 1 when `ambiguous` is true.
+// These tests pin the *resolution* contract; the banner / exit live in the
+// action handler (covered by Phase 3 e2e).
+
+describe('filterDefinitionsByHandle', () => {
+  const aaaaUuid = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
+  const bbbbUuid = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
+
+  it('resolves a unique uuid match to one entry, no ambiguity', () => {
+    const defs = [mkDef('Login', aaaaUuid), mkDef('Logout', bbbbUuid)];
+    const result = filterDefinitionsByHandle(defs, aaaaUuid);
+    expect(result.matched).toHaveLength(1);
+    expect(result.matched[0]?.def.id).toBe(aaaaUuid);
+    expect(result.ambiguous).toBe(false);
+  });
+
+  it('resolves a unique name match to one entry, no ambiguity (BC)', () => {
+    const defs = [mkDef('Solo', aaaaUuid), mkDef('Other', bbbbUuid)];
+    const result = filterDefinitionsByHandle(defs, 'Solo');
+    expect(result.matched).toHaveLength(1);
+    expect(result.matched[0]?.def.name).toBe('Solo');
+    expect(result.ambiguous).toBe(false);
+  });
+
+  it('flags ambiguity and returns all colliding entries when a name matches ≥2 defs', () => {
+    const defs = [mkDef('Dup', aaaaUuid), mkDef('Dup', bbbbUuid), mkDef('Other', undefined)];
+    const result = filterDefinitionsByHandle(defs, 'Dup');
+    expect(result.ambiguous).toBe(true);
+    expect(result.matched).toHaveLength(2);
+    const ids = result.matched.map((m) => m.def.id);
+    expect(ids).toContain(aaaaUuid);
+    expect(ids).toContain(bbbbUuid);
+  });
+
+  it('returns 0 matches and no ambiguity when a name does not match anything', () => {
+    const defs = [mkDef('Login', aaaaUuid), mkDef('Logout', bbbbUuid)];
+    const result = filterDefinitionsByHandle(defs, 'Nope');
+    expect(result.matched).toHaveLength(0);
+    expect(result.ambiguous).toBe(false);
+  });
+
+  it('returns 0 matches and no ambiguity when a uuid does not match anything', () => {
+    const missingUuid = 'cccccccc-cccc-4ccc-cccc-cccccccccccc';
+    const defs = [mkDef('Login', aaaaUuid), mkDef('Logout', bbbbUuid)];
+    const result = filterDefinitionsByHandle(defs, missingUuid);
+    expect(result.matched).toHaveLength(0);
+    expect(result.ambiguous).toBe(false);
+  });
+
+  it('routes a uuid-shaped handle through the UUID branch — does NOT fall back to name', () => {
+    // Regression-guard: a local def whose `name` literally equals a UUID must
+    // not be picked up by the name-branch when the handle is the same UUID.
+    // The `isUuid` gate must take precedence.
+    const defs = [
+      // A def whose *name* is a uuid string but whose id is something else.
+      mkDef(aaaaUuid, bbbbUuid),
+    ];
+    const result = filterDefinitionsByHandle(defs, aaaaUuid);
+    // Routed through UUID branch → looks up by id, finds nothing.
+    expect(result.matched).toHaveLength(0);
+    expect(result.ambiguous).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findLocalForImported
+// ---------------------------------------------------------------------------
+//
+// Maps an imported result entry (always has id + name from the cloud) back to
+// its local file. Prefers id-match. Falls back to name-match only when there
+// is exactly one un-id'd local def with that name. Refuses to silently
+// mis-target — the trap case is matching a brand-new local def against an
+// imported entry whose id collides with a *different* local def by name.
+
+describe('findLocalForImported', () => {
+  const importedId = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
+  const otherUuid = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
+
+  it('prefers id-match when local has the same id', () => {
+    const toImport = [
+      mkDef('Login', importedId), // <-- target
+      mkDef('Login'), // un-id'd same-name decoy
+      mkDef('Logout', otherUuid),
+    ];
+    const result = findLocalForImported({ id: importedId, name: 'Login' }, toImport);
+    expect(result?.def.id).toBe(importedId);
+    // Sanity: it picked the id-match, NOT the un-id'd decoy.
+    expect(result?.file).toBe(toImport[0]?.file);
+  });
+
+  it('falls back to name-match for a brand-new (un-id) local with exactly one such candidate', () => {
+    // The local def has no id (first push). The cloud assigned `importedId`.
+    // We can recover the mapping via name because exactly one un-id'd local
+    // has that name.
+    const toImport = [mkDef('NewTest'), mkDef('Other', otherUuid)];
+    const result = findLocalForImported({ id: importedId, name: 'NewTest' }, toImport);
+    expect(result?.def.name).toBe('NewTest');
+    expect(result?.def.id).toBeUndefined();
+  });
+
+  it('returns null when multiple un-id local defs share the imported name', () => {
+    const toImport = [mkDef('Dup'), mkDef('Dup'), mkDef('Other', otherUuid)];
+    const result = findLocalForImported({ id: importedId, name: 'Dup' }, toImport);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when an imported id matches nothing AND a name-only candidate has an id (the trap)', () => {
+    // The trap: imported entry has an id, but no local def has that id. There
+    // IS a local def with the same name — but it has *its own* different id.
+    // We must NOT match by name in that case (the local def represents a
+    // different cloud row). Result: null.
+    const toImport = [
+      mkDef('Login', otherUuid), // same name, different id — must not be picked
+    ];
+    const result = findLocalForImported({ id: importedId, name: 'Login' }, toImport);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when nothing matches by id or name', () => {
+    const toImport = [mkDef('Other', otherUuid)];
+    const result = findLocalForImported({ id: importedId, name: 'Login' }, toImport);
+    expect(result).toBeNull();
   });
 });
