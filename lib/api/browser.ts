@@ -5,6 +5,7 @@
 import type { AxiosInstance } from 'axios';
 import axios from 'axios';
 import type { ExtendedStep } from '../../src/types/test-definition.js';
+import { resolveForcedHeadless } from '../env/force-headless.js';
 import { getCustomHeaders, getEnv } from '../env/index.js';
 import type {
   ActionResult,
@@ -83,9 +84,16 @@ export class BrowserApiClient {
    * Create a new browser session
    */
   async createSession(options: CreateBrowserSessionOptions = {}): Promise<BrowserSession> {
+    // Defense-in-depth: even if a caller forgot the CLI fast-fail check,
+    // refuse to ask the backend for a headful session when force-headless
+    // is on. Throws on explicit `false`, coerces undefined → true.
+    const headless = resolveForcedHeadless(
+      options.headless,
+      'remote session createSession({ headless })'
+    );
     try {
       const response = await this.client.post('/sessions', {
-        headless: options.headless ?? true,
+        headless: headless ?? true,
         viewport_type: options.viewport ?? 'desktop',
         timeout: options.timeout ?? 300,
         ...(options.ws_url && { ws_url: options.ws_url }),

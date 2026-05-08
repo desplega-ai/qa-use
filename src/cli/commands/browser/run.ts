@@ -6,6 +6,7 @@ import * as readline from 'node:readline';
 import { Command } from 'commander';
 import type { BrowserApiClient } from '../../../../lib/api/browser.js';
 import type { FileUploadData, ScrollDirection } from '../../../../lib/api/browser-types.js';
+import { assertHeadlessAllowed } from '../../../../lib/env/force-headless.js';
 import { getTunnelModeFromConfig } from '../../../../lib/env/index.js';
 import {
   createStoredSession,
@@ -63,6 +64,14 @@ export const runCommand = addTunnelOption(
       {}
     )
 ).action(async (options: RunOptions) => {
+  // Fast-fail on `--no-headless` when QA_USE_FORCE_HEADLESS is set.
+  try {
+    assertHeadlessAllowed(options.headless, '--no-headless flag');
+  } catch (err) {
+    console.log(error(err instanceof Error ? err.message : String(err)));
+    process.exit(1);
+  }
+
   // Resolve tri-state tunnel flag for REPL session creation.
   // Phase 2: the mode + auto-inference are resolved here, but the REPL
   // does not yet start a tunnel on its own — it only creates backend

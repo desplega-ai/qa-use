@@ -15,6 +15,10 @@ import { Command } from 'commander';
 import type { BrowserApiClient } from '../../../../lib/api/browser.js';
 import type { ViewportType } from '../../../../lib/api/browser-types.js';
 import { BrowserManager } from '../../../../lib/browser/index.js';
+import {
+  assertHeadlessAllowed,
+  resolveForcedHeadless,
+} from '../../../../lib/env/force-headless.js';
 import { getAgentSessionId, getTunnelModeFromConfig } from '../../../../lib/env/index.js';
 import {
   isPidAlive,
@@ -81,6 +85,16 @@ export const createCommand = addTunnelOption(
     )
 ).action(async (startUrl: string | undefined, options: CreateOptions) => {
   options.startUrl = startUrl;
+
+  // Fast-fail on `--no-headless` when QA_USE_FORCE_HEADLESS is set.
+  // Runs before any tunnel/config/API work so we don't spawn a detached
+  // child only to have it crash later.
+  try {
+    assertHeadlessAllowed(options.headless, '--no-headless flag');
+  } catch (err) {
+    console.log(error(err instanceof Error ? err.message : String(err)));
+    process.exit(1);
+  }
 
   // Resolve tri-state tunnel flag: CLI > config > default 'auto'.
   const resolvedTunnelMode = resolveTunnelFlag(options.tunnel, getTunnelModeFromConfig());
@@ -170,7 +184,11 @@ async function runDetachedTunnelMode(
     '--timeout',
     String(timeout),
   ];
-  if (options.headless === true) {
+  // QA_USE_FORCE_HEADLESS coerces undefined/auto to headless=true; the
+  // CLI fast-fail above already rejected explicit --no-headless when force
+  // is on, so this only kicks in for the auto-defaulted-headful tunnel path.
+  const effectiveHeadless = resolveForcedHeadless(options.headless);
+  if (effectiveHeadless === true) {
     detachArgs.push('--headless');
   }
   if (options.startUrl) {

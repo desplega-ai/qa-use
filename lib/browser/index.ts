@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import type { Browser, BrowserServer } from 'playwright';
 import { chromium } from 'playwright';
+import { resolveForcedHeadless } from '../env/force-headless.js';
 
 export interface BrowserInstallationStatus {
   installed: boolean;
@@ -32,6 +33,13 @@ export class BrowserManager {
       throw new Error('Browser session already active');
     }
 
+    // Hard chokepoint for QA_USE_FORCE_HEADLESS: throws on explicit
+    // `headless: false` when force is on, coerces undefined→true otherwise.
+    const headless = resolveForcedHeadless(
+      options.headless,
+      'BrowserManager.startBrowser({ headless: false })'
+    );
+
     const defaultArgs = [
       '--disable-dev-shm-usage',
       '--no-sandbox',
@@ -49,7 +57,7 @@ export class BrowserManager {
 
     try {
       const browserServer = await chromium.launchServer({
-        headless: options.headless ?? true,
+        headless: headless ?? true,
         args: [...defaultArgs, ...(options.args || [])],
         handleSIGINT: false,
         handleSIGTERM: false,

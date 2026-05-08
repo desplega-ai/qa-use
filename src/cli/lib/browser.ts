@@ -6,6 +6,7 @@
  */
 
 import { BrowserManager } from '../../../lib/browser/index.js';
+import { resolveForcedHeadless } from '../../../lib/env/force-headless.js';
 import { classifyTunnelFailure, TunnelError } from '../../../lib/tunnel/errors.js';
 import type { TunnelManager } from '../../../lib/tunnel/index.js';
 import { type TunnelHandle, tunnelRegistry } from '../../../lib/tunnel/registry.js';
@@ -102,10 +103,15 @@ export async function startBrowserWithTunnel(
   let tunnelHandle: TunnelHandle | null = null;
   let publicWsUrl: string | null = null;
 
-  // Start browser
+  // Start browser. resolveForcedHeadless throws on explicit headful when
+  // QA_USE_FORCE_HEADLESS is set; otherwise passthrough.
+  const headless = resolveForcedHeadless(
+    options.headless,
+    'startBrowserWithTunnel({ headless: false })'
+  );
   console.error('Starting browser...');
   const browserSession = await browser.startBrowser({
-    headless: options.headless ?? true,
+    headless: headless ?? true,
   });
 
   const wsUrl = browserSession.wsEndpoint;

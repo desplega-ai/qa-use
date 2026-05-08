@@ -217,6 +217,7 @@ Alternatively, create a `.qa-use.json` in your project root or `~/.qa-use.json` 
 | `QA_USE_APP_URL` | App URL | `https://app.desplega.ai` |
 | `QA_USE_REGION` | Region (`us` or `auto`) | `auto` |
 | `QA_USE_DEFAULT_APP_CONFIG_ID` | Default app config | (from API key) |
+| `QA_USE_FORCE_HEADLESS` | When truthy (`1`/`true`/`yes`/`on`), forces `headless=true` on every browser launch and errors on any explicit headful request (`--no-headless`, `--headful`, `defaults.headless: false`). | (unset) |
 
 ## CI/CD Integration
 

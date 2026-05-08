@@ -7,6 +7,7 @@ import { homedir } from 'node:os';
 import * as path from 'node:path';
 import { BrowserApiClient } from '../../../lib/api/browser.js';
 import { ApiClient } from '../../../lib/api/index.js';
+import { assertHeadlessAllowed } from '../../../lib/env/force-headless.js';
 
 export interface CliConfig {
   env?: Record<string, string>;
@@ -152,6 +153,14 @@ export async function loadConfig(): Promise<CliConfig> {
 
   if (Object.keys(resolvedHeaders).length > 0) {
     config.headers = resolvedHeaders;
+  }
+
+  // QA_USE_FORCE_HEADLESS: refuse to load a config that requests headful.
+  // Catches `defaults.headless: false` set in .qa-use.json — without this
+  // the user could think the env var is honored when in fact a stale
+  // config file would silently flip headless back on.
+  if (config.defaults?.headless === false) {
+    assertHeadlessAllowed(false, `defaults.headless: false in ${configPath ?? '.qa-use.json'}`);
   }
 
   return config;

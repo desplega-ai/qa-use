@@ -21,6 +21,7 @@
 import { Command } from 'commander';
 import type { ViewportType } from '../../../../lib/api/browser-types.js';
 import { BrowserManager } from '../../../../lib/browser/index.js';
+import { resolveForcedHeadless } from '../../../../lib/env/force-headless.js';
 import { getAgentSessionId } from '../../../../lib/env/index.js';
 import {
   type DetachedSessionRecord,
@@ -181,7 +182,13 @@ async function runDetached(spawnId: string, options: DetachOptions): Promise<voi
 
     const viewport = (options.viewport ?? 'desktop') as ViewportType;
     const timeout = options.timeout ? parseInt(options.timeout, 10) : 300;
-    const headless = options.headless === true;
+    // resolveForcedHeadless throws on explicit --headless=false when
+    // QA_USE_FORCE_HEADLESS is set; otherwise passthrough. We coerce
+    // the commander default (`false`) to a boolean so the assertion
+    // can distinguish "headful requested" from "no flag passed".
+    const requested = options.headless === true;
+    const resolved = resolveForcedHeadless(requested, '__browser-detach --headless=false');
+    const headless = resolved === true;
     const tunnelOn = options.tunnelMode === 'on';
     const vars = options.varJson
       ? (JSON.parse(options.varJson) as Record<string, string>)

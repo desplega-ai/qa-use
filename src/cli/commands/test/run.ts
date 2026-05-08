@@ -3,6 +3,7 @@
  */
 
 import { Command } from 'commander';
+import { assertHeadlessAllowed } from '../../../../lib/env/force-headless.js';
 import { getAgentSessionId, getTunnelModeFromConfig } from '../../../../lib/env/index.js';
 import {
   type BrowserTunnelSession,
@@ -70,6 +71,18 @@ export const runCommand = addTunnelOption(
     )
     .option('--verbose', 'Output raw SSE event data for debugging')
 ).action(async (test, options) => {
+  // Fast-fail on `--headful` when QA_USE_FORCE_HEADLESS is set, before
+  // we touch the test loader / API client. Keeps the policy message in
+  // front of unrelated errors (missing file, invalid api key, etc).
+  if (options.headful) {
+    try {
+      assertHeadlessAllowed(false, '--headful flag');
+    } catch (err) {
+      console.log(error(err instanceof Error ? err.message : String(err)));
+      process.exit(1);
+    }
+  }
+
   try {
     const config = await loadConfig();
 

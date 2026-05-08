@@ -1317,6 +1317,85 @@ await section('Section 17: Test sync name-collision regression', () => {
 	}
 });
 
+// ---------------------------------------------------------------------------
+// Section 18: QA_USE_FORCE_HEADLESS policy switch
+// ---------------------------------------------------------------------------
+//
+// With `QA_USE_FORCE_HEADLESS=1`, every explicit headful request must fail
+// fast with a clear error mentioning the env var. Tests three entry points:
+//   1. `browser create --no-headless`
+//   2. `browser run --no-headless`
+//   3. `test run ... --headful`
+// All three should exit non-zero before any backend call is made (so this
+// section runs without needing a reachable backend).
+await section('Section 18: QA_USE_FORCE_HEADLESS policy switch', () => {
+	const env = { QA_USE_FORCE_HEADLESS: '1' };
+
+	// 1. `browser create --no-headless` — must fail at CLI fast-fail.
+	const create = run(
+		['browser', 'create', '--no-headless', EVALS_URL],
+		10_000,
+		env,
+	);
+	const createOut = stripAnsi(`${create.stdout}\n${create.stderr}`);
+	assert(
+		create.exitCode !== 0,
+		`browser create --no-headless exits non-zero with QA_USE_FORCE_HEADLESS=1 (exit=${create.exitCode})`,
+	);
+	assert(
+		/QA_USE_FORCE_HEADLESS/.test(createOut),
+		'browser create error message mentions QA_USE_FORCE_HEADLESS',
+	);
+	assert(
+		/--no-headless flag/.test(createOut),
+		'browser create error message mentions --no-headless flag as the trigger',
+	);
+
+	// 2. `browser run --no-headless` — REPL parity.
+	// Pipe an immediate `exit` so the REPL would close cleanly if it ever started.
+	const replProc = spawnSync(
+		cmdPrefix.split(/\s+/)[0],
+		[...cmdPrefix.split(/\s+/).slice(1), 'browser', 'run', '--no-headless'],
+		{
+			cwd: resolve(import.meta.dirname, '..'),
+			encoding: 'utf-8',
+			timeout: 10_000,
+			input: 'exit\n',
+			env: { ...process.env, ...env },
+		},
+	);
+	const replOut = stripAnsi(`${replProc.stdout ?? ''}\n${replProc.stderr ?? ''}`);
+	assert(
+		(replProc.status ?? 1) !== 0,
+		`browser run --no-headless exits non-zero (exit=${replProc.status})`,
+	);
+	assert(
+		/QA_USE_FORCE_HEADLESS/.test(replOut),
+		'browser run error message mentions QA_USE_FORCE_HEADLESS',
+	);
+
+	// 3. `test run --headful` — must error before tunnel-mode validation.
+	// Use a non-existent test name; force-headless check should fire first.
+	const testRun = run(
+		['test', 'run', 'this-test-does-not-exist', '--tunnel', 'on', '--headful'],
+		10_000,
+		env,
+	);
+	const testOut = stripAnsi(`${testRun.stdout}\n${testRun.stderr}`);
+	assert(
+		testRun.exitCode !== 0,
+		`test run --headful exits non-zero with QA_USE_FORCE_HEADLESS=1 (exit=${testRun.exitCode})`,
+	);
+	assert(
+		/QA_USE_FORCE_HEADLESS/.test(testOut),
+		'test run error message mentions QA_USE_FORCE_HEADLESS',
+	);
+	assert(
+		/--headful flag/.test(testOut),
+		'test run error message mentions --headful flag as the trigger',
+	);
+});
+
 // Local copy of `toSafeFilename` from src/utils/strings.ts. Inlined here to
 // avoid a TypeScript path import — scripts/e2e.ts is a top-level executable.
 function toSafeFilenameLocal(name: string, fallback = 'unnamed-test'): string {

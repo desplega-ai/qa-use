@@ -63,6 +63,8 @@ When implementing a multi-phase plan, run this after each phase before proceedin
 
 Required: `QA_USE_API_KEY=xxx`. Optional: `QA_USE_REGION=us|auto` (default `auto`), `QA_USE_API_URL=xxx` to override the endpoint.
 
+`QA_USE_FORCE_HEADLESS=1` (or `true`/`yes`/`on`) is a hard policy switch — every browser launch is forced to `headless=true`, and any explicit headful request (`--no-headless`, `--headful`, `defaults.headless: false`) fails fast with a clear error. Use it on CI/locked-down hosts where a visible browser must never open. Implemented in `lib/env/force-headless.ts`; enforced at `BrowserManager.startBrowser`, `createSession` (remote), the CLI entry points, and the config loader.
+
 A `~/.qa-use.json` config file is also supported. **Env vars take precedence over the file.** The file may include a top-level `"tunnel": "auto" | "on" | "off"` (see tunnel block below).
 
 The repo's `.qa-use.json` is pre-configured against `https://api.desplega.ai` with a valid `api_key` — no extra env setup needed. It also carries an underscore-prefixed `_api_url` / `_api_key` pair pointing at `http://localhost:5005`; swap the underscores to flip between prod and local backend without touching env vars.
