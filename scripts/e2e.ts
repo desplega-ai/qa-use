@@ -584,12 +584,38 @@ await section('Section 7b: Checks and Check Schedules', () => {
 			assert(del.exitCode === 0, 'Disposable check deleted');
 		}
 		if (scheduleId) {
-			const infoAfterDelete = run(['check-schedule', 'info', scheduleId, '--json'], 15_000);
-			assert(infoAfterDelete.exitCode !== 0, 'Disposable schedule is not fetchable after cleanup');
+			const schedulesAfterDelete = parseJsonArrayOutput(
+				runOrThrow(['check-schedule', 'list', '--json', '--q', nonce, '--limit', '10']),
+				'check-schedule list after delete'
+			);
+			assert(
+				!schedulesAfterDelete.some((schedule) => {
+					return (
+						typeof schedule === 'object' &&
+						schedule !== null &&
+						'id' in schedule &&
+						schedule.id === scheduleId
+					);
+				}),
+				'Disposable schedule is absent from list after cleanup'
+			);
 		}
 		if (checkId) {
-			const infoAfterDelete = run(['check', 'info', checkId, '--json'], 15_000);
-			assert(infoAfterDelete.exitCode !== 0, 'Disposable check is not fetchable after cleanup');
+			const checksAfterDelete = parseJsonArrayOutput(
+				runOrThrow(['check', 'list', '--json', '--q', nonce, '--limit', '10']),
+				'check list after delete'
+			);
+			assert(
+				!checksAfterDelete.some((check) => {
+					return (
+						typeof check === 'object' &&
+						check !== null &&
+						'id' in check &&
+						check.id === checkId
+					);
+				}),
+				'Disposable check is absent from list after cleanup'
+			);
 		}
 	}
 });
