@@ -9,6 +9,7 @@
  *   bun release patch        # Bump patch version
  *   bun release minor        # Bump minor version
  *   bun release major        # Bump major version
+ *   bun release current      # Use version already in package.json (skip bump/commit)
  */
 
 import { $ } from 'bun';
@@ -116,10 +117,17 @@ async function main() {
 
   // Determine new version
   let newVersion: string;
+  let useCurrent = false;
   const arg = process.argv[2];
 
   if (arg) {
-    if (['major', 'minor', 'patch'].includes(arg)) {
+    if (arg === 'current') {
+      newVersion = currentVersion;
+      useCurrent = true;
+      console.log(
+        `♻️  Using current version from package.json: ${newVersion}\n`,
+      );
+    } else if (['major', 'minor', 'patch'].includes(arg)) {
       newVersion = bumpVersion(currentVersion, arg as BumpType);
       console.log(
         `📈 Bumping ${arg} version: ${currentVersion} → ${newVersion}\n`,
@@ -129,7 +137,7 @@ async function main() {
       console.log(`📝 Using provided version: ${newVersion}\n`);
     } else {
       console.error(
-        '❌ Invalid version format. Use: X.Y.Z, major, minor, or patch',
+        '❌ Invalid version format. Use: X.Y.Z, major, minor, patch, or current',
       );
       process.exit(1);
     }
@@ -175,20 +183,31 @@ async function main() {
     process.exit(0);
   }
 
-  console.log('\n📝 Updating package.json...');
-  updateVersion(newVersion);
+  if (useCurrent) {
+    console.log('\n♻️  Skipping package.json update and commit (using current version).');
+  } else {
+    console.log('\n📝 Updating package.json...');
+    updateVersion(newVersion);
+  }
 
   console.log('🔨 Running build and checks...');
   await execVisible('bun run build');
   await execVisible('bun lint');
   await execVisible('bun typecheck');
 
-  console.log('\n📦 Committing version bump...');
-  await exec('git add package.json');
-  await exec(`git commit -m "Release v${newVersion}"`);
+  if (!useCurrent) {
+    console.log('\n📦 Committing version bump...');
+    await exec('git add package.json');
+    await exec(`git commit -m "Release v${newVersion}"`);
+  }
 
-  console.log('🏷️  Creating git tag...');
-  await exec(`git tag v${newVersion}`);
+  const existingTag = await execOutput(`git tag -l v${newVersion}`);
+  if (existingTag) {
+    console.log(`🏷️  Tag v${newVersion} already exists, skipping tag creation.`);
+  } else {
+    console.log('🏷️  Creating git tag...');
+    await exec(`git tag v${newVersion}`);
+  }
 
   console.log('⬆️  Pushing to remote...');
   await exec(`git push origin ${currentBranch}`);
