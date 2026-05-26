@@ -10,6 +10,8 @@ import { apiCommand } from './commands/api/index.js';
 import { appConfigCommand } from './commands/app-config/index.js';
 import { appContextCommand } from './commands/app-context/index.js';
 import { browserCommand } from './commands/browser/index.js';
+import { checkCommand } from './commands/check/index.js';
+import { checkScheduleCommand } from './commands/check-schedule/index.js';
 import { dataAssetCommand } from './commands/data-asset/index.js';
 import { docsCommand } from './commands/docs.js';
 import { doctorCommand } from './commands/doctor.js';
@@ -51,6 +53,8 @@ program.addCommand(testCommand);
 program.addCommand(suiteCommand);
 program.addCommand(mcpCommand);
 program.addCommand(browserCommand);
+program.addCommand(checkCommand);
+program.addCommand(checkScheduleCommand);
 program.addCommand(tunnelCommand());
 program.addCommand(installDepsCommand);
 program.addCommand(updateCommand);
@@ -96,6 +100,7 @@ Command Groups:
   Runs:      test runs list, test runs info, test runs steps
   Suites:    suite list, suite create, suite run
   Issues:    issues list, issues info, issues occurrences
+  Checks:    check list, check info, check-schedule run
   Browser:   browser create, browser goto, browser snapshot, browser click
   Config:    app-config list, app-config create
   Context:   app-context list, app-context create
@@ -132,6 +137,12 @@ Common Workflows:
   qa-use suite create -F name="Smoke Tests"
   qa-use suite list
   qa-use suite run <suite-id>
+
+  # Inspect remote API checks
+  qa-use check list --limit 5
+  qa-use check info <check-id>
+  qa-use check-schedule list --limit 5
+  qa-use check-schedule run <schedule-id> --var env=staging
 
   # Review test run results
   qa-use test runs list --limit 5

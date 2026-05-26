@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { Readable } from 'node:stream';
 import {
   collectFields,
   paginationQuery,
@@ -169,7 +170,7 @@ describe('parseResourceInput', () => {
     await writeFile(tmpFile, 'not valid json');
     try {
       await expect(parseResourceInput({ input: tmpFile })).rejects.toThrow(
-        'Failed to parse JSON input file'
+        'Failed to parse JSON input from file'
       );
     } finally {
       await unlink(tmpFile).catch(() => {});
@@ -187,5 +188,19 @@ describe('parseResourceInput', () => {
     } finally {
       await unlink(tmpFile).catch(() => {});
     }
+  });
+
+  it('should read JSON from stdin only when --input is explicit dash', async () => {
+    const result = await parseResourceInput({
+      input: '-',
+      stdin: Readable.from(['{"foo":"bar"}']),
+    });
+
+    expect(result).toEqual({ foo: 'bar' });
+    await expect(
+      parseResourceInput({
+        stdin: Readable.from(['{"foo":"ignored"}']),
+      })
+    ).resolves.toEqual({});
   });
 });

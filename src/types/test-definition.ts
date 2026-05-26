@@ -2,10 +2,10 @@
  * Auto-generated TypeScript types for Test CLI definitions
  *
  * DO NOT EDIT MANUALLY - Generated from API schema
- * Run 'pnpm generate:types' to regenerate
+ * Run 'bun run generate:types' to regenerate
  *
- * Source: http://localhost:5005/vibe-qa/cli/schema
- * Generated: 2026-05-05T13:12:45.740Z
+ * Source: https://api.desplega.ai/vibe-qa/cli/schema
+ * Generated: 2026-05-26T15:03:20.763Z
  */
 
 export type Name = string;
@@ -38,7 +38,7 @@ export type Type =
   | 'slug';
 export type Lifetime = 'all' | 'test' | 'suite';
 export type LifetimeIndex = number | null;
-export type Context = 'test' | 'suite' | 'persona' | 'app_config' | 'global';
+export type Context = 'test' | 'suite' | 'persona' | 'app_config' | 'global' | 'check';
 export type IsSensitive = boolean;
 export type DependsOn = string | null;
 export type Contexts = {
@@ -121,6 +121,7 @@ export type Action1 =
       | 'ai_validate_variable'
       | 'parse_request'
       | 'perform_request'
+      | 'api_check'
       | 'wait'
       | 'to_be_visible'
       | 'not_to_be_visible'
@@ -203,6 +204,7 @@ export type RequestMethod = string;
 export type RequestUrl = string;
 export type RequestBody = string;
 export type RequestExpectedStatus = number;
+export type CheckId = string;
 export type ValueStrategy = string;
 export type ValueSemanticText = string;
 export type ValueVariableName = string;
@@ -385,7 +387,7 @@ export type Type3 =
   | 'slug';
 export type Lifetime1 = 'all' | 'test' | 'suite';
 export type LifetimeIndex1 = number | null;
-export type Context3 = 'test' | 'suite' | 'persona' | 'app_config' | 'global';
+export type Context3 = 'test' | 'suite' | 'persona' | 'app_config' | 'global' | 'check';
 export type IsSensitive1 = boolean;
 export type VarOptions = MatrixVariableEntry[];
 export type TimeoutOverride = number | null;
@@ -581,6 +583,7 @@ export interface AnyDict {
   request_headers?: RequestHeaders;
   request_body?: RequestBody;
   request_expected_status?: RequestExpectedStatus;
+  check_id?: CheckId;
   value_strategy?: ValueStrategy;
   value_semantic_text?: ValueSemanticText;
   value_variable_name?: ValueVariableName;

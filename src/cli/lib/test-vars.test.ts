@@ -145,9 +145,10 @@ describe('runtime enum mirrors', () => {
     expect([...TEST_VARIABLE_LIFETIMES].sort()).toEqual(['all', 'suite', 'test']);
   });
 
-  it('TEST_VARIABLE_CONTEXTS covers test/suite/persona/app_config/global', () => {
+  it('TEST_VARIABLE_CONTEXTS covers test/suite/persona/app_config/global/check', () => {
     expect([...TEST_VARIABLE_CONTEXTS].sort()).toEqual([
       'app_config',
+      'check',
       'global',
       'persona',
       'suite',

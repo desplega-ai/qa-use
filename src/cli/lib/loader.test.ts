@@ -1,6 +1,27 @@
 import { describe, expect, it } from 'bun:test';
+import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, relative } from 'node:path';
 import type { TestDefinition } from '../../../src/types/test-definition.js';
-import { applyVariableOverrides } from './loader.js';
+import { applyVariableOverrides, resolveTestPath } from './loader.js';
+
+describe('resolveTestPath', () => {
+  it('honors existing cwd-relative file paths before test_directory fallback', () => {
+    const originalCwd = process.cwd();
+    const dir = mkdtempSync(join(tmpdir(), 'qa-use-loader-'));
+    const filePath = join(dir, 'qa-tests', '_examples', 'api-check-step.yaml');
+    mkdirSync(join(dir, 'qa-tests', '_examples'), { recursive: true });
+    writeFileSync(filePath, 'name: api\nsteps: []\n');
+
+    try {
+      process.chdir(dir);
+      const input = relative(dir, filePath);
+      expect(resolveTestPath(input, './qa-tests')).toBe(realpathSync(filePath));
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
+});
 
 describe('applyVariableOverrides', () => {
   it('should apply overrides to a single test definition', () => {
