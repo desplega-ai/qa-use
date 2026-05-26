@@ -2,6 +2,7 @@
  * Test definition file discovery and loading
  */
 
+import { existsSync } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob } from 'glob';
@@ -51,6 +52,10 @@ export function resolveTestPath(testNameOrPath: string, directory: string): stri
 
   // If it's a relative path with extension, resolve it
   if (testNameOrPath.match(/\.(yaml|yml|json)$/)) {
+    const cwdPath = path.resolve(testNameOrPath);
+    if (existsSync(cwdPath)) {
+      return cwdPath;
+    }
     return path.resolve(directory, testNameOrPath);
   }
 

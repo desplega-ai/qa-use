@@ -142,6 +142,35 @@ qa-use api ls --offline                   # Use cached OpenAPI only
 
 If live spec fetch fails, qa-use falls back to the last cached spec and prints a stale-cache warning.
 
+### Checks and Check Schedules
+
+Remote API checks and schedules are first-class CLI resources. They call the desplega.ai API directly; schedule runs are fully remote and do not create browser sessions.
+
+```bash
+qa-use check list --app-config <app-config-id> --q login
+qa-use check info <check-id>
+
+qa-use check create \
+  --name "Auth token" \
+  --app-config <app-config-id> \
+  --config auth-check.json \
+  --alias auth \
+  --capture token=$.access_token
+
+qa-use check-schedule create \
+  --name "Claims chain" \
+  --app-config <app-config-id> \
+  --cron "*/15 * * * *" \
+  --check <auth-check-id> \
+  --check <claim-check-id>
+
+qa-use check-schedule run <schedule-id> --var env=staging --var claim_id=123
+qa-use check-schedule delete <schedule-id> --force
+qa-use check delete <check-id> --force
+```
+
+There is no standalone `qa-use check run <check-id>` command yet because the public API currently exposes schedule runs, not individual check-run actions. Use `qa-use docs checks` for the full workflow and `qa-use api info /api/v1/checks -X POST` for the current check payload contract.
+
 ### Setup Commands
 
 | Command | Description |

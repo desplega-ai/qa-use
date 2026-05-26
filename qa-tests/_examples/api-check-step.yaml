@@ -1,0 +1,19 @@
+# Minimal DES-468 API-check step fixture.
+# Uses only fields exposed by the live test-definition schema:
+# extended action `api_check`, `value.check_id`, and check-scoped variables.
+name: api-check-step-example
+description: Minimal browser test fixture with an embedded API check step.
+variables:
+  env:
+    value: staging
+    type: custom
+    lifetime: test
+    context: check
+steps:
+  - type: extended
+    name: Run authentication API check
+    step_id: run-auth-check
+    action:
+      action: api_check
+      value:
+        check_id: 00000000-0000-0000-0000-000000000000

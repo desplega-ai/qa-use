@@ -41,7 +41,7 @@ async function generateTypes(options: GenerateTypesOptions = {}): Promise<void> 
  * Auto-generated TypeScript types for Test CLI definitions
  *
  * DO NOT EDIT MANUALLY - Generated from API schema
- * Run 'pnpm generate:types' to regenerate
+ * Run 'bun run generate:types' to regenerate
  *
  * Source: ${apiUrl}/vibe-qa/cli/schema
  * Generated: ${new Date().toISOString()}

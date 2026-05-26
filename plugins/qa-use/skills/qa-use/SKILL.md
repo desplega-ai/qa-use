@@ -395,6 +395,54 @@ Use diff output to interact with newly appeared elements directly, without runni
 
 **No Plugin Shortcut** - Use CLI commands directly.
 
+### API Checks And Check Schedules
+
+Remote API checks are managed through first-class commands. They call the
+desplega.ai API directly; they do not run checks locally or create browser
+sessions.
+
+| Command | Description |
+|---------|-------------|
+| `qa-use check list --app-config <id>` | List remote API checks |
+| `qa-use check info <check-id>` | Inspect one check, including dependencies and captures |
+| `qa-use check create --name <name> --app-config <id> --config check.json` | Create a check |
+| `qa-use check update <check-id> --depends-on <id> --alias <name>` | Update dependency-chain metadata |
+| `qa-use check delete <check-id> --force` | Delete a check |
+| `qa-use check-schedule list --app-config <id>` | List remote check schedules |
+| `qa-use check-schedule create --name <name> --app-config <id> --cron "*/15 * * * *" --check <id>` | Create an ordered schedule |
+| `qa-use check-schedule run <schedule-id> --var env=staging` | Run a schedule as a remote variable-passing chain |
+
+Common flow:
+
+```bash
+qa-use check create \
+  --name "Auth token" \
+  --app-config <app-config-id> \
+  --config auth-check.json \
+  --alias auth \
+  --capture token=$.access_token
+
+qa-use check update <claim-check-id> \
+  --depends-on <auth-check-id> \
+  --alias claim
+
+qa-use check-schedule create \
+  --name "Claims chain" \
+  --app-config <app-config-id> \
+  --cron "*/15 * * * *" \
+  --check <auth-check-id> \
+  --check <claim-check-id>
+
+qa-use check-schedule run <schedule-id> --var env=staging --var claim_id=123
+```
+
+There is no standalone `qa-use check run <check-id>` command yet because the
+public API currently documents schedule runs, not individual check-run actions.
+Use `qa-use api info /api/v1/checks -X POST` for the current check payload
+contract, and see [references/checks.md](references/checks.md) for examples.
+
+**No Plugin Shortcut** - Use CLI commands directly.
+
 ### Logs & Debugging
 
 | Command | Description |
@@ -696,6 +744,7 @@ Access any reference at runtime via the CLI: `qa-use docs <topic>`
 | Topic | CLI Command | Description |
 |-------|-------------|-------------|
 | [browser-commands.md](references/browser-commands.md) | `qa-use docs browser-commands` | Complete browser CLI reference with all flags |
+| [checks.md](references/checks.md) | `qa-use docs checks` | API checks and check schedule workflows |
 | [test-format.md](references/test-format.md) | `qa-use docs test-format` | Full test YAML specification |
 | [localhost-testing.md](references/localhost-testing.md) | `qa-use docs localhost-testing` | Tunnel setup for local development |
 | [failure-debugging.md](references/failure-debugging.md) | `qa-use docs failure-debugging` | Failure classification and diagnostics |
@@ -776,6 +825,7 @@ qa-use docs <topic>
 | Test failures | `qa-use docs failure-debugging` |
 | Localhost / tunnel issues | `qa-use docs localhost-testing` |
 | Test YAML syntax | `qa-use docs test-format` |
+| API checks / schedules | `qa-use docs checks` |
 | CI/CD setup | `qa-use docs ci` |
 
 **Key rules:**

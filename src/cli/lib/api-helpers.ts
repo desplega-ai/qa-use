@@ -7,6 +7,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as readline from 'node:readline/promises';
+import { text as readStreamText } from 'node:stream/consumers';
 import { executeApiRequest, formatApiResponseError } from '../commands/api/lib/http.js';
 import type { CliConfig } from './config.js';
 
@@ -109,32 +110,38 @@ export function collectFields(value: string, previous: string[]): string[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Reads body from `--input` file and/or `-F` fields and merges them.
+ * Reads body from `--input` file/stdin and/or `-F` fields and merges them.
  * Values that parse as valid JSON are treated as JSON
  * (e.g. `-F test_ids='["id1","id2"]'`).
  *
- * Stdin (piped) is intentionally **not** read here — that would complicate
- * interactive commands. Add it later if needed.
+ * Stdin is read only when `--input -` is provided explicitly. There is no
+ * implicit stdin sniffing, so interactive commands do not hang unexpectedly.
  */
 export async function parseResourceInput(options: {
   input?: string;
   field?: string[];
+  stdin?: NodeJS.ReadableStream;
 }): Promise<Record<string, unknown>> {
   let base: Record<string, unknown> = {};
 
-  // 1. --input file
+  // 1. --input file or explicit stdin
   if (options.input) {
-    const raw = await fs.readFile(options.input, 'utf-8');
+    const fromStdin = options.input === '-';
+    const raw = fromStdin
+      ? await readStreamText(options.stdin ?? process.stdin)
+      : await fs.readFile(options.input, 'utf-8');
     try {
       const parsed = JSON.parse(raw);
       if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
         base = parsed as Record<string, unknown>;
       } else {
-        throw new Error(`Input file must contain a JSON object, got ${typeof parsed}`);
+        const source = fromStdin ? 'Input from stdin' : 'Input file';
+        throw new Error(`${source} must contain a JSON object, got ${typeof parsed}`);
       }
     } catch (err) {
       if (err instanceof SyntaxError) {
-        throw new Error(`Failed to parse JSON input file: ${options.input}`);
+        const source = fromStdin ? 'stdin' : `file: ${options.input}`;
+        throw new Error(`Failed to parse JSON input from ${source}`);
       }
       throw err;
     }

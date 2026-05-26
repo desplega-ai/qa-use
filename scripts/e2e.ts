@@ -99,6 +99,31 @@ function parseSessionId(output: string): string {
 	return match[1];
 }
 
+function parseJsonArrayOutput(output: string, label: string): unknown[] {
+	const parsed = JSON.parse(output);
+	if (!Array.isArray(parsed)) {
+		throw new Error(`${label} did not return a JSON array:\n${output}`);
+	}
+	return parsed;
+}
+
+function parseJsonObjectOutput(output: string, label: string): Record<string, unknown> {
+	const parsed = JSON.parse(output);
+	if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+		throw new Error(`${label} did not return a JSON object:\n${output}`);
+	}
+	return parsed as Record<string, unknown>;
+}
+
+function parseCreatedId(output: string, label: string): string {
+	const parsed = parseJsonObjectOutput(output, label);
+	for (const key of ['id', 'check_id', 'schedule_id', 'check_schedule_id']) {
+		const value = parsed[key];
+		if (typeof value === 'string' && value.length > 0) return value;
+	}
+	throw new Error(`${label} response did not include an id field:\n${output}`);
+}
+
 async function section(name: string, fn: () => Promise<void> | void) {
 	console.log(`\n== ${name} ==`);
 	try {
@@ -413,6 +438,186 @@ await section('Section 7: Resource Commands Smoke Test', () => {
 		typeof usage === 'object' && usage !== null,
 		'usage --json returns a valid object',
 	);
+});
+
+// ---------------------------------------------------------------------------
+// Section 7b: Checks and Check Schedules
+// ---------------------------------------------------------------------------
+//
+// Default path is read-only and should run in every e2e pass. Destructive
+// mutation coverage is gated behind E2E_ALLOW_CHECK_MUTATION=1 and an explicit
+// E2E_CHECK_APP_CONFIG_ID so normal local/CI runs do not create remote checks.
+
+await section('Section 7b: Checks and Check Schedules', () => {
+	const checkHelp = runOrThrow(['check', '--help']);
+	assert(checkHelp.includes('list') && checkHelp.includes('info'), 'check --help lists read commands');
+
+	const checks = parseJsonArrayOutput(
+		runOrThrow(['check', 'list', '--json', '--limit', '1']),
+		'check list --json'
+	);
+	assert(Array.isArray(checks), 'check list --json returns an array');
+
+	const scheduleHelp = runOrThrow(['check-schedule', '--help']);
+	assert(
+		['list', 'info', 'create', 'update', 'delete', 'run'].every((cmd) =>
+			scheduleHelp.includes(cmd)
+		),
+		'check-schedule --help lists CRUD and run commands',
+	);
+
+	const schedules = parseJsonArrayOutput(
+		runOrThrow(['check-schedule', 'list', '--json', '--limit', '1']),
+		'check-schedule list --json'
+	);
+	assert(Array.isArray(schedules), 'check-schedule list --json returns an array');
+
+	if (process.env.E2E_ALLOW_CHECK_MUTATION !== '1') {
+		console.log(
+			'  SKIP: E2E_ALLOW_CHECK_MUTATION=1 not set; skipping destructive check mutation path',
+		);
+		return;
+	}
+
+	const appConfigId = process.env.E2E_CHECK_APP_CONFIG_ID;
+	if (!appConfigId) {
+		console.log(
+			'  SKIP: E2E_CHECK_APP_CONFIG_ID not set; cannot create disposable check resources',
+		);
+		return;
+	}
+
+	const checkConfigRaw =
+		process.env.E2E_CHECK_CONFIG_JSON ??
+		JSON.stringify({
+			method: 'GET',
+			url: EVALS_URL,
+		});
+	const checkConfig = JSON.parse(checkConfigRaw);
+	if (typeof checkConfig !== 'object' || checkConfig === null || Array.isArray(checkConfig)) {
+		throw new Error('E2E_CHECK_CONFIG_JSON must be a JSON object when provided');
+	}
+
+	const nonce = `${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
+	let checkId = '';
+	let scheduleId = '';
+
+	try {
+		const createCheckOut = runOrThrow([
+			'check',
+			'create',
+			'--json',
+			'--name',
+			`e2e check ${nonce}`,
+			'--app-config',
+			appConfigId,
+			'-F',
+			`config=${checkConfigRaw}`,
+			'--alias',
+			`e2e_${nonce.replace(/[^a-z0-9]/gi, '_')}`,
+			'--capture',
+			'status=$.status',
+		]);
+		checkId = parseCreatedId(createCheckOut, 'check create --json');
+		assert(!!checkId, `Disposable check created: ${checkId}`);
+
+		const checkInfo = parseJsonObjectOutput(
+			runOrThrow(['check', 'info', checkId, '--json']),
+			'check info --json'
+		);
+		assert(checkInfo.id === checkId, 'Created check is fetchable by info');
+
+		const updateOut = parseJsonObjectOutput(
+			runOrThrow([
+				'check',
+				'update',
+				checkId,
+				'--json',
+				'--description',
+				'Updated by qa-use e2e check mutation coverage',
+				'--timeout-ms',
+				'20000',
+			]),
+			'check update --json'
+		);
+		assert(updateOut.id === checkId, 'Created check can be updated');
+
+		const createScheduleOut = runOrThrow([
+			'check-schedule',
+			'create',
+			'--json',
+			'--name',
+			`e2e schedule ${nonce}`,
+			'--app-config',
+			appConfigId,
+			'--cron',
+			'*/15 * * * *',
+			'--timezone',
+			'UTC',
+			'--check',
+			checkId,
+			'--failure-strategy',
+			'stop_on_failure',
+		]);
+		scheduleId = parseCreatedId(createScheduleOut, 'check-schedule create --json');
+		assert(!!scheduleId, `Disposable schedule created: ${scheduleId}`);
+
+		const runOut = parseJsonObjectOutput(
+			runOrThrow([
+				'check-schedule',
+				'run',
+				scheduleId,
+				'--json',
+				'--var',
+				'env=staging',
+			]),
+			'check-schedule run --json'
+		);
+		assert(typeof runOut === 'object', 'Disposable schedule run returned JSON');
+	} finally {
+		if (scheduleId) {
+			const del = run(['check-schedule', 'delete', scheduleId, '--force'], 30_000);
+			assert(del.exitCode === 0, 'Disposable schedule deleted');
+		}
+		if (checkId) {
+			const del = run(['check', 'delete', checkId, '--force'], 30_000);
+			assert(del.exitCode === 0, 'Disposable check deleted');
+		}
+		if (scheduleId) {
+			const schedulesAfterDelete = parseJsonArrayOutput(
+				runOrThrow(['check-schedule', 'list', '--json', '--q', nonce, '--limit', '10']),
+				'check-schedule list after delete'
+			);
+			assert(
+				!schedulesAfterDelete.some((schedule) => {
+					return (
+						typeof schedule === 'object' &&
+						schedule !== null &&
+						'id' in schedule &&
+						schedule.id === scheduleId
+					);
+				}),
+				'Disposable schedule is absent from list after cleanup'
+			);
+		}
+		if (checkId) {
+			const checksAfterDelete = parseJsonArrayOutput(
+				runOrThrow(['check', 'list', '--json', '--q', nonce, '--limit', '10']),
+				'check list after delete'
+			);
+			assert(
+				!checksAfterDelete.some((check) => {
+					return (
+						typeof check === 'object' &&
+						check !== null &&
+						'id' in check &&
+						check.id === checkId
+					);
+				}),
+				'Disposable check is absent from list after cleanup'
+			);
+		}
+	}
 });
 
 // ---------------------------------------------------------------------------

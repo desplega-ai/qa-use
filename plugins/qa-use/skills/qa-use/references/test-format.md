@@ -304,6 +304,34 @@ The `target_locator` must be a valid Playwright locator string:
         args: ["Enter your code"]
 ```
 
+### API Check Steps
+
+Embedded API checks use the extended step format. The live test-definition
+schema exposes the `api_check` action, a `value.check_id` field, and
+`context: check` for typed variables:
+
+```yaml
+name: api-check-step-example
+variables:
+  env:
+    value: staging
+    type: custom
+    lifetime: test
+    context: check
+steps:
+  - type: extended
+    name: Run authentication API check
+    action:
+      action: api_check
+      value:
+        check_id: 00000000-0000-0000-0000-000000000000
+```
+
+Use check-scoped variables for values the embedded API check needs from the
+parent test. API-check output variables are not declared in this YAML schema;
+configure output captures on the remote check, then reference backend-exposed
+variables in later steps using the existing variable syntax.
+
 **Tip:** Use `qa-use test schema` to explore all available actions and their schemas.
 
 ## Target Descriptions

@@ -57,6 +57,7 @@ export const TEST_VARIABLE_CONTEXTS = [
   'persona',
   'app_config',
   'global',
+  'check',
 ] as const satisfies readonly VariableContext[];
 
 // Compile-time mutual-extends guard: fails `bun run typecheck` if the auto-generated
