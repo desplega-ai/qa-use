@@ -1,16 +1,53 @@
 {
-  "name": "@desplega.ai/qa-use-mcp",
-  "version": "1.0.1",
-  "description": "MCP server for browser automation and QA testing",
-  "command": "npx",
-  "args": ["-y", "@desplega.ai/qa-use-mcp"],
-  "capabilities": ["tools"],
-  "env": {
-    "QA_USE_API_KEY": "",
-    "QA_USE_API_URL": "",
-    "QA_USE_APP_URL": "",
-    "QA_USE_REGION": ""
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.desplega-ai/qa-use",
+  "title": "QA-Use",
+  "description": "Browser automation and QA testing MCP server using Playwright and desplega.ai.",
+  "version": "2.19.0",
+  "websiteUrl": "https://qa-use.dev",
+  "repository": {
+    "url": "https://github.com/desplega-ai/qa-use",
+    "source": "github"
   },
-  "homepage": "https://github.com/your-username/qa-use-mcp",
-  "license": "ISC"
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@desplega.ai/qa-use",
+      "version": "2.19.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "QA_USE_API_KEY",
+          "description": "Your desplega.ai API key; obtain it from desplega.ai.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "QA_USE_API_URL",
+          "description": "Optional desplega.ai API endpoint override."
+        },
+        {
+          "name": "QA_USE_APP_URL",
+          "description": "Optional desplega.ai web application URL override."
+        },
+        {
+          "name": "QA_USE_REGION",
+          "description": "Region for tunnel connections: auto (default) or us.",
+          "default": "auto",
+          "choices": [
+            "auto",
+            "us"
+          ]
+        }
+      ]
+    }
+  ]
 }

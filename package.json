@@ -96,5 +96,6 @@
     "playwright": "1.58.0",
     "ws": "^8.19.0",
     "yaml": "^2.8.2"
-  }
+  },
+  "mcpName": "io.github.desplega-ai/qa-use"
 }
