@@ -238,7 +238,7 @@ Your MCP client should initialize the server, set up browser automation, and sta
 
 ## HTTP Transport Mode (SSE)
 
-In addition to the standard MCP stdio transport, QA-Use can run with StreamableHTTP transport using Server-Sent Events (SSE). This mode implements the official [MCP Streamable HTTP specification](https://spec.modelcontextprotocol.io/specification/basic/transports/#http-with-sse) and is useful for web-based integrations, remote access, or when you need HTTP-based MCP connectivity.
+In addition to the standard MCP stdio transport, QA-Use can run with StreamableHTTP transport using Server-Sent Events (SSE). This mode implements the official [MCP Streamable HTTP specification](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http) and is useful for web-based integrations, remote access, or when you need HTTP-based MCP connectivity.
 
 ### When to Use Each Mode
 
@@ -283,7 +283,7 @@ Get your API key by:
 
 ### MCP Endpoints
 
-This server implements the [MCP Streamable HTTP transport specification](https://spec.modelcontextprotocol.io/specification/basic/transports/#http-with-sse):
+This server implements the [MCP Streamable HTTP transport specification](https://modelcontextprotocol.io/specification/2025-03-26/basic/transports#streamable-http):
 
 #### Health Check
 ```bash
